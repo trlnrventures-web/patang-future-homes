@@ -1,0 +1,733 @@
+[
+  {
+    "slug": "agarwal-sky-heights",
+    "tier": "affordable",
+    "title": "Agarwal Sky Heights",
+    "location": "Vasai East",
+    "area": "east",
+    "type": "flat",
+    "status": "Under Construction",
+    "priceRange": "Starting ₹46.98 Lacs",
+    "pricePerSqft": "₹11,050 / sq ft",
+    "shortDescription": "1, 2 & 3 BHK homes in Vasai East from Agarwal Group — RERA registered, with podium parking, landscaped gardens and easy access to Vasai Station.",
+    "fullDescription": "Agarwal Sky Heights is a RERA-registered residential project in Vasai East by Agarwal Group, a developer with over four decades of track record and 40+ completed projects. The development offers thoughtfully planned 1, 2 and 3 BHK apartments with carpet areas ranging from 425 to 714 sq ft, finished to a practical specification of modular kitchens, granite platforms and vitrified tiling. Residents enjoy podium parking, a walking track, landscaped gardens, a senior citizen area and a dedicated kids play zone, while Vasai Station is just 3.8 km away and everyday conveniences at Gokhivare Naka sit within 1.6 km.",
+    "usps": [
+      { "title": "Prime Location", "description": "Close to I Global School and Vasai East station" },
+      { "title": "Modern Design", "description": "6 towers, thoughtfully planned layouts with ample light" },
+      { "title": "Trusted Developer", "description": "Agarwal Group — 47+ years, 40+ completed projects" }
+    ],
+    "images": [
+      "/projects/agarwal-sky-heights/1.jpg",
+      "/projects/agarwal-sky-heights/2.jpg",
+      "/projects/agarwal-sky-heights/3.jpg"
+    ],
+    "reraId": "P99000054026",
+    "possessionDate": "December 2027 (Target), December 2029 (RERA)",
+    "totalTowers": 6,
+    "landParcel": "2.50 acres",
+    "configurations": [
+      { "type": "1 BHK", "carpetArea": "425–451 sq ft", "price": "₹46.98 Lacs onwards", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "2 BHK", "carpetArea": "561–648 sq ft", "price": "Price on request", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "3 BHK", "carpetArea": "714 sq ft", "price": "Price on request", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Modular Kitchen", "Stainless Steel Sink", "Granite Kitchen Platform", "Vitrified Tiles", "Seating Area", "Podium Parking"],
+      "safety": [],
+      "sports": ["Walking Track"],
+      "leisure": ["Senior Citizen Area", "Garden", "Kids Play Area"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Vasai Station", "distance": "3.8 km" },
+      { "name": "Gokhivare Naka", "distance": "1.6 km" },
+      { "name": "Ambadi Road", "distance": "1.8 km" }
+    ],
+    "developer": {
+      "name": "Agarwal Group",
+      "since": 1978,
+      "completedProjects": "40+"
+    },
+    "metaTitle": "Agarwal Sky Heights, Vasai East | 1, 2, 3 BHK Flats",
+    "metaDescription": "Agarwal Sky Heights offers 1, 2, 3 BHK flats in Vasai East starting ₹46.98 Lacs. RERA registered, by Agarwal Group — 47+ years, 40+ completed projects."
+  },
+  {
+    "slug": "sai-residency-shops",
+    "tier": "affordable",
+    "title": "Sai Residency Commercial Complex",
+    "location": "Vasai West, Near Evershine Global City",
+    "area": "west",
+    "type": "shop",
+    "status": "Under Construction",
+    "priceRange": "₹35L – ₹85L",
+    "pricePerSqft": "₹29,000 / sq ft",
+    "shortDescription": "Premium retail shops in a high-footfall commercial complex with modern amenities and excellent connectivity.",
+    "fullDescription": "Sai Residency Commercial Complex offers a rare opportunity to own premium retail spaces in the heart of Vasai West. Located near the bustling Evershine Global City, these shops enjoy excellent foot traffic from the surrounding residential catchment. The complex features contemporary architecture, wide corridors, ample parking, and 24/7 security. With the Vasai Road railway station just 10 minutes away and upcoming metro connectivity, this is an investment that promises strong returns. Each unit is thoughtfully designed with maximum frontage, proper ventilation, and customizable layouts to suit diverse business needs.",
+    "usps": [
+      { "title": "Prime Location", "description": "Near Evershine Global City with heavy daily footfall" },
+      { "title": "Modern Design", "description": "Contemporary architecture with wide, ventilated corridors" },
+      { "title": "Smart Investment", "description": "Flexible unit sizes built for strong rental yields" }
+    ],
+    "images": [
+      "/projects/sai-residency-shops/1.jpg",
+      "/projects/sai-residency-shops/2.jpg",
+      "/projects/sai-residency-shops/3.jpg"
+    ],
+    "reraId": "P51900042111",
+    "possessionDate": "September 2027",
+    "totalTowers": 3,
+    "landParcel": "1.5 acres",
+    "configurations": [
+      { "type": "Ground Floor Shop", "carpetArea": "120 – 200 sq ft", "price": "₹35L – ₹50L", "floorPlanImage": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&q=80" },
+      { "type": "First Floor Shop", "carpetArea": "180 – 300 sq ft", "price": "₹28L – ₹45L", "floorPlanImage": "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&q=80" },
+      { "type": "Second Floor Shop", "carpetArea": "220 – 400 sq ft", "price": "₹30L – ₹55L", "floorPlanImage": "https://images.unsplash.com/photo-1555636222-cae831e670b3?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["High-Speed Elevators", "Power Backup", "Wide Corridors", "Customizable Shop Fronts", "Ample Parking Space", "Common Loading Bay", "Entrance Plaza"],
+      "safety": ["Fire Safety Systems", "24/7 CCTV Security"],
+      "sports": [],
+      "leisure": []
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Evershine Global City", "distance": "5 min drive" },
+      { "name": "Vasai Road Station", "distance": "10 min drive" },
+      { "name": "SNS Hospital", "distance": "8 min drive" },
+      { "name": "Holy Family School", "distance": "6 min drive" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Sai Residency Shops in Vasai West | Patang Future Homes",
+    "metaDescription": "Own premium retail shops in Vasai West near Evershine Global City. Modern commercial complex with excellent connectivity. Prices from ₹35L."
+  },
+  {
+    "slug": "patang-heights-flats",
+    "tier": "affordable",
+    "title": "Patang Heights",
+    "location": "Vasai West, Opp. Pai Nagar",
+    "area": "west",
+    "type": "flat",
+    "status": "New Launch",
+    "priceRange": "₹42L – ₹78L",
+    "pricePerSqft": "₹10,300 / sq ft",
+    "shortDescription": "Thoughtfully designed 1 & 2 BHK apartments with premium finishes, lush green surroundings, and world-class amenities.",
+    "fullDescription": "Patang Heights brings you beautifully crafted 1 and 2 BHK residences that combine modern living with the tranquility of Vasai's green landscape. Situated opposite Pai Nagar, the project offers excellent connectivity to the Western Express Highway, railways, and the upcoming Vasai-Virar metro corridor. Each apartment features engineered wood flooring, modular kitchen fittings, premium sanitaryware, and large windows that flood every room with natural light. The project includes a rooftop jogging track, children's play area, clubhouse with gymnasium, and landscaped gardens. With Vastu-compliant layouts and RERA registration, Patang Heights is where comfort meets confidence.",
+    "usps": [
+      { "title": "Prime Location", "description": "Opp. Pai Nagar, near highway and the upcoming metro" },
+      { "title": "Modern Design", "description": "Premium finishes, Vastu layouts and abundant natural light" },
+      { "title": "Trusted Developer", "description": "Patang Future Homes — 50+ completed projects" }
+    ],
+    "images": [
+      "/projects/patang-heights-flats/1.jpg",
+      "/projects/patang-heights-flats/2.jpg",
+      "/projects/patang-heights-flats/3.jpg"
+    ],
+    "reraId": "P51900041502",
+    "possessionDate": "March 2027",
+    "totalTowers": 2,
+    "landParcel": "1.2 acres",
+    "configurations": [
+      { "type": "1 BHK", "carpetArea": "410 – 450 sq ft", "price": "₹42L – ₹48L", "floorPlanImage": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80" },
+      { "type": "2 BHK", "carpetArea": "580 – 685 sq ft", "price": "₹58L – ₹78L", "floorPlanImage": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Modular Kitchen", "Engineered Wood Flooring", "Premium Sanitaryware", "Vastu-Compliant Layouts", "24/7 Water Supply"],
+      "safety": [],
+      "sports": ["Rooftop Jogging Track", "Clubhouse with Gym"],
+      "leisure": ["Children's Play Area", "Landscaped Gardens"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Pai Nagar", "distance": "2 min" },
+      { "name": "Vasai Road Station", "distance": "12 min" },
+      { "name": "MGM Hospital", "distance": "7 min" },
+      { "name": "Viva College", "distance": "5 min" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Patang Heights Flats in Vasai West | 1 & 2 BHK Apartments",
+    "metaDescription": "Discover Patang Heights — premium 1 & 2 BHK flats in Vasai West with modern amenities, green surroundings, and excellent connectivity. Starting from ₹42L."
+  },
+  {
+    "slug": "anand-villa-bungalows",
+    "tier": "affordable",
+    "title": "Anand Villa",
+    "location": "Vasai West, Near Tunga Village",
+    "area": "west",
+    "type": "bungalow",
+    "status": "Under Construction",
+    "priceRange": "₹1.2Cr – ₹2.5Cr",
+    "pricePerSqft": "₹6,900 / sq ft",
+    "shortDescription": "Luxurious independent bungalows nestled in Vasai's green belt, offering privacy, space, and a premium lifestyle.",
+    "fullDescription": "Anand Villa is an exclusive enclave of luxurious independent bungalows set amidst the verdant landscape of Vasai West near Tunga Village. Each bungalow is a masterpiece of contemporary architecture, featuring expansive living areas, private gardens, servant quarters, and covered parking for two vehicles. The community is gated with round-the-clock security, solar-powered common areas, and a private clubhouse with swimming pool. Interiors are finished with Italian marble flooring, imported kitchen fittings, and smart home provisions. With the upcoming Virar-Alibaug multimodal corridor and proximity to the Mumbai-Ahmedabad bullet train station, Anand Villa offers both an elevated lifestyle and exceptional investment potential.",
+    "usps": [
+      { "title": "Prime Location", "description": "Green belt of Vasai West, near Tunga Village" },
+      { "title": "Modern Design", "description": "Contemporary architecture with smart home provisions" },
+      { "title": "Luxury Living", "description": "Private gardens, pool and resort-style community" }
+    ],
+    "images": [
+      "/projects/anand-villa-bungalows/1.jpg",
+      "/projects/anand-villa-bungalows/2.jpg",
+      "/projects/anand-villa-bungalows/3.jpg"
+    ],
+    "reraId": "P51900039945",
+    "possessionDate": "June 2028",
+    "totalTowers": 24,
+    "landParcel": "6.2 acres",
+    "configurations": [
+      { "type": "4 BHK Villa", "carpetArea": "1800 sq ft", "price": "₹1.2Cr – ₹1.6Cr", "floorPlanImage": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80" },
+      { "type": "4 BHK (Larger Plot)", "carpetArea": "2200 – 2400 sq ft", "price": "₹1.8Cr – ₹2.5Cr", "floorPlanImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Smart Home Provisions", "Italian Marble Flooring", "Imported Kitchen Fittings", "Solar-Powered Common Areas", "Covered Parking (2 cars)"],
+      "safety": ["Gated Community"],
+      "sports": ["Swimming Pool"],
+      "leisure": ["Private Garden", "Home Theatre Pre-wiring"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Tunga Village", "distance": "3 min" },
+      { "name": "Vasai Road Station", "distance": "18 min" },
+      { "name": "Tungareshwar Forest", "distance": "10 min" },
+      { "name": "Golden Nest School", "distance": "5 min" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Anand Villa Bungalows in Vasai West | Luxury Independent Homes",
+    "metaDescription": "Experience luxury living at Anand Villa — independent bungalows in Vasai West with private gardens, smart home features, and gated security. From ₹1.2Cr."
+  },
+  {
+    "slug": "nakshatra-greens-flats",
+    "tier": "affordable",
+    "title": "Nakshatra Greens",
+    "location": "Vasai East, Near Manickpur Naka",
+    "area": "east",
+    "type": "flat",
+    "status": "New Launch",
+    "priceRange": "₹38L – ₹69L",
+    "pricePerSqft": "₹10,100 / sq ft",
+    "shortDescription": "Affordable 1 & 2 BHK homes in Vasai East with expansive balconies, clubhouse amenities, and easy station access.",
+    "fullDescription": "Nakshatra Greens brings thoughtfully planned 1 and 2 BHK apartments to the heart of Vasai East, close to Manickpur Naka and within walking distance of the station. Designed for families who want space without stretching their budget, the project features cross-ventilated layouts, a dedicated senior citizen corner, children's play zone, and a multipurpose clubhouse. Residents enjoy 24/7 security, covered parking, and power backup for common areas. With the upcoming metro phase and the proposed Eastern Express highway extension, Nakshatra Greens offers strong appreciation potential in one of Palghar's fastest-developing corridors.",
+    "usps": [
+      { "title": "Prime Location", "description": "Near Manickpur Naka, walking distance to the station" },
+      { "title": "Modern Design", "description": "Cross-ventilated layouts with spacious balconies" },
+      { "title": "Great Value", "description": "Affordable pricing with strong appreciation potential" }
+    ],
+    "images": [
+      "/projects/nakshatra-greens-flats/1.jpg",
+      "/projects/nakshatra-greens-flats/2.jpg",
+      "/projects/nakshatra-greens-flats/3.jpg"
+    ],
+    "reraId": "P51900043087",
+    "possessionDate": "January 2028",
+    "totalTowers": 4,
+    "landParcel": "2.1 acres",
+    "configurations": [
+      { "type": "1 BHK", "carpetArea": "390 – 420 sq ft", "price": "₹38L – ₹44L", "floorPlanImage": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80" },
+      { "type": "2 BHK", "carpetArea": "540 – 620 sq ft", "price": "₹52L – ₹69L", "floorPlanImage": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Cross-Ventilated Layouts", "Tiled Flooring", "Balconies in All Units", "Prefab Kitchen Worktops", "Covered Parking"],
+      "safety": ["24/7 Security"],
+      "sports": [],
+      "leisure": ["Children's Play Zone", "Senior Citizen Corner", "Multipurpose Clubhouse"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Manickpur Naka", "distance": "2 min" },
+      { "name": "Vasai Road Station", "distance": "8 min" },
+      { "name": "Ideal Hospital", "distance": "6 min" },
+      { "name": "St. Arnold's School", "distance": "4 min" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Nakshatra Greens Flats in Vasai East | 1 & 2 BHK Homes",
+    "metaDescription": "Explore Nakshatra Greens — affordable 1 & 2 BHK flats in Vasai East near Manickpur Naka, with clubhouse amenities and easy station access. From ₹38L."
+  },
+  {
+    "slug": "golden-arc-plaza-shops",
+    "tier": "affordable",
+    "title": "Golden Arc Plaza",
+    "location": "Vasai East, Near Rajendra Nagar",
+    "area": "east",
+    "type": "shop",
+    "status": "Under Construction",
+    "priceRange": "₹28L – ₹64L",
+    "pricePerSqft": "₹28,000 / sq ft",
+    "shortDescription": "High-street retail shops on Vasai East's main commercial stretch with strong footfall and flexible unit sizes.",
+    "fullDescription": "Golden Arc Plaza is a high-street retail development positioned on the busiest commercial road in Vasai East, near Rajendra Nagar. The project offers flexible shop sizes from 120 to 400 sq ft, ideal for everything from grocery stores and pharmacies to fashion outlets and eateries. Double-height shop fronts, wide walkways, and dedicated loading bays make the units highly practical for daily operations. The plaza is supported by ample parking, 24/7 surveillance, and efficient power backup. Located minutes from the Eastern Express Highway feeder road, Golden Arc Plaza is built for business visibility and consistent walk-in traffic.",
+    "usps": [
+      { "title": "Prime Location", "description": "Busiest commercial stretch in Vasai East" },
+      { "title": "Modern Design", "description": "Double-height fronts, wide walkways, flexible sizes" },
+      { "title": "High Visibility", "description": "Strong walk-in traffic on the main high street" }
+    ],
+    "images": [
+      "/projects/golden-arc-plaza-shops/1.jpg",
+      "/projects/golden-arc-plaza-shops/2.jpg",
+      "/projects/golden-arc-plaza-shops/3.jpg"
+    ],
+    "reraId": "P51900042733",
+    "possessionDate": "October 2027",
+    "totalTowers": 1,
+    "landParcel": "0.8 acres",
+    "configurations": [
+      { "type": "Ground Floor High-Street", "carpetArea": "120 – 250 sq ft", "price": "₹34L – ₹64L", "floorPlanImage": "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=900&q=80" },
+      { "type": "First Floor Units", "carpetArea": "150 – 300 sq ft", "price": "₹28L – ₹45L", "floorPlanImage": "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=900&q=80" },
+      { "type": "Second Floor Units", "carpetArea": "180 – 400 sq ft", "price": "₹25L – ₹40L", "floorPlanImage": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Double-Height Shop Fronts", "Flexible Unit Sizes", "Wide Walkways", "Power Backup", "Ample Parking", "Central Garbage Collection", "High-Street Location"],
+      "safety": ["24/7 Surveillance"],
+      "sports": [],
+      "leisure": []
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Rajendra Nagar Junction", "distance": "2 min" },
+      { "name": "Vasai Road Station", "distance": "9 min" },
+      { "name": "Om Sai Hospital", "distance": "5 min" },
+      { "name": "Eastern Express Feeder Road", "distance": "7 min" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Golden Arc Plaza Shops in Vasai East | Retail Spaces",
+    "metaDescription": "Own a high-street retail shop in Vasai East near Rajendra Nagar. Flexible units from 120 sq ft with strong footfall. Prices from ₹28L."
+  },
+  {
+    "slug": "vasai-palm-villas-bungalows",
+    "tier": "affordable",
+    "title": "Vasai Palm Villas",
+    "location": "Vasai East, Near Tungareshwar Base",
+    "area": "east",
+    "type": "bungalow",
+    "status": "Under Construction",
+    "priceRange": "₹1.4Cr – ₹2.8Cr",
+    "pricePerSqft": "₹9,400 / sq ft",
+    "shortDescription": "Private villa-style bungalows at the foothills of Tungareshwar with landscaped plots and resort-style living.",
+    "fullDescription": "Vasai Palm Villas is a boutique community of villa-style bungalows set against the scenic backdrop of the Tungareshwar foothills in Vasai East. Each residence spreads across a generous plot with a private garden, car porch, and covered terrace, offering the feel of a weekend home every single day. The community includes a shared clubhouse, a landscaped central lawn, and a rainwater harvesting system that keeps common utilities self-sufficient. With the proposed Eastern Express corridor pending approval, early buyers stand to benefit from significant value appreciation. Vasai Palm Villas is designed for those who want space, privacy, and nature without moving far from the city.",
+    "usps": [
+      { "title": "Prime Location", "description": "Scenic Tungareshwar foothills, easy city access" },
+      { "title": "Modern Design", "description": "Villa-style homes with gardens and covered terraces" },
+      { "title": "Resort-Style Living", "description": "Clubhouse, central lawn and a private community" }
+    ],
+    "images": [
+      "/projects/vasai-palm-villas-bungalows/1.jpg",
+      "/projects/vasai-palm-villas-bungalows/2.jpg",
+      "/projects/vasai-palm-villas-bungalows/3.jpg"
+    ],
+    "reraId": "P51900040826",
+    "possessionDate": "May 2028",
+    "totalTowers": 18,
+    "landParcel": "5.4 acres",
+    "configurations": [
+      { "type": "3 BHK Villa", "carpetArea": "1500 sq ft", "price": "₹1.4Cr – ₹1.8Cr", "floorPlanImage": "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=900&q=80" },
+      { "type": "4 BHK Villa", "carpetArea": "1800 – 2100 sq ft", "price": "₹2.0Cr – ₹2.8Cr", "floorPlanImage": "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Covered Terrace", "Premium Finishes", "Rainwater Harvesting", "Car Porch"],
+      "safety": ["Gated Community"],
+      "sports": [],
+      "leisure": ["Private Garden", "Landscaped Central Lawn", "Shared Clubhouse"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Tungareshwar Foothills", "distance": "5 min" },
+      { "name": "Vasai Road Station", "distance": "20 min" },
+      { "name": "RFO Hospital", "distance": "8 min" },
+      { "name": "City Centre Mall", "distance": "12 min" }
+    ],
+    "developer": {
+      "name": "Patang Future Homes",
+      "since": 2011,
+      "completedProjects": "50+"
+    },
+    "metaTitle": "Vasai Palm Villas Bungalows in Vasai East | Premium Villas",
+    "metaDescription": "Discover Vasai Palm Villas — private bungalows in Vasai East near Tungareshwar base with gardens, clubhouse, and resort-style living. From ₹1.4Cr."
+  },
+  {
+    "slug": "pearl-gardens",
+    "tier": "affordable",
+    "title": "Pearl Gardens",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "Under Construction",
+    "priceRange": "Starting ₹49 Lacs* onwards",
+    "pricePerSqft": "On request",
+    "shortDescription": "1, 2 & 3 BHK flats and Jodi homes in Vasai West starting ₹49 Lacs* — RERA registered (P99000047167), by Mansarovar Group with 30+ years and 15+ completed projects.",
+    "fullDescription": "Pearl Gardens by Mansarovar Group brings thoughtfully planned 1, 2 and 3 BHK apartments and Jodi homes to a prime 3-acre parcel in Vasai West, near the Vasai Flyover and Gokul Aagan, close to Vasai Road railway station. The G+22 towers feature 8 flats per floor in an earthquake-resistant structure, finished with vitrified tiles, granite kitchen platforms, SS sinks and long-lasting fixtures. Residents enjoy a complete lifestyle stack — a gymnasium, indoor games, kids play area, senior citizen corner, rooftop fit-out and a clubhouse — supported by CCTV surveillance and video door phone security. With a developer known for 30+ years of experience and 15+ completed projects, Pearl Gardens offers all-inclusive pricing starting from ₹49 Lacs*.",
+    "usps": [
+      { "title": "Prime Location", "description": "Near Vasai Flyover, Gokul Aagan, close to Vasai Road station" },
+      { "title": "Modern Design", "description": "G+22 towers, 8 flats per floor, earthquake-resistant structure" },
+      { "title": "Trusted Developer", "description": "Mansarovar Group — 30+ years, 15+ completed projects" }
+    ],
+    "images": [
+      "/projects/pearl-gardens/1.jpg",
+      "/projects/pearl-gardens/2.jpg",
+      "/projects/pearl-gardens/3.jpg"
+    ],
+    "reraId": "P99000047167",
+    "possessionDate": "Details on request",
+    "totalTowers": 4,
+    "landParcel": "3 acres",
+    "configurations": [
+      { "type": "1 BHK", "carpetArea": "408 sq ft", "price": "Price on request", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "2 BHK", "carpetArea": "531 sq ft", "price": "₹73.27 Lacs (all-inclusive)", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "2 BHK", "carpetArea": "636 sq ft", "price": "₹86.92 Lacs (all-inclusive)", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" },
+      { "type": "3 BHK / Jodi", "carpetArea": "On request", "price": "Price on request", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Vitrified Tiles", "Granite Kitchen Platform", "Earthquake Resistant Structure", "SS Sink", "CCTV", "Video Door Phone"],
+      "safety": [],
+      "sports": ["Gymnasium", "Rooftop Fit-Out"],
+      "leisure": ["Indoor Games", "Kids Play Area", "Senior Citizen Corner", "Clubhouse"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Vasai Road Railway Station", "distance": "1.7 km" },
+      { "name": "DMart", "distance": "4.1 km" },
+      { "name": "The Capital Mall", "distance": "4.4 km" }
+    ],
+    "developer": {
+      "name": "Mansarovar Group",
+      "since": 1996,
+      "completedProjects": "15+"
+    },
+    "metaTitle": "Pearl Gardens, Vasai West | 1, 2, 3 BHK Flats & Jodi Homes",
+    "metaDescription": "Pearl Gardens offers 1, 2, 3 BHK flats and Jodi homes in Vasai West starting ₹49 Lacs*. RERA registered (P99000047167), by Mansarovar Group — 30+ years, 15+ completed projects."
+  },
+  {
+    "slug": "casa-terraza-phase-3",
+    "tier": "affordable",
+    "title": "Casa Terraza - Phase III",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "Under Construction",
+    "priceRange": "Starting ₹60.74 Lacs (all-inclusive)",
+    "pricePerSqft": "On request",
+    "shortDescription": "1, 2, 3, 4 & 5 BHK flats on Vasai West's 100 ft Road, every apartment with an attached terrace. RERA P99000031526, by TREC — 35+ landmarks, 5mn+ sq ft portfolio.",
+    "description": "Casa Terraza Phase III is the final chapter of TREC's landmark Casa Terraza development on 100 ft Road, Vasai West. This 22-storey high-rise offers 1 to 5 BHK residences, each with its own attached terrace, designed for residents who value both indoor comfort and outdoor space. The project includes a dedicated 4-storey clubhouse with a gymnasium and indoor games room, along with a rooftop garden for relaxation and family time. Located near Sahakari Bhandar and well-connected to Vasai Road station, schools, and hospitals, Casa Terraza suits families looking for spacious, well-ventilated homes with strong social infrastructure nearby. Backed by TREC's three-decade legacy of over 35 completed projects across Mumbai, the development combines architectural quality with a trusted delivery track record.",
+    "fullDescription": "Casa Terraza Phase III — 'Happiness Inside Out' — is a 22-storey single-tower residence on the 100 ft Road in Navghar, Vasai West, near the Sahakari Bhandar landmark. Every apartment features an attached terrace, with interiors finished to a premium specification of designer vitrified tiles, gypsum-finished walls, premium wall paint, designer bathrooms with premium CP fittings, parallel granite kitchen platforms, modular kitchen cabinets, AC in the living room, storage lofts and firefighting equipment. The project is built as a self-sufficient ecosystem with a 4-storey clubhouse, gymnasium, indoor games room, rooftop garden, kids play area, ample car parking, CCTV surveillance, power backup, rainwater harvesting, borewells and a sewage treatment plant. Developed by TREC — with 35+ completed landmarks and a 5mn+ sq ft portfolio across Mumbai — Casa Terraza Phase III is RERA registered (P99000031526) with an all-inclusive starting price of ₹60.74 Lacs.",
+    "usps": [
+      { "title": "Prime Location", "description": "On 100 ft Road, Navghar, close to Vasai Road station" },
+      { "title": "Modern Design", "description": "22-storey high-rise with attached terrace in every apartment" },
+      { "title": "Trusted Developer", "description": "TREC — 5mn+ sq ft portfolio, 35+ completed landmarks across Mumbai" }
+    ],
+    "images": [
+      "/projects/casa-terraza-phase-3/1.jpg",
+      "/projects/casa-terraza-phase-3/2.jpg",
+      "/projects/casa-terraza-phase-3/3.jpg"
+    ],
+    "reraId": "P99000031526",
+    "possessionDate": "Under Construction",
+    "totalTowers": 1,
+    "landParcel": "Details on request",
+    "configurations": [
+      { "type": "1 BHK", "carpetArea": "399 sq ft (RCA)", "saleableArea": "453 sq ft", "price": "₹52.20 Lacs", "allInclusive": "₹60.75 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "2 BHK (Small)", "carpetArea": "538 sq ft (RCA)", "saleableArea": "591 sq ft", "price": "₹67.79 Lacs", "allInclusive": "₹78.59 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "2 BHK (Large)", "carpetArea": "644 sq ft (RCA)", "saleableArea": "701 sq ft", "price": "₹80.55 Lacs", "allInclusive": "₹93.25 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" },
+      { "type": "3 BHK", "carpetArea": "798 sq ft (RCA)", "saleableArea": "906 sq ft", "price": "₹1.04 Cr", "allInclusive": "₹1.21 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "4 BHK", "carpetArea": "1172 sq ft (RCA)", "saleableArea": "1282 sq ft", "price": "₹1.48 Cr", "allInclusive": "₹1.72 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "5 BHK", "carpetArea": "1288 sq ft (RCA)", "saleableArea": "1402 sq ft", "price": "₹1.61 Cr", "allInclusive": "₹1.86 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Designer Vitrified Tiles", "Gypsum Finished Walls", "Premium Wall Paint", "Designer Bathrooms with Premium CP Fittings", "Parallel Granite Kitchen Platforms", "Modular Kitchen Cabinets", "Attached Terrace", "AC in Living Room", "Storage Loft", "Ample Car Parking", "Power Backup", "Rainwater Harvesting", "Borewells", "Sewage Treatment Plant"],
+      "safety": ["CCTV Surveillance", "Firefighting Equipment"],
+      "sports": ["Gymnasium", "Indoor Games Room"],
+      "leisure": ["Rooftop Garden", "Kids Play Area", "4-Storey Clubhouse"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "St. Francis School", "distance": "Nearby" },
+      { "name": "Krishna Hospital", "distance": "Nearby" },
+      { "name": "Vasai Road Railway Station", "distance": "~2 km" },
+      { "name": "Vasai Engineering College", "distance": "Nearby" },
+      { "name": "Ambadi Market", "distance": "Nearby" }
+    ],
+    "developer": {
+      "name": "TREC - The Real Estate Company",
+      "since": 1996,
+      "completedProjects": "35+"
+    },
+    "metaTitle": "Casa Terraza Phase III, Vasai West | 1-5 BHK Flats on 100 ft Road",
+    "metaDescription": "Casa Terraza Phase III offers 1, 2, 3, 4 & 5 BHK flats in Vasai West starting ₹60.74 Lacs all-inclusive. RERA P99000031526, by TREC — 35+ completed projects across Mumbai."
+  },
+  {
+    "slug": "shanta-bhawan",
+    "tier": "affordable",
+    "title": "Shanta Bhawan",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "New Launch",
+    "priceRange": "2 BHK Starting ₹79.50 Lacs* onwards",
+    "pricePerSqft": "On request",
+    "shortDescription": "Premium 2 & 3 BHK flats in Sai Nagar, Vasai West starting ₹79.50 Lacs*. RERA approved (P99000080383), G+14 floors, by Sanjari Properties.",
+    "description": "Shanta Bhawan is a G+14 residential tower by Sanjari Properties, located in Sai Nagar, Vasai West, just behind Sai Nagar Ground. The project focuses on wellness-oriented living, with a jogging track, yoga and meditation zone, and an equipped open gym built into the community. A dedicated senior citizen corner and reliable 24/7 VVMC water supply add practical value for families across generations. Positioned close to Vartak College and Vasai Road station, residents get easy access to daily essentials, schools, and public transport. With RERA and VVMC approvals in place and the Commencement Certificate already received, Shanta Bhawan offers 2 and 3 BHK homes for buyers looking for a project further along in its approval and construction journey.",
+    "fullDescription": "Shanta Bhawan brings bespoke 2 and 3 BHK homes to Sai Nagar, Vasai West — set behind Sai Nagar Ground and within easy reach of Vartak College and Vasai Road railway station. Spread across G+14 floors, this RERA-approved redevelopment project (P99000080383) by Sanjari Properties pairs quality construction with modern fittings and a 24/7 VVMC water supply. Everyday wellness is built into the design with a jogging track, yoga and meditation zone, senior citizen corner and an equipped open gym. The project is fully approved — RERA, VVMC and Maharashtra Commencement Certificate received — with 2 BHK residences starting at ₹79.50 Lacs*.",
+    "usps": [
+      { "title": "Prime Location", "description": "Sai Nagar, near Vartak College and Vasai Road station" },
+      { "title": "Wellness Focused", "description": "Jogging track, yoga & meditation zone, senior citizen corner" },
+      { "title": "Fully Approved", "description": "RERA approved, VVMC approved, Commencement Certificate received" }
+    ],
+    "images": [
+      "/projects/shanta-bhawan/shanta-bhawan-building-1-sai-nagar-vasai-west.jpg",
+      "/projects/shanta-bhawan/shanta-bhawan-building-2-sai-nagar-vasai-west.jpg",
+      "/projects/shanta-bhawan/shanta-bhawan-building-3-sai-nagar-vasai-west.jpg"
+    ],
+    "reraId": "P99000080383",
+    "possessionDate": "December 2027 (Target)",
+    "totalTowers": 1,
+    "landParcel": "Details on request",
+    "configurations": [
+      { "type": "2 BHK", "carpetArea": "495–532 sq ft (RERA)", "saleableArea": "948–1065 sq ft", "price": "₹77 Lacs – ₹85 Lacs", "allInclusive": "₹88.04 Lacs – ₹97 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "3 BHK", "carpetArea": "677 sq ft (RERA)", "saleableArea": "1330 sq ft", "price": "₹1.04 Cr", "allInclusive": "₹1.18 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Modern Fittings", "Quality Construction", "24/7 VVMC Water Supply"],
+      "safety": [],
+      "sports": ["Jogging Track", "Yoga & Meditation Zone", "Equipped Open Gym"],
+      "leisure": ["Senior Citizen Corner"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "Vartak College", "distance": "950 m" },
+      { "name": "Vasai Road Railway Station", "distance": "1.1 km" },
+      { "name": "DMart", "distance": "2.6 km" }
+    ],
+    "developer": {
+      "name": "Sanjari Properties",
+      "since": 2010,
+      "completedProjects": "Multiple"
+    },
+    "metaTitle": "Shanta Bhawan, Sai Nagar Vasai West | 2 & 3 BHK Flats",
+    "metaDescription": "Shanta Bhawan offers premium 2 & 3 BHK flats in Sai Nagar, Vasai West starting ₹79.50 Lacs. RERA approved (P99000080383), G+14 floors, by Sanjari Properties."
+  },
+  {
+    "slug": "bless-residency",
+    "tier": "affordable",
+    "title": "Bless Residency",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "Under Construction",
+    "priceRange": "2 BHK Starting ₹92.70 Lacs (all-inclusive)",
+    "pricePerSqft": "On request",
+    "shortDescription": "2 & 3 BHK flats in Vasai West starting ₹92.70 Lacs all-inclusive. RERA P99000053994, by Trinity Developers — 194 units across 2 towers at Kaul Heritage City.",
+    "description": "Bless Residency by Trinity Developers is a 194-unit residential project spread across two towers in Kaul Heritage City, Bhabola, Vasai West, opposite Navjeevan Hospital. The development offers 2 and 3 BHK homes across nearly 5 acres, with resort-style amenities including a swimming pool, spacious clubhouse, jogging and cycling track, and landscaped gardens. Its location just 900 metres from DMart and within easy reach of Vasai Road station makes daily commuting and shopping convenient for residents. Internal specifications include vitrified tiles, granite kitchen platforms, and an earthquake-resistant structure, reflecting a focus on long-term build quality. With MahaRERA registration in place and construction underway, Bless Residency suits buyers seeking a larger community setup with full-scale lifestyle amenities.",
+    "fullDescription": "Bless Residency brings 194 well-planned 2 and 3 BHK homes to a 5-acre resort-style community at Kaul Heritage City, Bhabola — directly opposite Navjeevan Hospital, Vasai West. Spread across two towers, each home is finished with vitrified tiles, granite kitchens, SS sinks and an earthquake-resistant structure, supported by CCTV surveillance and video door phone security. Residents enjoy a resort-style lifestyle with a swimming pool, spacious clubhouse, jogging and cycle track, rooftop fit-out, gymnasium, indoor games, kids play area, senior citizen corner, landscape garden, party lawn and a multipurpose hall. Conveniently placed just 900 m from DMart and 2.9 km from Vasai Road railway station, and RERA registered (P99000053994), Bless Residency offers all-inclusive 2 BHK pricing starting at ₹92.70 Lacs.",
+    "usps": [
+      { "title": "Prime Location", "description": "Opp. Navjeevan Hospital, Bhabola, near DMart (900m)" },
+      { "title": "Resort-Style Amenities", "description": "Swimming pool, clubhouse, jogging track across 5 acres" },
+      { "title": "Trusted Developer", "description": "Trinity Developers — 194 units, RERA registered" }
+    ],
+    "images": [
+      "/projects/bless-residency/1.jpg",
+      "/projects/bless-residency/2.jpg",
+      "/projects/bless-residency/3.jpg"
+    ],
+    "reraId": "P99000053994",
+    "possessionDate": "March 2028 (Target)",
+    "totalTowers": 2,
+    "landParcel": "5 acres",
+    "configurations": [
+      { "type": "2 BHK (Type 1)", "carpetArea": "716 sq ft (Usable)", "price": "₹82.34 Lacs", "allInclusive": "₹92.70 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "2 BHK (Type 2)", "carpetArea": "717 sq ft (Usable)", "price": "₹82.46 Lacs", "allInclusive": "₹92.83 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "2 BHK (Type 3)", "carpetArea": "757 sq ft (Usable)", "price": "₹87.06 Lacs", "allInclusive": "₹97.98 Lacs", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" },
+      { "type": "2 BHK (Type 4)", "carpetArea": "775 sq ft (Usable)", "price": "₹89.13 Lacs", "allInclusive": "₹1.00 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "2 BHK (Type 5)", "carpetArea": "778 sq ft (Usable)", "price": "₹89.47 Lacs", "allInclusive": "₹1.01 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" },
+      { "type": "2 BHK (Type 6)", "carpetArea": "803 sq ft (Usable)", "price": "₹92.35 Lacs", "allInclusive": "₹1.04 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80" },
+      { "type": "3 BHK (Type 7)", "carpetArea": "908 sq ft (Usable)", "price": "₹1.04 Cr", "allInclusive": "₹1.17 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80" },
+      { "type": "3 BHK (Type 8)", "carpetArea": "910 sq ft (Usable)", "price": "₹1.05 Cr", "allInclusive": "₹1.18 Cr", "floorPlanImage": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=900&q=80" }
+    ],
+    "amenities": {
+      "convenience": ["Vitrified Tiles", "Granite Kitchen", "Earthquake Resistant Structure", "SS Sink", "Video Door Phone"],
+      "safety": ["CCTV"],
+      "sports": ["Gymnasium", "Indoor Games", "Rooftop Fit-Out", "Swimming Pool", "Jogging/Cycle Track"],
+      "leisure": ["Kids Play Area", "Senior Citizen Corner", "Landscape Garden", "Party Lawn", "Multipurpose Hall", "Spacious Clubhouse"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "nearbyLandmarks": [
+      { "name": "DMart", "distance": "900 m" },
+      { "name": "Vasai Road Railway Station", "distance": "2.9 km" },
+      { "name": "Vartak College", "distance": "3.2 km" }
+    ],
+    "developer": {
+      "name": "Trinity Developers",
+      "since": 2010,
+      "completedProjects": "Multiple"
+    },
+    "metaTitle": "Bless Residency, Vasai West | 2 & 3 BHK Flats by Trinity Developers",
+    "metaDescription": "Bless Residency offers 2 & 3 BHK flats in Vasai West starting ₹92.70 Lacs all-inclusive. RERA P99000053994, by Trinity Developers — 194 units across 2 towers."
+  },
+  {
+    "slug": "pam-one-time-vasai-edition",
+    "title": "PAM One Time Vasai Edition",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "Under Construction",
+    "tier": "luxury",
+    "priceRange": "Starting ₹1.49 Cr onwards*",
+    "pricePerSqft": "On request",
+    "shortDescription": "Luxury sea-facing 2, 3, 4 & 5 BHK deck residences in the tallest tower in Vasai West, near Suruchi Beach. RERA P99000009688, by PAM Infrastructure.",
+    "fullDescription": "PAM One Time Vasai Edition redefines luxury living in Vasai West with a 36-storey sea-facing tower near Suruchi Beach — the tallest residential structure in the area. With just 6 flats per wing on every floor across 3 acres, the project offers 2, 3, 4 and 5 BHK deck residences ranging from 620 sq ft to over 2000 sq ft, each designed to maximise natural light and coastal views. Residents enjoy an infinity pool overlooking the coastline, professional PMS-managed upkeep, and proximity to the upcoming Coastal Road for improved connectivity to Mumbai.",
+    "description": "PAM One Time Vasai Edition redefines luxury living in Vasai West with a 36-storey sea-facing tower near Suruchi Beach — the tallest residential structure in the area. Spread across 3 acres with just 6 flats per wing on every floor, the project offers 2, 3, 4 and 5 BHK deck residences ranging from 620 sq ft to over 2000 sq ft, each designed to maximise natural light and coastal views. Residents get access to an infinity pool overlooking the coastline, professional PMS-managed upkeep, and proximity to the upcoming Coastal Road for improved connectivity to Mumbai. With MahaRERA registration in place and a target possession of December 2028, this is a premium option for buyers seeking a sea-facing address with resort-style living, rather than a budget-first purchase.",
+    "usps": [
+      { "title": "Sea-Facing Luxury", "description": "Panoramic city and ocean views from the tallest tower in Vasai West" },
+      { "title": "Low-Density Living", "description": "Only 6 flats per wing per floor across 3 wings" },
+      { "title": "Trusted Developer", "description": "PAM Infrastructure — premium coastal residences across Vasai-Virar" }
+    ],
+    "images": [
+      "/projects/pam-one-time-vasai-edition/1.jpg",
+      "/projects/pam-one-time-vasai-edition/2.jpg",
+      "/projects/pam-one-time-vasai-edition/3.jpg"
+    ],
+    "reraId": "P99000009688",
+    "possessionDate": "December 2028 (Target), December 2029 (RERA)",
+    "totalTowers": 1,
+    "totalFloors": 36,
+    "landParcel": "3 acres",
+    "landmark": "Near Shree Chimaji Appa Ground, Koliwada, Suruchi Beach, Vasai West",
+    "configurations": [
+      { "type": "2 BHK Deck Residence", "carpetArea": "620+ sq ft", "price": "₹1.49 Cr onwards*" },
+      { "type": "3 BHK Deck Residence", "carpetArea": "Larger layouts", "price": "On request" },
+      { "type": "4 BHK Deck Residence", "carpetArea": "Larger layouts", "price": "On request" },
+      { "type": "5 BHK Deck Residence", "carpetArea": "Up to 2000+ sq ft", "price": "On request" }
+    ],
+    "amenities": {
+      "convenience": ["Deck/Terrace with Every Apartment", "Sea-Facing Layouts", "Premium Fittings"],
+      "safety": [],
+      "sports": ["Infinity Pool"],
+      "leisure": ["PMS-Managed Society", "Low-Density Layout (6 flats/floor per wing)", "Coastal Road Proximity"]
+    },
+    "showFlatVideoUrl": "/projects/pam-one-time-vasai-edition/video/pam-av.mp4",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "amenityImages": [
+      { "title": "Clubhouse Entrance", "src": "/projects/pam-one-time-vasai-edition/Amenities/Entrance.webp" },
+      { "title": "Gazebo", "src": "/projects/pam-one-time-vasai-edition/Amenities/Gazebo.webp" },
+      { "title": "Kids Play Area", "src": "/projects/pam-one-time-vasai-edition/Amenities/Play-area.webp" },
+      { "title": "Infinity Pool", "src": "/projects/pam-one-time-vasai-edition/Amenities/Swimming-pool-2.webp" },
+      { "title": "Rooftop Terrace", "src": "/projects/pam-one-time-vasai-edition/Amenities/terrace.webp" },
+      { "title": "Yoga Lawn", "src": "/projects/pam-one-time-vasai-edition/Amenities/Yoga-copy.jpg" }
+    ],
+    "showFlatImages": [
+      { "title": "Master Bedroom", "type": "actual", "src": "/projects/pam-one-time-vasai-edition/Actual Show Flat/Bedroom-1.webp" },
+      { "title": "Dining Area", "type": "actual", "src": "/projects/pam-one-time-vasai-edition/Actual Show Flat/dinig.webp" },
+      { "title": "Modular Kitchen", "type": "actual", "src": "/projects/pam-one-time-vasai-edition/Actual Show Flat/Kitchen-1.webp" },
+      { "title": "Living Room", "type": "actual", "src": "/projects/pam-one-time-vasai-edition/Actual Show Flat/Living-room-1.webp" },
+      { "title": "Master Bedroom Render", "type": "render", "src": "/projects/pam-one-time-vasai-edition/Show Flat/Bedroom-1.webp" },
+      { "title": "Dining Area Render", "type": "render", "src": "/projects/pam-one-time-vasai-edition/Show Flat/dinig.webp" },
+      { "title": "Modular Kitchen Render", "type": "render", "src": "/projects/pam-one-time-vasai-edition/Show Flat/Kitchen-1.webp" },
+      { "title": "Living Room Render", "type": "render", "src": "/projects/pam-one-time-vasai-edition/Show Flat/Living-room-1.webp" }
+    ],
+    "nearbyLandmarks": [
+      { "name": "Suruchi Beach", "distance": "5 min" },
+      { "name": "Vasai-Bhayander Ferry", "distance": "5 min" },
+      { "name": "Naigaon Station", "distance": "12 min" },
+      { "name": "Vasai Station", "distance": "14 min" }
+    ],
+    "developer": {
+      "name": "PAM Infrastructure",
+      "since": 2005,
+      "completedProjects": "Multiple Vasai West developments"
+    },
+    "metaTitle": "PAM One Time Vasai Edition | Sea-Facing 2-5 BHK Flats in Vasai West",
+    "metaDescription": "PAM One Time Vasai Edition offers luxury sea-facing 2, 3, 4 & 5 BHK deck residences in Vasai West, starting ₹1.49 Cr*. RERA P99000009688, 36-storey tower near Suruchi Beach."
+  }
+,
+  {
+    "slug": "sunteck-beach-residences",
+    "title": "Sunteck Beach Residences",
+    "location": "Vasai West",
+    "area": "west",
+    "type": "flat",
+    "status": "Under Construction",
+    "tier": "luxury",
+    "priceRange": "Starting ₹90 Lacs onwards*",
+    "pricePerSqft": "On request",
+    "shortDescription": "2 & 3 BHK sea-facing homes in a 50-acre beachfront township on Suruchi Beach Road, Vasai West, starting ₹90 Lacs*. RERA registered, by Sunteck Realty.",
+    "fullDescription": "Sunteck Beach Residences brings a rare beachfront township experience to Vasai West, spread across 50 acres on Suruchi Beach Road. Developed by Sunteck Realty — one of Mumbai's leading listed real estate companies known for landmark projects like Signature Island in BKC — this 4-tower, 30-storey development offers 2 and 3 BHK residences with direct beach access and panoramic sea views. Each tower comes with its own dedicated clubhouse, alongside over 50 shared amenities including a swimming pool, amphitheater, and children's play areas, supported by extensive basement and podium parking. With a sample flat ready for viewing and MahaRERA registration in place, Sunteck Beach Residences appeals to buyers seeking a large-scale, professionally managed luxury address by the sea, distinct from the smaller standalone towers typical of the Vasai market.",
+    "description": "Sunteck Beach Residences brings a rare beachfront township experience to Vasai West, spread across 50 acres on Suruchi Beach Road. Developed by Sunteck Realty — one of Mumbai's leading listed real estate companies known for landmark projects like Signature Island in BKC — this 4-tower, 30-storey development offers 2 and 3 BHK residences with direct beach access and panoramic sea views. Each tower comes with its own dedicated clubhouse, alongside over 50 shared amenities including a swimming pool, amphitheater, and children's play areas, supported by extensive basement and podium parking. With a sample flat ready for viewing and MahaRERA registration in place, Sunteck Beach Residences appeals to buyers seeking a large-scale, professionally managed luxury address by the sea, distinct from the smaller standalone towers typical of the Vasai market.",
+    "usps": [
+      { "title": "Beachfront Township", "description": "50-acre luxury development with direct access to Suruchi Beach" },
+      { "title": "Resort-Style Amenities", "description": "50+ amenities including clubhouse, pool, and amphitheater" },
+      { "title": "Trusted Developer", "description": "Sunteck Realty — NSE/BSE listed, ~50 million sq ft development portfolio" }
+    ],
+    "images": [
+      "/projects/sunteck-beach-residences/1.jpg",
+      "/projects/sunteck-beach-residences/2.jpg",
+      "/projects/sunteck-beach-residences/3.jpg"
+    ],
+    "reraId": "P99000045490, P99000045499, P99000045599",
+    "possessionDate": "January 2027 (Target), December 2027 (RERA)",
+    "totalTowers": 4,
+    "totalFloors": 30,
+    "landParcel": "50 acres",
+    "landmark": "Suruchi Beach Road, Vasai West",
+    "configurations": [
+      { "type": "2 BHK", "carpetArea": "604-634 sq ft", "price": "₹90 Lacs onwards*" },
+      { "type": "3 BHK", "carpetArea": "785-1184 sq ft", "price": "₹1.35 Cr onwards*" }
+    ],
+    "amenities": {
+      "convenience": ["Premium Fittings", "Sea-Facing Layouts", "Basement + Podium Parking"],
+      "safety": [],
+      "sports": ["Swimming Pool", "Gymnasium"],
+      "leisure": ["Clubhouse (per tower)", "Amphitheater", "Kids Play Area"]
+    },
+    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
+    "amenityImages": [
+      { "title": "State-of-the-Art Gym", "src": "/projects/sunteck-beach-residences/Amenities/Gym-1000x900.jpg" },
+      { "title": "Yoga Deck", "src": "/projects/sunteck-beach-residences/Amenities/Yoga-1000x900.jpg" },
+      { "title": "Beach View", "src": "/projects/sunteck-beach-residences/Amenities/Beach View-1000x900.jpg" },
+      { "title": "Window View", "src": "/projects/sunteck-beach-residences/Amenities/Window View-1000x900.jpg" }
+    ],
+    "showFlatImages": [
+      { "title": "Master Bedroom", "type": "actual", "src": "/projects/sunteck-beach-residences/Actual Show Flat/Bedroom-1000x900.jpg" },
+      { "title": "Master Bedroom", "type": "actual", "src": "/projects/sunteck-beach-residences/Actual Show Flat/Master Bedroom-1000x900.jpg" },
+      { "title": "Living Room", "type": "actual", "src": "/projects/sunteck-beach-residences/Actual Show Flat/Living Room-1000x900.jpg" },
+      { "title": "Dining Area", "type": "actual", "src": "/projects/sunteck-beach-residences/Actual Show Flat/Licing Room-1000x900.jpg" },
+      { "title": "Window View", "type": "actual", "src": "/projects/sunteck-beach-residences/Actual Show Flat/Window View-1000x900.jpg" }
+    ],
+    "nearbyLandmarks": [
+      { "name": "St. Augustine's High School", "distance": "2.2 km" },
+      { "name": "Vidya Vikasini College", "distance": "3.5 km" },
+      { "name": "Thomas Baptista College", "distance": "4.1 km" }
+    ],
+    "developer": {
+      "name": "Sunteck Realty Limited",
+      "since": 1989,
+      "completedProjects": "13 completed, 19 developing projects, ~50 million sq ft portfolio"
+    },
+    "metaTitle": "Sunteck Beach Residences, Vasai West | 2 & 3 BHK Beachfront Homes",
+    "metaDescription": "Sunteck Beach Residences offers 2 & 3 BHK sea-facing homes in a 50-acre beachfront township in Vasai West, starting ₹90 Lacs*. By Sunteck Realty, RERA registered."
+  }
+
+]
