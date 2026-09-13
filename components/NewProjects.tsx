@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import ProjectCover from "./ProjectCover";
 import projects from "@/data/projects.json";
 import { startingFrom } from "@/lib/price";
 
@@ -79,10 +79,9 @@ export default function NewProjects() {
                 className="group w-[280px] shrink-0 overflow-hidden rounded-2xl bg-white shadow-md transition-shadow hover:shadow-xl sm:w-[320px]"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  <Image
-                    src={project.images[0]}
-                    alt={project.title}
-                    fill
+                  <ProjectCover
+                    images={project.images}
+                    alt={`${project.title} in ${project.location}`}
                     className="object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
                     sizes="320px"
                   />

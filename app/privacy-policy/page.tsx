@@ -3,9 +3,10 @@ import Link from "next/link";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Privacy Policy | Patang Future Homes",
+    title: "Privacy Policy",
     description:
       "Read the privacy policy of Patang Future Homes — how we collect, use and protect your personal information when you browse or use our services.",
+    alternates: { canonical: "/privacy-policy" },
     robots: { index: false, follow: true },
   };
 }

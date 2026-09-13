@@ -34,6 +34,19 @@ export const metadata: Metadata = {
       "Discover premium residential and commercial properties in Vasai West.",
     images: ["/og-image.jpg"],
   },
+  keywords: [
+    "properties in Vasai West",
+    "properties in Vasai East",
+    "real estate Vasai",
+    "Patang Future Homes",
+    "flats shops and bungalows in Vasai",
+  ],
+  other: {
+    "geo.region": "IN-MH",
+    "geo.placename": "Vasai West, Maharashtra",
+    "geo.position": "19.3919;72.8317",
+    ICBM: "19.3919, 72.8317",
+  },
   metadataBase: new URL("https://patangfuturehomes.com"),
 };
 

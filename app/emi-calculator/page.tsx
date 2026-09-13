@@ -3,8 +3,7 @@ import EmiCalculator from "@/components/EmiCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Home Loan EMI Calculator | Calculate Monthly EMI — Patang Future Homes",
+    title: "Home Loan EMI Calculator — Calculate Monthly EMI",
     description:
       "Calculate your home loan EMI instantly with our free calculator. Enter loan amount, interest rate and tenure to see monthly payments, total interest and total payment.",
     keywords: [
@@ -13,6 +12,24 @@ export async function generateMetadata(): Promise<Metadata> {
       "loan EMI calculator",
       "monthly EMI calculator Vasai",
     ],
+    alternates: {
+      canonical: "/emi-calculator",
+    },
+    openGraph: {
+      type: "website",
+      title: "Home Loan EMI Calculator — Calculate Monthly EMI",
+      description:
+        "Free home loan EMI calculator — enter loan amount, interest rate and tenure to see your monthly payment instantly.",
+      url: "/emi-calculator",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Home loan EMI calculator by Patang Future Homes",
+        },
+      ],
+    },
   };
 }
 

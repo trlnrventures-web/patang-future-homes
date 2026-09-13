@@ -3,8 +3,7 @@ import HomeLoanCalculator from "@/components/HomeLoanCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Home Loan Eligibility & EMI Calculator | Free Online Tool — Patang Future Homes",
+    title: "Home Loan Eligibility & EMI Calculator — Free Online Tool",
     description:
       "Check your home loan eligibility and calculate monthly EMIs instantly. Free online calculator for buyers looking at flats, bungalows and shops in Vasai West & Vasai East.",
     keywords: [
@@ -14,6 +13,24 @@ export async function generateMetadata(): Promise<Metadata> {
       "home loan calculator Vasai",
       "property loan eligibility",
     ],
+    alternates: {
+      canonical: "/home-loan-calculator",
+    },
+    openGraph: {
+      type: "website",
+      title: "Home Loan Eligibility & EMI Calculator — Free Online Tool",
+      description:
+        "Check how much home loan you can afford and your monthly EMI — free, instant eligibility and EMI calculator for Vasai property buyers.",
+      url: "/home-loan-calculator",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Home loan eligibility and EMI calculator by Patang Future Homes",
+        },
+      ],
+    },
   };
 }
 

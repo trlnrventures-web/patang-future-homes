@@ -43,7 +43,7 @@ export default function ProjectGallery({
             >
               <Image
                 src={img}
-                alt=""
+                alt={`${title} photo ${i + 1} thumbnail`}
                 fill
                 className="object-cover"
                 sizes="112px"

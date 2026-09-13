@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
+import ProjectCover from "./ProjectCover";
 import projects from "@/data/projects.json";
 import { startingFrom } from "@/lib/price";
 
@@ -71,10 +71,9 @@ export default function ProjectGrid() {
             className="group block overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-xl"
           >
             <div className="relative aspect-[16/10] overflow-hidden">
-              <Image
-                src={project.images[0]}
-                alt={project.title}
-                fill
+              <ProjectCover
+                images={project.images}
+                alt={`${project.title} in ${project.location}`}
                 className="object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />

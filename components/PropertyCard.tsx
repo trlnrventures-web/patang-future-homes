@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import ProjectCover from "./ProjectCover";
 import {
   carpetAreaRange,
   configurationLabel,
@@ -71,11 +71,10 @@ export default function PropertyCard({
         href={linkHref}
         className="group grid overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition hover:shadow-md sm:grid-cols-2"
       >
-        <div className="relative aspect-[4/3] sm:aspect-auto sm:h-full">
-          <Image
-            src={project.images[0]}
-            alt={project.title}
-            fill
+<div className="relative aspect-[4/3] sm:aspect-auto sm:h-full">
+          <ProjectCover
+            images={project.images}
+            alt={`${project.title} in ${project.location}`}
             className="object-cover"
             sizes="(min-width: 640px) 50vw, 100vw"
           />
@@ -123,10 +122,9 @@ export default function PropertyCard({
       className="group block overflow-hidden rounded-xl border border-border bg-white shadow-sm transition hover:shadow-md"
     >
       <div className="relative aspect-[4/3]">
-        <Image
-          src={project.images[0]}
-          alt={project.title}
-          fill
+        <ProjectCover
+          images={project.images}
+          alt={`${project.title} in ${project.location}`}
           className="object-cover"
           sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
         />

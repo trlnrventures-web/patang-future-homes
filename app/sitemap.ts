@@ -1,25 +1,33 @@
+import type { MetadataRoute } from "next";
 import projects from "@/data/projects.json";
 import seoLandingPages from "@/data/seo-landing-pages.json";
 
 const BASE = "https://patangfuturehomes.com";
+const LAST_MODIFIED = new Date("2026-09-13");
 
-export default function sitemap() {
-  const staticPages = [
-    { url: BASE, lastModified: new Date() },
-    { url: `${BASE}/projects`, lastModified: new Date() },
-    { url: `${BASE}/about`, lastModified: new Date() },
-    { url: `${BASE}/contact`, lastModified: new Date() },
+export default function sitemap(): MetadataRoute.Sitemap {
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: BASE, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/properties`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/projects`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/about`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/contact`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/emi-calculator`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/home-loan-calculator`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/rent-vs-buy-calculator`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/roi-calculator`, lastModified: LAST_MODIFIED },
+    { url: `${BASE}/stamp-duty-calculator`, lastModified: LAST_MODIFIED },
   ];
 
-  const projectPages = projects.map((p) => ({
+  const projectPages: MetadataRoute.Sitemap = projects.map((p) => ({
     url: `${BASE}/projects/${p.slug}`,
-    lastModified: new Date(),
+    lastModified: LAST_MODIFIED,
   }));
 
-  const landingPages = seoLandingPages.map(
+  const landingPages: MetadataRoute.Sitemap = seoLandingPages.map(
     (p: { locationSlug: string; bhkSlug: string }) => ({
       url: `${BASE}/${p.locationSlug}/${p.bhkSlug}`,
-      lastModified: new Date(),
+      lastModified: LAST_MODIFIED,
     })
   );
 

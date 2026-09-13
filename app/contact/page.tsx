@@ -7,10 +7,33 @@ const WHATSAPP_LINK = "https://wa.me/919657447246";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Contact Patang Future Homes | Vasai West & East Property Experts",
+    title: "Contact Us — Vasai West & East Property Experts",
     description:
       "Get in touch with Patang Future Homes. Call, WhatsApp, or send an enquiry — our Vasai West & East property experts are here to help you find the right home or investment.",
+    keywords: [
+      "contact Patang Future Homes",
+      "property enquiry Vasai",
+      "real estate agents Vasai West",
+      "site visit Vasai",
+    ],
+    alternates: {
+      canonical: "/contact",
+    },
+    openGraph: {
+      type: "website",
+      title: "Contact Patang Future Homes — Vasai Property Experts",
+      description:
+        "Call, WhatsApp or send an enquiry to Patang Future Homes — Vasai West & East property experts here to help you find the right home or investment.",
+      url: "/contact",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Contact Patang Future Homes in Vasai West",
+        },
+      ],
+    },
   };
 }
 

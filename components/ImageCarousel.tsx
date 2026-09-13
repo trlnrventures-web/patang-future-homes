@@ -34,6 +34,16 @@ export default function ImageCarousel({
     touchStartX.current = null;
   };
 
+  if (count === 0) {
+    return (
+      <div className="relative flex aspect-[4/3] w-full select-none items-center justify-center overflow-hidden bg-gradient-to-br from-lavender via-primary/25 to-accent-ink/60 sm:aspect-[16/9] lg:aspect-[16/10]">
+        <span className="text-4xl font-extrabold uppercase tracking-tight text-white/90">
+          PFH
+        </span>
+      </div>
+    );
+  }
+
   const statusClass =
     status === "New Launch"
       ? "bg-accent text-primary"

@@ -6,6 +6,7 @@ export type Configuration = {
   saleableArea?: string;
   price: string;
   allInclusive?: string;
+  floorBreakup?: { floors: string; price: string }[];
   floorPlanImage: string;
 };
 

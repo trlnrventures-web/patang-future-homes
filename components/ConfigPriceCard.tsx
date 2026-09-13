@@ -162,6 +162,30 @@ export default function ConfigPriceCard({ project }: { project: Project }) {
               </div>
             </dl>
 
+            {group.items[0]?.floorBreakup &&
+              group.items[0].floorBreakup.length > 0 && (
+                <div className="mt-4 rounded-xl bg-ink/[0.03] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-soft">
+                    Floor-wise price
+                  </p>
+                  <ul className="mt-2.5 space-y-2">
+                    {group.items[0].floorBreakup.map((row) => (
+                      <li
+                        key={row.floors}
+                        className="flex items-center justify-between gap-4 text-sm"
+                      >
+                        <span className="font-medium text-muted">
+                          {row.floors}
+                        </span>
+                        <span className="font-bold text-primary">
+                          {row.price}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
             <div className="mt-5 border-t border-border" />
 
             <a

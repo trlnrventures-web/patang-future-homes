@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { notFound } from "next/navigation";
 import {
   projects,
   getProject,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/projects";
 import { startingFrom } from "@/lib/price";
 import ImageCarousel from "@/components/ImageCarousel";
+import ProjectCover from "@/components/ProjectCover";
 import VideoEmbed from "@/components/VideoEmbed";
 import ConfigPriceCard from "@/components/ConfigPriceCard";
 import GalleryGrid from "@/components/GalleryGrid";
@@ -27,15 +28,38 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const project = getProject(slug);
-  if (!project) return { title: "Project Not Found" };
+  if (!project) notFound();
+  const heroImage = project.images[0];
 
   return {
     title: { absolute: project.metaTitle },
     description: project.metaDescription,
+    alternates: {
+      canonical: `/projects/${project.slug}`,
+    },
     openGraph: {
       title: project.metaTitle,
       description: project.metaDescription,
-      images: [{ url: project.images[0], width: 1200, height: 630 }],
+      url: `/projects/${project.slug}`,
+      siteName: "Patang Future Homes",
+      type: "website",
+      locale: "en_IN",
+      images: heroImage
+        ? [
+            {
+              url: heroImage,
+              width: 1200,
+              height: 630,
+              alt: project.title,
+            },
+          ]
+        : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: project.metaTitle,
+      description: project.metaDescription,
+      images: heroImage ? [heroImage] : [],
     },
   };
 }
@@ -279,19 +303,7 @@ export default async function ProjectDetail({ params }: Props) {
   const project = getProject(slug);
 
   if (!project) {
-    return (
-      <section className="flex min-h-[60vh] items-center justify-center bg-background pt-28">
-        <div className="text-center">
-          <h1 className="font-bold text-2xl text-ink">Project Not Found</h1>
-          <Link
-            href="/projects"
-            className="mt-4 inline-block text-sm font-medium text-primary underline"
-          >
-            Back to Projects
-          </Link>
-        </div>
-      </section>
-    );
+    notFound();
   }
 
   const startingPrice = startingFrom(project.priceRange);
@@ -573,7 +585,7 @@ export default async function ProjectDetail({ params }: Props) {
                 {project.amenityImages &&
                   project.amenityImages.length > 0 && (
                     <div className="mt-6">
-                      <AmenityShowcase images={project.amenityImages} />
+                      <AmenityShowcase images={project.amenityImages} projectTitle={project.title} />
                     </div>
                   )}
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -799,10 +811,9 @@ export default async function ProjectDetail({ params }: Props) {
                     className="w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border border-ink/10 bg-white transition-shadow hover:shadow-lg"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden">
-                      <Image
-                        src={p.images[0]}
+                      <ProjectCover
+                        images={p.images}
                         alt={`${p.title} in ${p.location}`}
-                        fill
                         className="object-cover transition-transform duration-400 ease-out hover:scale-105"
                         sizes="280px"
                       />

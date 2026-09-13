@@ -3,9 +3,10 @@ import Link from "next/link";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Terms & Conditions | Patang Future Homes",
+    title: "Terms & Conditions",
     description:
       "Read the terms and conditions governing the use of the Patang Future Homes website and services. Please review before using our platform.",
+    alternates: { canonical: "/terms-and-conditions" },
     robots: { index: false, follow: true },
   };
 }

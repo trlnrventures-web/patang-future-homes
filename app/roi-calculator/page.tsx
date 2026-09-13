@@ -3,8 +3,7 @@ import RoiCalculator from "@/components/RoiCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Property ROI Calculator | Real Estate Returns — Patang Future Homes",
+    title: "Property ROI Calculator — Real Estate Returns",
     description:
       "Calculate the return on investment for a property — rental yield plus capital appreciation. Free ROI calculator for flats, shops and bungalows in Vasai.",
     keywords: [
@@ -13,6 +12,24 @@ export async function generateMetadata(): Promise<Metadata> {
       "rental yield calculator",
       "investment property return India",
     ],
+    alternates: {
+      canonical: "/roi-calculator",
+    },
+    openGraph: {
+      type: "website",
+      title: "Property ROI Calculator — Real Estate Returns",
+      description:
+        "Free property ROI calculator — see rental yield plus capital appreciation for flats, shops and bungalows in Vasai.",
+      url: "/roi-calculator",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Property ROI calculator by Patang Future Homes",
+        },
+      ],
+    },
   };
 }
 

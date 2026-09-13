@@ -3,8 +3,7 @@ import RentVsBuyCalculator from "@/components/RentVsBuyCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Rent vs Buy Calculator | Should I Rent or Buy in Vasai? — Patang Future Homes",
+    title: "Rent vs Buy Calculator — Should I Rent or Buy in Vasai?",
     description:
       "Compare renting vs buying a home with our free calculator. Input your rent, property price, down payment and interest rate to see which option builds more wealth over time.",
     keywords: [
@@ -13,6 +12,24 @@ export async function generateMetadata(): Promise<Metadata> {
       "buy or rent house India",
       "rent vs buy Vasai",
     ],
+    alternates: {
+      canonical: "/rent-vs-buy-calculator",
+    },
+    openGraph: {
+      type: "website",
+      title: "Rent vs Buy Calculator — Should I Rent or Buy in Vasai?",
+      description:
+        "Free rent vs buy calculator — compare the long-term wealth of renting versus buying a home in Vasai.",
+      url: "/rent-vs-buy-calculator",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Rent vs buy calculator by Patang Future Homes",
+        },
+      ],
+    },
   };
 }
 

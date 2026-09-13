@@ -32,10 +32,33 @@ const SERVICES = [
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "About Us | Patang Future Homes — Vasai's Trusted Property Advisors",
+    title: "About Us — Vasai's Trusted Property Advisors",
     description:
       "Learn about Patang Future Homes — Vasai's trusted property advisors connecting owners with buyers and renters across Vasai West and Vasai East.",
+    keywords: [
+      "about Patang Future Homes",
+      "property advisors Vasai West",
+      "real estate consultants Vasai East",
+      "Vasai property experts",
+    ],
+    alternates: {
+      canonical: "/about",
+    },
+    openGraph: {
+      type: "website",
+      title: "About Us — Vasai's Trusted Property Advisors",
+      description:
+        "Patang Future Homes is Vasai's trusted property advisory connecting owners with buyers and renters across Vasai West and Vasai East.",
+      url: "/about",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Patang Future Homes — about the Vasai property advisory team",
+        },
+      ],
+    },
   };
 }
 

@@ -12,10 +12,16 @@ export async function generateMetadata({
   const hasFilterParams = Object.keys(params).length > 0;
 
   return {
-    title:
-      "Properties for Sale & Rent in Vasai West & East | Patang Future Homes",
+    title: "Properties for Sale & Rent in Vasai West & East",
     description:
       "Browse authentic property listings in Vasai West and Vasai East. Flats, bungalows and commercial spaces for sale and rent — filter by type, configuration, location and budget.",
+    keywords: [
+      "properties for sale in Vasai West",
+      "flats for sale in Vasai East",
+      "shops for sale in Vasai",
+      "bungalows in Vasai West",
+      "property listings Palghar",
+    ],
     alternates: {
       canonical: "/properties",
     },

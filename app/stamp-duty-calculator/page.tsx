@@ -3,8 +3,7 @@ import StampDutyCalculator from "@/components/StampDutyCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title:
-      "Stamp Duty Calculator | Maharashtra Property Cost — Patang Future Homes",
+    title: "Stamp Duty Calculator — Maharashtra Property Cost",
     description:
       "Calculate stamp duty and registration charges for properties in Maharashtra (Vasai West & Vasai East). Choose buyer gender and area type to estimate your total cost instantly.",
     keywords: [
@@ -13,6 +12,24 @@ export async function generateMetadata(): Promise<Metadata> {
       "registration charges Maharashtra",
       "property registration cost India",
     ],
+    alternates: {
+      canonical: "/stamp-duty-calculator",
+    },
+    openGraph: {
+      type: "website",
+      title: "Stamp Duty Calculator — Maharashtra Property Cost",
+      description:
+        "Free Maharashtra stamp duty and registration calculator for Vasai West & Vasai East property buyers.",
+      url: "/stamp-duty-calculator",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Stamp duty calculator by Patang Future Homes",
+        },
+      ],
+    },
   };
 }
 

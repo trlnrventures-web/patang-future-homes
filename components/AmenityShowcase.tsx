@@ -1,7 +1,13 @@
 import Image from "next/image";
 import type { AmenityImage } from "@/lib/projects";
 
-export default function AmenityShowcase({ images }: { images: AmenityImage[] }) {
+export default function AmenityShowcase({
+  images,
+  projectTitle,
+}: {
+  images: AmenityImage[];
+  projectTitle: string;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
       {images.map((img) => (
@@ -11,7 +17,7 @@ export default function AmenityShowcase({ images }: { images: AmenityImage[] }) 
         >
           <Image
             src={img.src}
-            alt={`${img.title} — PAM One Time Vasai Edition amenity`}
+            alt={`${img.title} — ${projectTitle} amenity`}
             fill
             className="object-cover transition-transform duration-400 ease-out group-hover:scale-105"
             sizes="(min-width: 1024px) 33vw, 50vw"

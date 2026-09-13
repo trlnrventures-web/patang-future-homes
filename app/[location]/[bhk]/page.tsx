@@ -72,6 +72,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "website",
       title: page.metaTitle,
       description: page.metaDescription,
+      url: `/${location}/${bhk}`,
+      siteName: "Patang Future Homes",
+      locale: "en_IN",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: "Patang Future Homes",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: page.metaTitle,
+      description: page.metaDescription,
+      images: ["/og-image.jpg"],
     },
   };
 }

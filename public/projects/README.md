@@ -20,11 +20,13 @@ Supported formats: `.jpg`, `.jpeg`, `.png`, `.webp` (use whichever you drop in �
 
 ```text
 public/projects/
-  pearl-gardens/
+  sethi-palacio/
     1.jpg
     2.jpg
     3.jpg
 ```
+
+Each project folder already contains ready subfolders (`Amenities/`, `Actual Show Flat/`, `Elevation/`, `Show Flat/`, `Video/`) — drop your photos there and add matching entries to `data/projects.json`. A project with an empty `images` array shows a placeholder cover automatically.
 
 After adding files, refresh the page — the dev server serves them automatically.
 

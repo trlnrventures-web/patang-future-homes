@@ -3,9 +3,10 @@ import Link from "next/link";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Disclaimer | Patang Future Homes",
+    title: "Disclaimer",
     description:
       "Disclaimer for Patang Future Homes — important information about the accuracy of property listings, pricing and content on this platform.",
+    alternates: { canonical: "/disclaimer" },
     robots: { index: false, follow: true },
   };
 }

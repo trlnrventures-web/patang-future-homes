@@ -24,7 +24,17 @@ export default function Navbar() {
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-ink/10 bg-background/95 backdrop-blur-sm">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
         {/* Logo lockup */}
@@ -81,21 +91,27 @@ export default function Navbar() {
           <span className="block h-0.5 w-4 bg-ink" />
         </button>
       </nav>
+    </header>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-[55] bg-ink/50 animate-fade-in"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+    {/* Mobile overlay */}
+    <div
+      className={`fixed inset-0 z-[55] bg-ink/50 transition-opacity duration-300 ${
+        mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
+      onClick={() => setMobileOpen(false)}
+      aria-hidden={!mobileOpen}
+    />
 
       {/* Mobile slide-in menu */}
-      <div
-        className={`fixed top-0 right-0 z-[60] flex h-full w-72 flex-col bg-background p-6 shadow-2xl transition-transform duration-300 ease-in-out ${
-          mobileOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
+    <aside
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mobile menu"
+      className={`fixed top-0 right-0 z-[60] flex h-full w-72 flex-col bg-background p-6 shadow-2xl transition-transform duration-300 ease-in-out ${
+        mobileOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
+      }`}
+      aria-hidden={!mobileOpen}
+    >
         <button
           type="button"
           className="mb-8 self-end text-ink"
@@ -159,7 +175,7 @@ export default function Navbar() {
             Call Us
           </a>
         </div>
-      </div>
-    </header>
+    </aside>
+    </>
   );
 }
