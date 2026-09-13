@@ -43,3 +43,11 @@ next-env.d.ts
 # logs
 dev-server.log
 
+# cloudflare / opennext
+.open-next
+.dev.vars
+wrangler-local.log
+.wrangler
+# large local-only media (489 MB, exceeds GitHub limit)
+public/projects/pam-one-time-vasai-edition/Video/Pam AV.mp4
+
