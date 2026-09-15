@@ -3,16 +3,36 @@
 import { useState } from "react";
 import projects from "@/data/projects.json";
 
-const WHATSAPP_NUMBER = "919657447246";
+const WHATSAPP_NUMBER = "917249138197";
 
 const inputClass =
   "w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary";
 
-export default function InquiryForm() {
+export default function InquiryForm({
+  defaultProject,
+}: {
+  defaultProject?: string;
+}) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [project, setProject] = useState("");
+  const [project, setProject] = useState(defaultProject || "");
   const [message, setMessage] = useState("");
+
+  function saveLeadToCrm() {
+    const base =
+      process.env.NEXT_PUBLIC_CRM_URL ||
+      (typeof window !== "undefined" &&
+      (window.location.hostname.includes("crm.") || window.location.hostname === "localhost"))
+        ? window.location.origin
+        : "https://crm.patangfuturehomes.com";
+    fetch(`${base}/api/inquiries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, phone, project, message }),
+    }).catch(() => {
+      // CRM save is best-effort; WhatsApp flow should not be blocked
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,10 +46,12 @@ export default function InquiryForm() {
 
     const text = `Hello, I'd like to make an enquiry.%0A${parts.join("%0A")}`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${text}`, "_blank");
+    saveLeadToCrm();
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <input type="hidden" name="websiteProject" value={project} />
       <div>
         <label
           htmlFor="name"

@@ -74,7 +74,7 @@ export function configurationLabel(configs: Configuration[]): string {
       .sort((a, b) => a - b);
     return `${nums.join(", ")} BHK`;
   }
-  return configs[0]?.type ?? "—";
+  return configs[0]?.type ?? "N/A";
 }
 
 export function carpetAreaRange(configs: Configuration[]): string {
@@ -85,7 +85,7 @@ export function carpetAreaRange(configs: Configuration[]): string {
     );
     values.push(...nums);
   }
-  if (values.length === 0) return "—";
+  if (values.length === 0) return "N/A";
   const min = Math.min(...values);
   const max = Math.max(...values);
   return min === max ? `${min} sq ft` : `${min} – ${max} sq ft`;

@@ -86,3 +86,13 @@ h6 {
 .animate-fade-in {
   animation: fade-in 400ms ease-out forwards;
 }
+
+/* ================= Announcement bar messages ================= */
+.announce-item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}

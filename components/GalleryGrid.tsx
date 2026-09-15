@@ -41,7 +41,7 @@ export default function GalleryGrid({
           >
             <Image
               src={img}
-              alt={`${title} — photo ${i + 1}`}
+              alt={`${title}, photo ${i + 1}`}
               fill
               sizes="(max-width: 768px) 66vw, 40vw"
               className="object-cover transition-transform duration-400 ease-out group-hover:scale-105"
@@ -71,7 +71,7 @@ export default function GalleryGrid({
       {activeIndex !== null && (
         <Lightbox
           src={images[activeIndex]}
-          alt={`${title} — photo ${activeIndex + 1}`}
+          alt={`${title}, photo ${activeIndex + 1}`}
           onClose={() => setActiveIndex(null)}
           onPrev={prev}
           onNext={next}

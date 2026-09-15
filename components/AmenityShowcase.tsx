@@ -17,7 +17,7 @@ export default function AmenityShowcase({
         >
           <Image
             src={img.src}
-            alt={`${img.title} — ${projectTitle} amenity`}
+            alt={`${img.title}, ${projectTitle} amenity`}
             fill
             className="object-cover transition-transform duration-400 ease-out group-hover:scale-105"
             sizes="(min-width: 1024px) 33vw, 50vw"

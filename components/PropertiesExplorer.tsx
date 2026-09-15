@@ -395,7 +395,7 @@ export default function PropertiesExplorer() {
             No properties match your filters
           </p>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Try adjusting or clearing your filters — more listings from Vasai
+            Try adjusting or clearing your filters, more listings from Vasai
             West &amp; East are added regularly.
           </p>
           <button

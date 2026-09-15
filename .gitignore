@@ -42,6 +42,12 @@ next-env.d.ts
 
 # logs
 dev-server.log
+dev-server-err.log
+
+# local sqlite database (live CRM data + WAL files)
+data/crm.db
+data/crm.db-shm
+data/crm.db-wal
 
 # cloudflare / opennext
 .open-next

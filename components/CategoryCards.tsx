@@ -5,7 +5,8 @@ const CATEGORIES = [
   {
     type: "shop" as const,
     label: "Shops",
-    image: "https://images.unsplash.com/photo-1555636222-cae831e670b3?w=800&q=80",
+    image:
+      "https://images.unsplash.com/photo-1674286388329-837db73581c3?w=800&q=80",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -21,7 +22,7 @@ const CATEGORIES = [
   {
     type: "flat" as const,
     label: "Flats",
-    image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80",
+    image: "/projects/pam-one-time-vasai-edition/Elevation/Evening-View.webp",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -37,7 +38,8 @@ const CATEGORIES = [
   {
     type: "bungalow" as const,
     label: "Bungalows",
-    image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80",
+    image:
+      "https://images.unsplash.com/photo-1726995036039-1ff318dd445c?w=800&q=80",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -81,8 +83,14 @@ export default function CategoryCards() {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
 
-              {/* Bottom gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/20 to-transparent" />
+              {/* Bottom gradient overlay — 40% height */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.40) 30%, transparent 55%)",
+                }}
+              />
 
               {/* Label */}
               <div className="absolute bottom-0 left-0 flex items-center gap-2.5 p-5">

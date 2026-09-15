@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import type { ShowFlatImage } from "@/lib/projects";
 
-const WHATSAPP_NUMBER = "919657447246";
+const WHATSAPP_NUMBER = "917249138197";
 
 export default function ShowFlatGallery({
   images,
@@ -92,7 +92,7 @@ export default function ShowFlatGallery({
             >
               <Image
                 src={img.src}
-                alt={`${img.title} — ${projectTitle} ${tab === "render" ? "3D render" : "show flat photo"}`}
+                alt={`${img.title}, ${projectTitle} ${tab === "render" ? "3D render" : "show flat photo"}`}
                 fill
                 className="object-cover transition-transform duration-400 ease-out group-hover:scale-105"
                 sizes="(min-width: 1024px) 33vw, 50vw"

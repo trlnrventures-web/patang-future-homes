@@ -67,7 +67,7 @@ export default function Footer() {
             </div>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
               Your trusted real estate partner in Vasai West. We help you find
-              the perfect property — from premium flats to luxury bungalows and
+              the perfect property, from premium flats to luxury bungalows and
               commercial spaces.
             </p>
           </div>
@@ -112,10 +112,10 @@ export default function Footer() {
         <div className="mt-6 flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1 text-sm text-white/50">
             <a
-              href="tel:+919657447246"
+              href="tel:+917249138197"
               className="transition-colors hover:text-accent"
             >
-              +91 96574 47246
+              +91 72491 38197
             </a>
             <span>Vasai West, Maharashtra, India</span>
           </div>

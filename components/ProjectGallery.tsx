@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import HorizontalScroll from "./HorizontalScroll";
 
 export default function ProjectGallery({
   images,
@@ -27,7 +28,7 @@ export default function ProjectGallery({
 
       {/* Thumbnail strip */}
       {images.length > 1 && (
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+        <HorizontalScroll className="mt-3" gap="gap-3" showArrows={false}>
           {images.map((img, i) => (
             <button
               key={i}
@@ -40,6 +41,7 @@ export default function ProjectGallery({
                   ? "ring-2 ring-accent ring-offset-2 ring-offset-background"
                   : "opacity-60 hover:opacity-100"
               }`}
+              style={{ scrollSnapAlign: "start" }}
             >
               <Image
                 src={img}
@@ -50,7 +52,7 @@ export default function ProjectGallery({
               />
             </button>
           ))}
-        </div>
+        </HorizontalScroll>
       )}
     </div>
   );

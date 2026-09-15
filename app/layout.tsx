@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { inter, plusJakarta } from "./fonts";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: {
@@ -10,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s | Patang Future Homes",
   },
   description:
-    "Discover premium residential and commercial properties in Vasai West. Shops, flats, and bungalows by Patang Future Homes — your trusted real estate partner.",
+    "Discover premium residential and commercial properties in Vasai West. Shops, flats, and bungalows by Patang Future Homes, your trusted real estate partner.",
   openGraph: {
     type: "website",
     locale: "en_IN",
@@ -50,62 +48,18 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://patangfuturehomes.com"),
 };
 
-const organizationJsonLd = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://patangfuturehomes.com/#organization",
-      name: "Patang Future Homes",
-      url: "https://patangfuturehomes.com/",
-      description:
-        "Patang Future Homes is a trusted property advisory in Vasai West and Vasai East, connecting buyers and renters with premium shops, flats and bungalows across the region.",
-      telephone: "+919657447246",
-      areaServed: ["Vasai West", "Vasai East"],
-    },
-    {
-      "@type": "RealEstateAgent",
-      "@id": "https://patangfuturehomes.com/#realestateagent",
-      parentOrganization: {
-        "@id": "https://patangfuturehomes.com/#organization",
-      },
-      name: "Patang Future Homes",
-      url: "https://patangfuturehomes.com/",
-      description:
-        "Patang Future Homes helps you find the right property in Vasai West and Vasai East — from premium flats to luxury bungalows and commercial spaces, with trusted guidance at every step.",
-      telephone: "+919657447246",
-      priceRange: "₹₹",
-      areaServed: ["Vasai West", "Vasai East"],
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: "Vasai West",
-        addressRegion: "Maharashtra",
-        addressCountry: "IN",
-      },
-    },
-  ],
-};
-
 export default function RootLayout({
   children,
-}: LayoutProps<"/">) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"
       className={`${inter.variable} ${plusJakarta.variable} h-full antialiased`}
     >
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(organizationJsonLd),
-          }}
-        />
-      </head>
       <body className="min-h-full flex flex-col font-sans">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );

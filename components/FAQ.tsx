@@ -29,11 +29,11 @@ const FAQS = [
   },
   {
     q: "Do you help with property rentals as well as sales?",
-    a: "Yes, we assist with rentals across Vasai West and Vasai East — from 1 BHK apartments for small families to independent homes and commercial spaces. We handle tenant vetting, agreement drafting, and negotiation on the landlord's side, while tenants get verified listings and assistance with paperwork at a fair brokerage.",
+    a: "Yes, we assist with rentals across Vasai West and Vasai East, from 1 BHK apartments for small families to independent homes and commercial spaces. We handle tenant vetting, agreement drafting, and negotiation on the landlord's side, while tenants get verified listings and assistance with paperwork at a fair brokerage.",
   },
   {
     q: "Which builders/developers are active in Vasai right now?",
-    a: "Vasai currently sees activity from both established regional developers and newer local builders, with several RERA-registered launches underway across Vasai West and Vasai East. Patang Future Homes is your contact point for these projects — we represent multiple verified developers and can arrange site visits, share legal documents, and compare options side by side. Do ask us for the RERA registration number of any project before booking.",
+    a: "Vasai currently sees activity from both established regional developers and newer local builders, with several RERA-registered launches underway across Vasai West and Vasai East. Patang Future Homes is your contact point for these projects, and we represent multiple verified developers and can arrange site visits, share legal documents, and compare options side by side. Do ask us for the RERA registration number of any project before booking.",
   },
 ];
 

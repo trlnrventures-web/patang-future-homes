@@ -35,7 +35,7 @@ export default function Navbar() {
 
   return (
     <>
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-ink/10 bg-background/95 backdrop-blur-sm">
+    <header className="relative border-b border-ink/10 bg-background/95 backdrop-blur-sm">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
         {/* Logo lockup */}
         <Link href="/" className="flex flex-col leading-none">
@@ -63,7 +63,7 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <a
-          href="https://wa.me/919657447246"
+          href="https://wa.me/917249138197"
           target="_blank"
           rel="noopener noreferrer"
           className="hidden items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-secondary md:flex"
@@ -159,7 +159,7 @@ export default function Navbar() {
 
         <div className="mt-auto pt-8">
           <a
-            href="https://wa.me/919657447246"
+            href="https://wa.me/917249138197"
             target="_blank"
             rel="noopener noreferrer"
             className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-secondary"

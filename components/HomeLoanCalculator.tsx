@@ -71,7 +71,7 @@ export default function HomeLoanCalculator() {
             Home Loan Calculator
           </h2>
           <p className="mt-3 text-sm text-muted sm:text-base">
-            Check how much you can borrow or calculate your monthly EMI — instant,
+            Check how much you can borrow or calculate your monthly EMI, instant,
             free and without any obligation.
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function HomeLoanCalculator() {
                 <p className="mt-1 text-sm text-muted">
                   Your max eligible loan of <strong>{fmtINR(eligibility.maxLoan)}</strong> at{" "}
                   {interestRate}% p.a. over {tenureYears} years keeps your EMI
-                  within 40% of your take-home income — a safe threshold
+                  within 40% of your take-home income, a safe threshold
                   recommended by financial advisors.
                 </p>
               </div>

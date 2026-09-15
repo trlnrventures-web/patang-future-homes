@@ -40,7 +40,7 @@ export default function EmiCalculator() {
           </h2>
           <p className="mt-3 text-sm text-muted sm:text-base">
             Calculate your monthly home loan EMI for any amount, interest rate
-            and tenure — instantly and free.
+            and tenure, instantly and free.
           </p>
         </div>
 
@@ -103,8 +103,8 @@ export default function EmiCalculator() {
             {/* Breakdown */}
             <div className="mt-2">
               <div className="mb-2 flex items-center justify-between text-xs text-muted">
-                <span>Principal — {principalPct.toFixed(0)}%</span>
-                <span>Interest — {(100 - principalPct).toFixed(0)}%</span>
+                <span>Principal: {principalPct.toFixed(0)}%</span>
+                <span>Interest: {(100 - principalPct).toFixed(0)}%</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-ink/10">
                 <div

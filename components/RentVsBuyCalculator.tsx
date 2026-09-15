@@ -84,7 +84,7 @@ export default function RentVsBuyCalculator() {
           </h2>
           <p className="mt-3 text-sm text-muted sm:text-base">
             Compare the long-term cost of renting against buying a home in Vasai
-            — so you can decide what makes financial sense for you.
+            , so you can decide what makes financial sense for you.
           </p>
         </div>
 
@@ -214,7 +214,7 @@ export default function RentVsBuyCalculator() {
                 {result.buyBetter
                   ? `Over ${years} years, buying leaves you with a home plus equity worth roughly ${fmtCrOrLac(
                       result.buyNetWorth
-                    )} — more than renting would give back.`
+                    )}, more than renting would give back.`
                   : `Over ${years} years, renting and investing the difference leaves you better off than owning this property.`}
               </p>
             </div>

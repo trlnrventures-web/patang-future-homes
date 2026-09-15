@@ -52,11 +52,11 @@ export default function Hero() {
     <section className="relative overflow-hidden bg-background pt-28 pb-16 lg:pt-36 lg:pb-24">
       <div className="mx-auto max-w-7xl px-5 lg:px-8">
         <div className="grid items-center gap-12 lg:grid-cols-[55fr_45fr]">
-          {/* Left — text + lead capture */}
+          {/* Left: text + lead capture */}
           <div className="animate-hero-enter">
             <h1 className="font-display text-4xl leading-[1.1] tracking-tight text-ink sm:text-5xl lg:text-6xl">
               <span className="block font-bold">Buy. Sell. Rent.</span>
-              <span className="block font-normal">— All in Vasai.</span>
+              <span className="block font-normal">All in Vasai.</span>
             </h1>
 
             <p className="mt-5 max-w-md text-base leading-relaxed text-muted sm:text-lg">
@@ -213,9 +213,9 @@ export default function Hero() {
             </form>
           </div>
 
-          {/* Right — image with soft gradient edges */}
+          {/* Right: image with soft gradient edges */}
           <div className="relative aspect-[4/3] animate-hero-enter lg:aspect-[5/4]">
-            {/* Gradient masks — blend into background at edges */}
+            {/* Gradient masks: blend into background at edges */}
             <div className="absolute inset-0 z-10 rounded-2xl bg-gradient-to-r from-background via-transparent to-background" />
             <div className="absolute inset-0 z-10 rounded-2xl bg-gradient-to-b from-background via-transparent to-background" />
             <div className="absolute inset-0 z-10 rounded-2xl bg-gradient-to-t from-background via-transparent to-transparent" />

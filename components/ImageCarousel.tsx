@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type TouchEvent } from "react";
 import Image from "next/image";
+import HorizontalScroll from "./HorizontalScroll";
 
 export default function ImageCarousel({
   images,
@@ -59,7 +60,7 @@ export default function ImageCarousel({
         <Image
           key={index}
           src={images[index]}
-          alt={`${title} in ${location} — photo ${index + 1}`}
+          alt={`${title} in ${location}, photo ${index + 1}`}
           fill
           priority={index === 0}
           className="animate-fade-in object-cover"
@@ -134,7 +135,7 @@ export default function ImageCarousel({
 
       {/* Thumbnail strip */}
       {count > 1 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+        <HorizontalScroll className="mt-3" gap="gap-2" showArrows={false}>
           {images.map((img, i) => (
             <button
               key={img}
@@ -146,17 +147,18 @@ export default function ImageCarousel({
                   ? "border-accent"
                   : "border-transparent hover:border-primary/40"
               }`}
+              style={{ scrollSnapAlign: "start" }}
             >
               <Image
                 src={img}
-                alt={`${title} in ${location} — thumbnail ${i + 1}`}
+                alt={`${title} in ${location}, thumbnail ${i + 1}`}
                 fill
                 className="object-cover"
                 sizes="80px"
               />
             </button>
           ))}
-        </div>
+        </HorizontalScroll>
       )}
     </div>
   );

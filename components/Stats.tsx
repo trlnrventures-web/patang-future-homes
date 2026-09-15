@@ -27,7 +27,7 @@ export default function Stats() {
 
         <p className="mt-12 text-center text-sm text-white/40">
           Serving buyers, sellers, and renters across Vasai West and Vasai
-          East — with honesty and transparency.
+          East, with honesty and transparency.
         </p>
       </div>
     </section>

@@ -1,6 +1,6 @@
 import type { Configuration, Project } from "@/lib/projects";
 
-const WHATSAPP_NUMBER = "919657447246";
+const WHATSAPP_NUMBER = "917249138197";
 
 const TYPE_LABELS: Record<Project["type"], string> = {
   flat: "Flat",

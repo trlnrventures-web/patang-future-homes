@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
 import Image from "next/image";
+import HorizontalScroll from "./HorizontalScroll";
 
 const TESTIMONIALS = [
   {
@@ -57,105 +57,54 @@ function Stars() {
 }
 
 export default function Testimonials() {
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  function scrollBy(direction: 1 | -1) {
-    trackRef.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
-  }
-
   return (
     <section className="bg-white py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-5 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-accent-ink">
-              Client stories
-            </div>
-            <h2 className="mt-2 font-bold text-ink text-2xl sm:text-3xl">
-              Real Stories from Real Buyers
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              What our clients across Vasai say about working with us.
-            </p>
+        <div>
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-accent-ink">
+            Client stories
           </div>
-
-          {/* Scroll arrows */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => scrollBy(-1)}
-              aria-label="Scroll testimonials left"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink/20 text-muted transition-colors hover:border-primary hover:text-primary"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-5 w-5"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollBy(1)}
-              aria-label="Scroll testimonials right"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink/20 text-muted transition-colors hover:border-primary hover:text-primary"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-5 w-5"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
+          <h2 className="mt-2 font-bold text-ink text-2xl sm:text-3xl">
+            Real Stories from Real Buyers
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            What our clients across Vasai say about working with us.
+          </p>
         </div>
 
         {/* Scrollable row */}
-        <div className="mt-10 -mx-5 px-5 lg:-mx-8 lg:px-8">
-          <div
-            ref={trackRef}
-            className="flex gap-5 overflow-x-auto scroll-smooth pb-2"
-          >
-            {TESTIMONIALS.map((t) => (
-              <figure
-                key={t.name}
-                className="flex w-[300px] shrink-0 flex-col rounded-2xl border border-ink/10 bg-background p-6 sm:w-[340px]"
-              >
-                <Stars />
-                <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-muted">
-                  &ldquo;{t.quote}&rdquo;
-                </blockquote>
-                <figcaption className="mt-5 flex items-center gap-3 border-t border-ink/10 pt-4">
-                  <Image
-                    src={t.photo}
-                    alt={`${t.name} photo`}
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <div>
-                    <div className="text-sm font-bold text-ink">
-                      {t.name}
-                    </div>
-                    <div className="text-xs text-soft">{t.location}</div>
+        <HorizontalScroll
+          className="mt-10 -mx-5 px-5 lg:-mx-8 lg:px-8"
+          fadeColor="#ffffff"
+        >
+          {TESTIMONIALS.map((t) => (
+            <figure
+              key={t.name}
+              className="flex w-[300px] shrink-0 flex-col rounded-2xl border border-ink/10 bg-background p-6 sm:w-[340px]"
+              style={{ scrollSnapAlign: "start" }}
+            >
+              <Stars />
+              <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-muted">
+                &ldquo;{t.quote}&rdquo;
+              </blockquote>
+              <figcaption className="mt-5 flex items-center gap-3 border-t border-ink/10 pt-4">
+                <Image
+                  src={t.photo}
+                  alt={`${t.name} photo`}
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+                <div>
+                  <div className="text-sm font-bold text-ink">
+                    {t.name}
                   </div>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
+                  <div className="text-xs text-soft">{t.location}</div>
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </HorizontalScroll>
       </div>
     </section>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import ProjectCover from "./ProjectCover";
+import HorizontalScroll from "./HorizontalScroll";
 import projects from "@/data/projects.json";
 import { startingFrom } from "@/lib/price";
 
@@ -70,62 +71,61 @@ export default function NewProjects() {
         </div>
 
         {/* Horizontal scroll row */}
-        <div className="mt-10 -mx-5 overflow-x-auto px-5 pb-2 lg:-mx-8 lg:px-8">
-          <div className="flex gap-5">
-            {visible.map((project) => (
-              <Link
-                key={project.slug}
-                href={`/projects/${project.slug}`}
-                className="group w-[280px] shrink-0 overflow-hidden rounded-2xl bg-white shadow-md transition-shadow hover:shadow-xl sm:w-[320px]"
-              >
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <ProjectCover
-                    images={project.images}
-                    alt={`${project.title} in ${project.location}`}
-                    className="object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
-                    sizes="320px"
-                  />
+        <HorizontalScroll className="mt-10 -mx-5 px-5 lg:-mx-8 lg:px-8">
+          {visible.map((project) => (
+            <Link
+              key={project.slug}
+              href={`/projects/${project.slug}`}
+              className="group w-[280px] shrink-0 overflow-hidden rounded-2xl bg-white shadow-md transition-shadow hover:shadow-xl sm:w-[320px]"
+              style={{ scrollSnapAlign: "start" }}
+            >
+              <div className="relative aspect-[16/10] overflow-hidden">
+                <ProjectCover
+                  images={project.images}
+                  alt={`${project.title} in ${project.location}`}
+                  className="object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
+                  sizes="320px"
+                />
 
-                  {/* Status badge */}
-                  <span
-                    className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                      project.status === "New Launch"
-                        ? "bg-accent text-primary"
-                        : "bg-ink/80 text-white backdrop-blur-sm"
-                    }`}
+                {/* Status badge */}
+                <span
+                  className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                    project.status === "New Launch"
+                      ? "bg-accent text-primary"
+                      : "bg-ink/80 text-white backdrop-blur-sm"
+                  }`}
+                >
+                  {project.status}
+                </span>
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-bold text-ink">
+                  {project.title}
+                </h3>
+                <p className="mt-1 text-xs text-soft">{project.location}</p>
+                <p className="mt-2.5 text-sm font-bold text-primary">
+                  Starting from {startingFrom(project.priceRange)}
+                </p>
+                <span className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-accent-ink transition-colors group-hover:gap-2">
+                  View Details
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-3.5 w-3.5"
                   >
-                    {project.status}
-                  </span>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-bold text-ink">
-                    {project.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-soft">{project.location}</p>
-                  <p className="mt-2.5 text-sm font-bold text-primary">
-                    Starting from {startingFrom(project.priceRange)}
-                  </p>
-                  <span className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-accent-ink transition-colors group-hover:gap-2">
-                    View Details
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-3.5 w-3.5"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+                    <path
+                      fillRule="evenodd"
+                      d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </Link>
+          ))}
+        </HorizontalScroll>
 
         {visible.length === 0 && (
           <p className="mt-8 text-center text-sm text-soft">

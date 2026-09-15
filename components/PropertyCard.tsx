@@ -94,11 +94,11 @@ export default function PropertyCard({
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-sm text-muted">
             <span className="inline-flex items-center gap-1.5">
               <BedIcon />
-              {beds ? `${beds} Beds` : "—"}
+              {beds ? `${beds} Beds` : "N/A"}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <BathIcon />
-              {beds ? `${beds} Baths` : "—"}
+              {beds ? `${beds} Baths` : "N/A"}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <AreaIcon />

@@ -106,7 +106,7 @@ export default function PricingTable({
       {activeConfig && (
         <Lightbox
           src={activeConfig.floorPlanImage}
-          alt={`${activeConfig.type} floor plan — ${title}`}
+          alt={`${activeConfig.type} floor plan, ${title}`}
           onClose={() => setActiveConfig(null)}
         />
       )}
