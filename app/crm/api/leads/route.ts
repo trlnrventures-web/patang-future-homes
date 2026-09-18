@@ -159,9 +159,15 @@ export async function POST(request: NextRequest) {
 
     // New-lead invariants: always status "new", never pre-assigned to an SM,
     // and always routed to a real Caller role user, never the creator (Admin).
+    // Exception: when a Sales Manager creates the lead themselves they take
+    // ownership of it (so the detail page access check passes for them and the
+    // lead is not chaseable by a caller), bypassing caller routing.
+    const isSmCreator = user.role === "sales_manager";
     const preferredCallerId =
       user.role === "caller" ? user.id : Number(body.assignedCallerId) || null;
-    const callerId = resolveDefaultCallerId(db, { preferredId: preferredCallerId });
+    const callerId = isSmCreator
+      ? null
+      : resolveDefaultCallerId(db, { preferredId: preferredCallerId });
 
     const lead = db
       .insert(schema.leads)
@@ -195,7 +201,9 @@ export async function POST(request: NextRequest) {
         notes: body.notes || null,
         status: "new",
         assignedCallerId: callerId,
-        assignedSmId: null,
+        assignedSmId: isSmCreator ? user.id : null,
+        assignedAt: isSmCreator ? now : null,
+        assignedBy: isSmCreator ? user.id : null,
         createdAt: now,
         updatedAt: now,
       })
@@ -209,6 +217,21 @@ export async function POST(request: NextRequest) {
       notes: "Lead created",
       createdAt: now,
     }).run();
+
+    if (isSmCreator) {
+      const sm = db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, user.id))
+        .get();
+      db.insert(schema.activities).values({
+        leadId: lead.id,
+        userId: user.id,
+        type: "assignment",
+        notes: `Assigned: SM → ${sm?.name || "Self"} (lead created by SM)`,
+        createdAt: now,
+      }).run();
+    }
 
     return NextResponse.json({ lead }, { status: 201 });
   } catch (error) {
