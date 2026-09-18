@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   MESSAGE_CATEGORIES,
   MESSAGE_CATEGORY_LABELS,
@@ -9,6 +9,7 @@ import {
   type LeadSnapshot,
   formatMessageTime,
 } from "@/lib/crm/messages";
+import { bhkLabel } from "@/lib/crm/leads";
 import { CopyButton, WhatsAppOpenButton, Badge, Toast } from "./ui";
 
 export type MCTemplate = {
@@ -67,6 +68,18 @@ export default function MessageCenter({
   const [showMore, setShowMore] = useState(false);
 
   const context: LeadSnapshot = useMemo(() => buildLeadContext(lead), [lead]);
+
+  // Auto-load the recommended template for this lead on mount (no logging).
+  useEffect(() => {
+    const first = templates.find((t) => t.category === suggestedCategory);
+    if (first) {
+      setCategory(first.category);
+      setTemplateId(first.id);
+      setIsPersonal(false);
+      setDraft(renderMessage(first.body, buildLeadContext(lead)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedTemplate = useMemo(() => {
     const source = isPersonal ? myTemplates : templates;
@@ -174,7 +187,7 @@ export default function MessageCenter({
         showToast("Personal template saved");
       }
     } catch {
-      showToast("Save nahi ho paya");
+      showToast("Could not save template");
     } finally {
       setSaving(false);
     }
@@ -190,7 +203,7 @@ export default function MessageCenter({
       <div className="rounded-2xl border border-border bg-background/60 p-4">
         <div className="text-sm font-bold text-navy">{lead.name || "Customer"}</div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-          {lead.bhk ? <span>{String(lead.bhk)} BHK</span> : null}
+          {lead.bhk ? <span>{bhkLabel(String(lead.bhk))}</span> : null}
           {lead.budget ? (
             <>
               <span>•</span>
@@ -232,7 +245,7 @@ export default function MessageCenter({
             onClick={() => setShowMore((s) => !s)}
             className="text-xs font-semibold text-accent-ink hover:underline"
           >
-            {showMore ? "Less ▴" : "All messages ▾"}
+            {showMore ? "Show less ▴" : "More options ▾"}
           </button>
         </div>
 
@@ -240,8 +253,7 @@ export default function MessageCenter({
           <button
             onClick={() => {
               setIsPersonal(false);
-              setTemplateId(null);
-              setCategory(suggestedCategory);
+              selectCategory(suggestedCategory);
             }}
             className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors ${
               !isPersonal && category === suggestedCategory
@@ -249,67 +261,58 @@ export default function MessageCenter({
                 : "border-border bg-white text-muted hover:bg-primary/5"
             }`}
           >
-            {MESSAGE_CATEGORY_LABELS[suggestedCategory] || "Suggest"}
+            {MESSAGE_CATEGORY_LABELS[suggestedCategory] || "Recommended"}
           </button>
-          {MESSAGE_CATEGORIES.filter((c) => c.value !== suggestedCategory)
-            .slice(0, showMore ? MESSAGE_CATEGORIES.length : 5)
-            .map((c) => (
-              <button
-                key={c.value}
-                onClick={() => {
-                  setIsPersonal(false);
-                  selectCategory(c.value);
-                }}
-                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                  !isPersonal && category === c.value
-                    ? "border-primary bg-primary text-white"
-                    : "border-border bg-white text-muted hover:bg-primary/5"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
         </div>
 
         {showMore && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {isPersonal && (
-              <button
-                onClick={() => {
-                  setIsPersonal(false);
-                  setTemplateId(null);
-                }}
-                className="shrink-0 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary"
-              >
-                Shared Templates
-              </button>
-            )}
-            {(isPersonal ? myTemplates : templates)
-              .filter((t) => !(isPersonal ? false : t.isPersonal))
-              .map((t) => (
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {MESSAGE_CATEGORIES.filter((c) => c.value !== suggestedCategory).map((c) => (
                 <button
-                  key={t.id}
-                  onClick={() => selectTemplate(t)}
+                  key={c.value}
+                  onClick={() => {
+                    setIsPersonal(false);
+                    selectCategory(c.value);
+                  }}
                   className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    templateId === t.id && isPersonal === t.isPersonal
+                    !isPersonal && category === c.value
                       ? "border-primary bg-primary text-white"
                       : "border-border bg-white text-muted hover:bg-primary/5"
                   }`}
                 >
-                  {t.name}
+                  {c.label}
                 </button>
               ))}
-            {!isPersonal && myTemplates.length > 0 && (
-              <button
-                onClick={() => {
-                  setIsPersonal(true);
-                  setTemplateId(null);
-                  setCategory(myTemplates[0]?.category || "custom");
-                }}
-                className="shrink-0 rounded-full border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700"
-              >
-                My Templates ({myTemplates.length})
-              </button>
+              {!isPersonal && myTemplates.length > 0 && (
+                <button
+                  onClick={() => {
+                    setIsPersonal(true);
+                    setTemplateId(null);
+                    setCategory(myTemplates[0]?.category || "custom");
+                  }}
+                  className="shrink-0 rounded-full border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700"
+                >
+                  My Templates ({myTemplates.length})
+                </button>
+              )}
+            </div>
+            {isPersonal && myTemplates.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-1">
+                {myTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => selectTemplate(t)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      templateId === t.id && isPersonal
+                        ? "border-primary bg-primary text-white"
+                        : "border-border bg-white text-muted hover:bg-primary/5"
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -350,7 +353,7 @@ export default function MessageCenter({
               logAction("edited");
             }}
             className="text-[11px] font-semibold text-soft hover:text-primary"
-            title="Edit inline (chahe toh directly badal sakte ho)"
+            title="Edit inline (you can change it directly)"
           >
             ✎ Edit
           </button>
@@ -360,7 +363,7 @@ export default function MessageCenter({
           onChange={(e) => setDraft(e.target.value)}
           rows={7}
           className="w-full resize-y bg-transparent px-4 py-3 text-sm leading-relaxed text-navy outline-none"
-          placeholder={renderMessage("{{name}} sir, message yahan prepare hoke dikhega.", context)}
+          placeholder="Your message will be prepared here."
         />
 
         <div className="flex flex-col gap-2 border-t border-border p-3 sm:flex-row">
@@ -389,7 +392,7 @@ export default function MessageCenter({
             + Save as my template
           </button>
           <span className="text-[10px] text-soft">
-            Message copy hone ke baad aap WhatsApp mein paste kar ke bhej sakte ho
+            After copying, paste and send the message on WhatsApp
           </span>
         </div>
       </div>
@@ -399,7 +402,7 @@ export default function MessageCenter({
         <h3 className="mb-2 text-sm font-bold text-primary">Message History</h3>
         {logs.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border bg-white p-4 text-center text-xs text-muted">
-            Abhi tak koi message activity nahi.
+            No message activity yet.
           </p>
         ) : (
           <div className="space-y-2">

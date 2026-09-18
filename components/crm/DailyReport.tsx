@@ -51,7 +51,7 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
         setMy(await res.json());
       }
     } catch {
-      showToast("Report load nahi hua");
+      showToast("Could not load the report");
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
       await navigator.clipboard.writeText(text);
       showToast("Report copied");
     } catch {
-      showToast("Copy nahi hua");
+      showToast("Could not copy");
     }
   };
 

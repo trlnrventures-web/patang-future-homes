@@ -49,6 +49,46 @@ export async function POST(
       .returning()
       .get();
 
+    // ---- @mention capture in notes (text-based tagging) ----
+    if (body.type === "note" && typeof body.notes === "string" && body.notes.includes("@")) {
+      const noteLower = body.notes.toLowerCase();
+      const candidates = db
+        .select()
+        .from(schema.users)
+        .all()
+        .map((u) => {
+          const full = u.name.trim().toLowerCase();
+          return {
+            id: u.id,
+            full,
+            first: full.split(/\s+/)[0] || "",
+          };
+        })
+        .sort((a, b) => b.full.length - a.full.length);
+      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const mentionedIds = new Set<number>();
+      for (const c of candidates) {
+        if (mentionedIds.has(c.id) || !c.full || !c.first) continue;
+        const fullRe = new RegExp(`@\\s*${escape(c.full)}(?=$|[\\s.,!?;:])`, "i");
+        const firstRe = new RegExp(`@\\s*${escape(c.first)}(?=$|[\\s.,!?;:])`, "i");
+        if (fullRe.test(noteLower) || firstRe.test(noteLower)) {
+          mentionedIds.add(c.id);
+        }
+      }
+      for (const uid of mentionedIds) {
+        db.insert(schema.leadMentions)
+          .values({
+            leadId: lead.id,
+            userId: uid,
+            mentionedById: user.id,
+            noteId: activity.id,
+            noteSnippet: body.notes,
+            createdAt: now,
+          })
+          .run();
+      }
+    }
+
     const leadUpdates: Record<string, unknown> = {};
     const statusMap: Record<string, string> = {
       call_connected: "connected",
@@ -97,7 +137,7 @@ export async function POST(
     if (body.type === "call_no_answer") {
       newStatus = "no_response";
       const attempts = (lead.attemptCount ?? 0) + 1;
-      const nextAt = nextNoResponseAttempt(attempts);
+      const nextAt = body.scheduledFollowUp ? String(body.scheduledFollowUp) : nextNoResponseAttempt(attempts);
       leadUpdates.attemptCount = attempts;
       leadUpdates.lastAttemptAt = now;
       leadUpdates.nextAttemptAt = nextAt;
@@ -144,6 +184,26 @@ export async function POST(
       newStatus = "nurture";
       leadUpdates.concern = lead.concern || "not_interested";
       leadUpdates.nextAction = "nurture";
+    }
+
+    if (
+      body.scheduledFollowUp &&
+      body.type !== "call_no_answer" &&
+      body.type !== "call_back"
+    ) {
+      const scheduledFor = String(body.scheduledFollowUp);
+      leadUpdates.nextFollowUp = scheduledFor;
+      leadUpdates.nextAction = body.nextAction || "callback";
+      if (lead.status === "new") newStatus = "calling";
+      db.insert(schema.followUps).values({
+        leadId: lead.id,
+        userId: user.id,
+        scheduledFor,
+        purpose: body.followUpPurpose || "Follow-up after call",
+        status: "pending",
+        notes: body.notes || "",
+        createdAt: now,
+      }).run();
     }
 
     if (body.type === "follow_up") {
@@ -221,7 +281,9 @@ export async function POST(
 
     if (body.type === "post_visit_feedback") {
       const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.leadId, lead.id)).all();
-      const latestVisit = visits[visits.length - 1];
+      const latestVisit =
+        visits.find((v) => body.visitId && v.id === Number(body.visitId)) ||
+        visits[visits.length - 1];
       if (latestVisit) {
         db.insert(schema.postVisitFeedback).values({
           visitId: latestVisit.id,
@@ -237,7 +299,10 @@ export async function POST(
           notes: body.notes || "",
           createdAt: now,
         }).run();
-        db.update(schema.siteVisits).set({ status: "visit_done" }).where(eq(schema.siteVisits.id, latestVisit.id)).run();
+        db.update(schema.siteVisits)
+          .set({ status: "visit_done", doneAt: latestVisit.doneAt || now })
+          .where(eq(schema.siteVisits.id, latestVisit.id))
+          .run();
       }
       newStatus = lead.status === "booked" ? "booked" : "follow_up";
       leadUpdates.nextAction = body.nextAction || "follow_up";
@@ -251,6 +316,39 @@ export async function POST(
           status: "pending",
           createdAt: now,
         }).run();
+      }
+    }
+
+    if (
+      body.type === "visit_arrived" ||
+      body.type === "visit_done" ||
+      body.type === "visit_no_show" ||
+      body.type === "visit_cancelled"
+    ) {
+      const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.leadId, lead.id)).all();
+      const target =
+        visits.find((v) => body.visitId && v.id === Number(body.visitId)) ||
+        visits[visits.length - 1];
+      const nextVisitStatus =
+        body.type === "visit_arrived"
+          ? "arrived"
+          : body.type === "visit_no_show"
+            ? "no_show"
+            : body.type === "visit_cancelled"
+              ? "cancelled"
+              : "visit_done";
+      if (target) {
+        db.update(schema.siteVisits)
+          .set({
+            status: nextVisitStatus,
+            doneAt: body.type === "visit_done" ? now : target.doneAt,
+          })
+          .where(eq(schema.siteVisits.id, target.id))
+          .run();
+        if (body.type === "visit_done") {
+          leadUpdates.nextAction = "post_visit_feedback";
+          if (lead.status !== "negotiation" && lead.status !== "booked") newStatus = "visit_done";
+        }
       }
     }
 

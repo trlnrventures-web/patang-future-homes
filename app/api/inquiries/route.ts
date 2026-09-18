@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
+import { resolveDefaultCallerId } from "@/lib/crm/leads";
 
 export const runtime = "nodejs";
 
@@ -65,6 +66,8 @@ export async function POST(request: NextRequest) {
     const db = getDb();
     const now = new Date().toISOString();
 
+    const callerId = resolveDefaultCallerId(db);
+
     const lead = db
       .insert(schema.leads)
       .values({
@@ -76,6 +79,7 @@ export async function POST(request: NextRequest) {
         originalMessage: theirMessage ? `${project ? `${project}: ` : ""}${theirMessage}` : project,
         location: null,
         status: "new",
+        assignedCallerId: callerId,
         createdAt: now,
         updatedAt: now,
       })
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
           leadId: lead.id,
           userId: admin.id,
           type: "note",
-          notes: `Website enquiry${project ? ` for ${project}` : ""}${theirMessage ? ` — ${theirMessage}` : ""}`,
+          notes: `Website enquiry${project ? ` for ${project}` : ""}${theirMessage ? `. Message: ${theirMessage}` : ""}`,
           createdAt: now,
         })
         .run();

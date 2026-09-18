@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
   }
 
-  // userId is NEVER trusted from the query string — the report is always for the caller.
+  // userId is NEVER trusted from the query string: the report is always for the caller.
   const metrics = getDailyMetricsForEmployee(
     { id: user.id, name: user.name, role: user.role },
     date

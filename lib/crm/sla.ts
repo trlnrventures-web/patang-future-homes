@@ -34,6 +34,6 @@ export function slaStatusMeta(s: SlaStatus) {
     case "no_call":
       return { label: "Not called", cls: "bg-slate-100 text-slate-600" };
     default:
-      return { label: "—", cls: "bg-slate-100 text-slate-500" };
+      return { label: "No SLA", cls: "bg-slate-100 text-slate-500" };
   }
 }

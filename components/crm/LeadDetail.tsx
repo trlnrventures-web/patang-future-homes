@@ -17,6 +17,7 @@ import {
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import { slaStatusMeta, formatLeadAge } from "@/lib/crm/sla";
 import { matchLevelMeta, type PropertyMatch } from "@/lib/crm/matching";
+import { SUB_LOCATIONS, priceValidityInfo } from "@/lib/projects";
 
 export type LeadDetailData = {
   lead: Record<string, any>;
@@ -24,6 +25,7 @@ export type LeadDetailData = {
   followUps: any[];
   visits: any[];
   users: { id: number; name: string; role: string }[];
+  latestFeedback: Record<string, any> | null;
 };
 
 type Props = {
@@ -36,6 +38,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const [activities, setActivities] = useState(data.activities);
   const [followUps, setFollowUps] = useState(data.followUps);
   const [visits, setVisits] = useState(data.visits);
+  const [latestFeedback, setLatestFeedback] = useState(data.latestFeedback);
   const [toast, setToast] = useState("");
   const [note, setNote] = useState("");
   const [editingReq, setEditingReq] = useState(false);
@@ -55,6 +58,12 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const [showLostPicker, setShowLostPicker] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [lostNote, setLostNote] = useState("");
+  const [visitDefaults, setVisitDefaults] = useState({
+    date: "",
+    time: "11:00",
+    project: "",
+    meetingPoint: "",
+  });
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
   const isCaller = currentUser.role === "caller";
@@ -104,6 +113,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       setActivities(fresh.activities);
       setFollowUps(fresh.followUps);
       setVisits(fresh.visits);
+      if (fresh.latestFeedback) setLatestFeedback(fresh.latestFeedback);
     }
   }, [lead.id]);
 
@@ -139,7 +149,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       showToast(ACTIVITY_LABELS[type] || "Updated");
       reload();
     } catch {
-      showToast("Update nahi ho paya");
+      showToast("Could not update");
     } finally {
       setBusy(false);
     }
@@ -149,10 +159,10 @@ export default function LeadDetail({ data, currentUser }: Props) {
     setBusy(true);
     try {
       await postActivity({ type: "concern", concern, notes: `Concern recorded: ${concern}` });
-      showToast("Concern recorded. Customer active rahega.");
+      showToast("Concern recorded. Customer stays active.");
       reload();
     } catch {
-      showToast("Record nahi hua");
+      showToast("Could not record");
     } finally {
       setBusy(false);
     }
@@ -165,7 +175,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       showToast(`Status → ${LEAD_STATUS_LABELS[status]}`);
       reload();
     } catch {
-      showToast("Status update nahi hua");
+      showToast("Could not update status");
     } finally {
       setBusy(false);
     }
@@ -173,7 +183,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
   const handleConfirmLost = async () => {
     if (!lostReason) {
-      showToast("Reason select karein");
+      showToast("Select a reason");
       return;
     }
     setBusy(true);
@@ -181,7 +191,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       await patchLead({
         status: "lost",
         notes: setLeadLostReasonInNotes(lead.notes, lostReason),
-        statusChangeNote: lostNote.trim() || `Lead lost — ${lostReasonLabel(lostReason)}`,
+        statusChangeNote: lostNote.trim() || `Lead lost: ${lostReasonLabel(lostReason)}`,
       });
       showToast("Lead marked lost");
       setShowLostPicker(false);
@@ -189,7 +199,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       setLostNote("");
       reload();
     } catch {
-      showToast("Update nahi hua");
+      showToast("Could not update");
     } finally {
       setBusy(false);
     }
@@ -200,10 +210,10 @@ export default function LeadDetail({ data, currentUser }: Props) {
     setBusy(true);
     try {
       await postActivity({ type: "assignment", smId: selectedSm });
-      showToast("Lead assign ho gaya");
+      showToast("Lead assigned");
       reload();
     } catch {
-      showToast("Assign nahi ho paya");
+      showToast("Could not assign");
     } finally {
       setBusy(false);
     }
@@ -218,7 +228,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       showToast("Note added");
       reload();
     } catch {
-      showToast("Note add nahi hua");
+      showToast("Could not add note");
     } finally {
       setBusy(false);
     }
@@ -239,7 +249,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       setShowFollowUp(false);
       reload();
     } catch {
-      showToast("Schedule nahi hua");
+      showToast("Could not schedule");
     } finally {
       setBusy(false);
     }
@@ -263,7 +273,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       setShowVisit(false);
       reload();
     } catch {
-      showToast("Visit book nahi hui");
+      showToast("Could not book visit");
     } finally {
       setBusy(false);
     }
@@ -273,7 +283,27 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const waNumber = formatPhoneForWhatsApp(phone);
   const notesList = activities.filter((a) => a.type === "note");
 
+  const SECOND_VISIT_MESSAGE =
+    "Great to see your interest! Would you like to bring your family for a second look this weekend? I can arrange a convenient time.";
+  const shouldSuggestSecondVisit =
+    !!latestFeedback &&
+    (String(latestFeedback.interest || "").toLowerCase() === "hot" ||
+      String(latestFeedback.likedProperty || "").toLowerCase() === "yes" ||
+      latestFeedback.likedProperty === true);
+
   const requiredFieldsFilled = Boolean(lead.bhk && (lead.budget || (lead.budgetMin && lead.budgetMax)) && lead.location);
+
+  const qualificationFields = [
+    { key: "Location", filled: Boolean(lead.location) },
+    { key: "BHK", filled: Boolean(lead.bhk) },
+    { key: "Budget", filled: Boolean(lead.budget || lead.budgetMin || lead.budgetMax) },
+    { key: "Purpose", filled: Boolean(lead.purpose) },
+    { key: "Timeline", filled: Boolean(lead.timeline) },
+    { key: "Loan", filled: lead.loanRequired != null },
+    { key: "Family", filled: Boolean(lead.familyRequirements) },
+    { key: "Other Prefs", filled: Boolean(lead.otherPreferences) },
+  ];
+  const qualificationDone = qualificationFields.filter((f) => f.filled).length;
 
   return (
     <div className="space-y-7">
@@ -338,7 +368,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <span className="text-xs font-bold">FOLLOW-UP</span>
         </button>
         <button
-          onClick={() => setShowVisit((s) => !s)}
+          onClick={openVisit}
           className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-3 text-emerald-700"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -373,98 +403,144 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Call outcome buttons ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { t: "call_connected", label: "Connected", color: "bg-green-100 text-green-800" },
-            { t: "call_no_answer", label: "No Answer", color: "bg-amber-100 text-amber-800" },
-            { t: "call_busy", label: "Busy", color: "bg-orange-100 text-orange-800" },
-            { t: "call_wrong_number", label: "Wrong Number", color: "bg-red-100 text-red-700" },
-            { t: "call_back", label: "Call Back", color: "bg-blue-100 text-blue-800" },
-            { t: "call_not_interested", label: "Not Interested", color: "bg-slate-200 text-slate-700" },
-            { t: "call_other", label: "Other", color: "bg-gray-100 text-gray-700" },
-          ].map((b) => (
-            <button
-              key={b.t}
-              disabled={busy}
-              onClick={() => {
-                if (b.t === "call_back") {
-                  setShowCallback((s) => !s);
-                } else {
-                  handleCallOutcome(b.t);
-                }
-              }}
-              className={`rounded-full px-4 py-2 text-xs font-bold transition-opacity disabled:opacity-50 ${b.color}`}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-        {showCallback && (
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <input
-              type="datetime-local"
-              value={callbackTime}
-              onChange={(e) => setCallbackTime(e.target.value)}
-              className="flex-1 rounded-xl border border-blue-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
-            />
-            <Button
-              disabled={busy || !callbackTime}
-              onClick={() => {
-                handleCallOutcome("call_back", { callbackTime: new Date(callbackTime).toISOString() });
-                setShowCallback(false);
-                setCallbackTime("");
-              }}
-            >
-              Confirm Call Back
-            </Button>
-          </div>
-        )}
-        <p className="mt-2 text-[10px] text-soft">
-          CALL button phone dial karta hai — yahan outcome log karo after the call.
-        </p>
-      </div>
-
-      {/* ===== Concern / Rejected project ===== */}
-      {lead.originalProject && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-primary">
-              Original Enquiry: {lead.originalProject}
+      {/* ===== 2nd visit suggestion (post-visit feedback) ===== */}
+      {shouldSuggestSecondVisit && (
+        <div className="rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-navy">
+              Suggest a 2nd visit with family?
             </h3>
-            {lead.concern && (
-              <Badge color="bg-amber-100 text-amber-800">Concern: {lead.concern}</Badge>
-            )}
+            <Badge color="bg-amber-100 text-amber-800">Post-visit feedback</Badge>
           </div>
-          <p className="mb-2 text-xs text-muted">
-            Project reject ho sakta hai, customer nahi. Agenda record karo aur alternative options dikhao.
+          <p className="mt-1 text-xs text-muted">
+            Customer showed strong interest after the site visit (
+            {latestFeedback?.interest ? `interest: ${String(latestFeedback.interest).toUpperCase()}` : ""}
+            {latestFeedback?.likedProperty ? (latestFeedback.interest ? " · " : "") + `liked: ${String(latestFeedback.likedProperty).toUpperCase()}` : ""}
+            ). Lock in a family follow-up visit before interest fades.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href={`https://wa.me/${waNumber}?text=${encodeURIComponent(SECOND_VISIT_MESSAGE)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleShareSecondVisit}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            >
+              <WhatsAppIcon />
+              Send on WhatsApp
+            </a>
+            <button
+              onClick={openVisitWithFamily}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition-opacity hover:bg-emerald-100 disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              Book 2nd Visit
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-soft">
+            WhatsApp message is pre-filled, just send it. Or book a weekend visit right away.
+          </p>
+        </div>
+      )}
+
+      {/* ===== Row 2: Call Outcome + Original Enquiry ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className={`rounded-2xl border border-border bg-white p-4 ${lead.originalProject ? "" : "sm:col-span-2"}`}>
+          <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
           <div className="flex flex-wrap gap-2">
             {[
-              { v: "budget", l: "Budget zyada" },
-              { v: "location", l: "Location pasand nahi" },
-              { v: "bhk", l: "BHK size" },
-              { v: "possession", l: "Possession time" },
-              { v: "comparing", l: "Comparing with others" },
-            ].map((c) => (
+              { t: "call_connected", label: "Connected", color: "bg-green-100 text-green-800" },
+              { t: "call_no_answer", label: "No Answer", color: "bg-amber-100 text-amber-800" },
+              { t: "call_busy", label: "Busy", color: "bg-orange-100 text-orange-800" },
+              { t: "call_wrong_number", label: "Wrong Number", color: "bg-red-100 text-red-700" },
+              { t: "call_back", label: "Call Back", color: "bg-blue-100 text-blue-800" },
+              { t: "call_not_interested", label: "Not Interested", color: "bg-slate-200 text-slate-700" },
+              { t: "call_other", label: "Other", color: "bg-gray-100 text-gray-700" },
+            ].map((b) => (
               <button
-                key={c.v}
+                key={b.t}
                 disabled={busy}
-                onClick={() => handleRecordConcern(c.v)}
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  lead.concern === c.v
-                    ? "border-amber-500 bg-amber-100 text-amber-800"
-                    : "border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
-                }`}
+                onClick={() => {
+                  if (b.t === "call_back") {
+                    setShowCallback((s) => !s);
+                  } else {
+                    handleCallOutcome(b.t);
+                  }
+                }}
+                className={`rounded-full px-4 py-2 text-xs font-bold transition-opacity disabled:opacity-50 ${b.color}`}
               >
-                {c.l}
+                {b.label}
               </button>
             ))}
           </div>
+          {showCallback && (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="datetime-local"
+                value={callbackTime}
+                onChange={(e) => setCallbackTime(e.target.value)}
+                className="flex-1 rounded-xl border border-blue-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
+              />
+              <Button
+                disabled={busy || !callbackTime}
+                onClick={() => {
+                  handleCallOutcome("call_back", { callbackTime: new Date(callbackTime).toISOString() });
+                  setShowCallback(false);
+                  setCallbackTime("");
+                }}
+              >
+                Confirm Call Back
+              </Button>
+            </div>
+          )}
+          <p className="mt-2 text-[10px] text-soft">
+            The CALL button dials the phone. Log the outcome here after the call.
+          </p>
         </div>
-      )}
+
+        {/* Concern / Rejected project */}
+        {lead.originalProject && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary">
+                Original Enquiry: {lead.originalProject}
+              </h3>
+              {lead.concern && (
+                <Badge color="bg-amber-100 text-amber-800">Concern: {lead.concern}</Badge>
+              )}
+            </div>
+            <p className="mb-2 text-xs text-muted">
+              The project can be rejected, not the customer. Record the agenda and show alternative options.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { v: "budget", l: "Budget too high" },
+                { v: "location", l: "Location not preferred" },
+                { v: "bhk", l: "BHK size" },
+                { v: "possession", l: "Possession time" },
+                { v: "comparing", l: "Comparing with others" },
+              ].map((c) => (
+                <button
+                  key={c.v}
+                  disabled={busy}
+                  onClick={() => handleRecordConcern(c.v)}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                    lead.concern === c.v
+                      ? "border-amber-500 bg-amber-100 text-amber-800"
+                      : "border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                  }`}
+                >
+                  {c.l}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ===== Status change ===== */}
       <div className="rounded-2xl border border-border bg-white p-4">
@@ -526,7 +602,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
             </button>
           </div>
           <p className="mt-1.5 text-xs text-muted">
-            Original enquiry preserved — customer reactivated ho sakta hai. Lost reason is used in
+            Original enquiry is preserved, so the customer can be reactivated. Lost reason is used in
             Reports for project-level loss analysis.
           </p>
         </div>
@@ -546,14 +622,44 @@ export default function LeadDetail({ data, currentUser }: Props) {
           )}
         </div>
 
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="font-semibold text-navy">Qualification Progress</span>
+            <span className="font-bold text-primary">
+              {qualificationDone}/8 captured
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${(qualificationDone / 8) * 100}%` }}
+            />
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {qualificationFields.map((f) => (
+              <span
+                key={f.key}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  f.filled
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-gray-100 text-soft"
+                }`}
+              >
+                {f.filled ? "✓ " : "○ "}{f.key}
+              </span>
+            ))}
+          </div>
+        </div>
+
         {!requiredFieldsFilled && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Requirement abhi complete nahi hai. Call karke qualify karein.
+            Requirement is not complete yet. Call and qualify the lead.
           </p>
         )}
 
         <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
-          <ReqItem label="Location" value={lead.location || "—"} />
+          <ReqItem label="Location" value={lead.location || ""} />
+          <ReqItem label="Sub-location" value={lead.sublocation || ""} />
           <ReqItem label="Budget" value={budgetLabel(lead)} />
           <ReqItem label="BHK" value={bhkLabel(lead.bhk)} />
           <ReqItem label="Purpose" value={purposeLabel(lead.purpose)} />
@@ -589,8 +695,9 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Lead Tag ===== */}
-      <div className="rounded-2xl border border-primary/15 bg-white p-4">
+      {/* ===== Lead Tag + SM handoff/assign ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={`rounded-2xl border border-primary/15 bg-white p-4 ${(canAssign && !lead.assignedSmId) || lead.assignedSmName ? "" : "sm:col-span-2"}`}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
           {!tagShown && (
@@ -621,7 +728,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         ) : (
           <p className="text-xs text-muted">
-            Client aur visit details ka summary generate karo — WhatsApp par share karna asaan.
+            Generate a summary of the client and visit details to share easily on WhatsApp.
           </p>
         )}
       </div>
@@ -677,16 +784,17 @@ export default function LeadDetail({ data, currentUser }: Props) {
             <Badge color="bg-violet-100 text-violet-800">Assigned to {lead.assignedSmName}</Badge>
           </div>
           <div className="rounded-xl bg-white p-3 text-sm">
-            <div className="mb-1 font-bold text-navy">CUSTOMER REQUIREMENT — {lead.name}</div>
+            <div className="mb-1 font-bold text-navy">CUSTOMER REQUIREMENT: {lead.name}</div>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <HandoffItem label="Location" value={lead.location || "—"} />
+              <HandoffItem label="Location" value={lead.location || ""} />
+              <HandoffItem label="Sub-location" value={lead.sublocation || ""} />
               <HandoffItem label="Budget" value={budgetLabel(lead)} />
               <HandoffItem label="BHK" value={bhkLabel(lead.bhk)} />
               <HandoffItem label="Purpose" value={purposeLabel(lead.purpose)} />
               <HandoffItem label="Timeline" value={timelineLabel(lead.timeline)} />
               <HandoffItem label="Loan" value={loanLabel(lead.loanRequired)} />
-              <HandoffItem label="Original Enquiry" value={lead.originalProject || "—"} />
-              <HandoffItem label="Customer Concern" value={lead.concern || "—"} />
+              <HandoffItem label="Original Enquiry" value={lead.originalProject || ""} />
+              <HandoffItem label="Customer Concern" value={lead.concern || ""} />
             </dl>
             {lead.familyRequirements && (
               <p className="mt-2 text-xs text-muted">Family: {lead.familyRequirements}</p>
@@ -702,6 +810,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
+      </div>
 
       {/* ===== Property matches ===== */}
       {(showMatches || matches.length > 0) && (
@@ -716,17 +825,25 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
           {matches.length === 0 ? (
             <p className="text-xs text-muted">
-              Requirement complete karo (budget, location, BHK) — uske baad matching dikhega.
+              Complete the requirement (budget, location, BHK) and matching properties will appear.
             </p>
           ) : (
             <div className="space-y-2.5">
               {matches.map((m) => (
-                <div key={m.projectSlug} className="rounded-xl border border-border bg-white p-3">
+                <div key={m.projectSlug} className={`rounded-xl border p-3 ${m.source === "market" ? "border-blue-100 bg-blue-50/40" : "border-border bg-white"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-sm font-bold text-navy">{m.title}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-navy">{m.title}</span>
+                        {m.source === "market" && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Partner network</span>
+                        )}
+                        {m.developer && (
+                          <span className="text-[10px] text-soft">· {m.developer}</span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted">
-                        {m.location} · {m.bhkOptions.join(", ") || "—"} BHK
+                        {m.location} · {m.bhkOptions.map(bhkLabel).join(", ") || ""}
                       </div>
                     </div>
                     <Badge color={matchLevelMeta(m.level).cls}>
@@ -736,6 +853,14 @@ export default function LeadDetail({ data, currentUser }: Props) {
                   <div className="mt-1 text-xs text-soft">
                     {m.priceRange} · Possession {m.possessionDate}
                   </div>
+                  {m.priceValidUntil && (() => {
+                    const pv = priceValidityInfo({ priceValidUntil: m.priceValidUntil });
+                    return pv ? (
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        ⏰ Price valid till {pv.validUntil} · {pv.daysLeft} day{pv.daysLeft === 1 ? "" : "s"} left
+                      </span>
+                    ) : null;
+                  })()}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {m.reasons.map((r, i) => (
                       <span
@@ -748,14 +873,20 @@ export default function LeadDetail({ data, currentUser }: Props) {
                       </span>
                     ))}
                   </div>
-                  <a
-                    href={`/projects/${m.projectSlug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
-                  >
-                    View project →
-                  </a>
+                  {m.source === "primary" ? (
+                    <a
+                      href={`/projects/${m.projectSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+                    >
+                      View project →
+                    </a>
+                  ) : (
+                    <span className="mt-2 inline-block text-[11px] font-semibold text-blue-600">
+                      Available via partner network
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -805,20 +936,20 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold text-muted">Date</label>
-              <input type="date" name="visitDate" required className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
+              <input type="date" name="visitDate" required defaultValue={visitDefaults.date} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-muted">Time</label>
-              <input type="time" name="visitTime" required className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
+              <input type="time" name="visitTime" required defaultValue={visitDefaults.time || "11:00"} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted">Project</label>
-            <input type="text" name="visitProject" defaultValue={lead.preferredProject || lead.originalProject || ""} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
+            <input type="text" name="visitProject" defaultValue={visitDefaults.project || lead.preferredProject || lead.originalProject || ""} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted">Meeting Point</label>
-            <input type="text" name="meetingPoint" placeholder="e.g. Project gate, Vasai West station..." className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
+            <input type="text" name="meetingPoint" defaultValue={visitDefaults.meetingPoint} placeholder="e.g. Project gate, Vasai West station..." className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
           </div>
           <div className="flex gap-2">
             <Button type="submit" disabled={busy}>Book Visit</Button>
@@ -827,20 +958,21 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </form>
       )}
 
-      {/* ===== Notes ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
+      {/* ===== Row: Notes + Call History ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={`rounded-2xl border border-border bg-white p-4 ${activities.some((a) => String(a.type).startsWith("call")) ? "" : "sm:col-span-2"}`}>
         <h3 className="mb-1 text-sm font-bold text-primary">Notes</h3>
         <p className="mb-3 text-[10px] text-soft">
-          Call updates, customer preferences, reminders — sab yahan.
+          Call updates, customer preferences, and reminders all in one place.
         </p>
         {notesList.length === 0 ? (
-          <p className="rounded-xl bg-background px-3 py-2 text-xs text-muted">Koi note abhi tak nahi.</p>
+          <p className="rounded-xl bg-background px-3 py-2 text-xs text-muted">No notes yet.</p>
         ) : (
           <div className="space-y-2">
             {notesList.map((a) => (
               <div key={a.id} className="rounded-xl bg-background px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-navy">{a.userName || "—"}</span>
+                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
                   <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
                 </div>
                 <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
@@ -882,19 +1014,22 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
+      </div>
 
-      {/* ===== Visits ===== */}
+      {/* ===== Row: Site Visits + Follow-ups ===== */}
+      {(visits.length > 0 || followUps.length > 0) && (
+      <div className="grid gap-4 sm:grid-cols-2">
       {visits.length > 0 && (
-        <div className="rounded-2xl border border-border bg-white p-4">
+        <div className={`rounded-2xl border border-border bg-white p-4 ${visits.length > 0 && followUps.length > 0 ? "" : "sm:col-span-2"}`}>
           <h3 className="mb-3 text-sm font-bold text-primary">Site Visits</h3>
           <div className="space-y-2">
             {visits.map((v) => (
               <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
                 <div className="text-sm">
                   <div className="font-semibold text-navy">
-                    {v.projectId || "—"} · {v.date || "TBD"} {v.time}
+                    {v.projectId || ""} · {v.date || "TBD"} {v.time}
                   </div>
-                  <div className="text-xs text-muted">SM: {v.smName || "—"}</div>
+                  <div className="text-xs text-muted">SM: {v.smName || ""}</div>
                 </div>
                 <Badge
                   color={
@@ -913,9 +1048,9 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
       )}
 
-      {/* ===== Follow-ups ===== */}
+      {/* Follow-ups */}
       {followUps.length > 0 && (
-        <div className="rounded-2xl border border-border bg-white p-4">
+        <div className={`rounded-2xl border border-border bg-white p-4 ${visits.length > 0 && followUps.length > 0 ? "" : "sm:col-span-2"}`}>
           <h3 className="mb-3 text-sm font-bold text-primary">Follow-ups</h3>
           <div className="space-y-2">
             {followUps.map((f) => (
@@ -941,12 +1076,14 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
+      </div>
+      )}
 
       {/* ===== Activity timeline ===== */}
       <div className="rounded-2xl border border-border bg-white p-4">
         <h3 className="mb-3 text-sm font-bold text-primary">Activity</h3>
         {activities.length === 0 ? (
-          <p className="text-center text-xs text-muted">Koi activity abhi tak nahi.</p>
+          <p className="text-center text-xs text-muted">No activity yet.</p>
         ) : (
           <div className="space-y-3">
             {activities.slice(0, 12).map((a) => (
@@ -973,7 +1110,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
           <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-5">
             <h3 className="text-sm font-bold text-primary">Mark Lead as Lost</h3>
-            <p className="mt-0.5 text-xs text-muted">Reason select karein (required).</p>
+            <p className="mt-0.5 text-xs text-muted">Select a reason (required).</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {LEAD_LOST_REASONS.map((r) => (
                 <button
@@ -992,7 +1129,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
             <textarea
               value={lostNote}
               onChange={(e) => setLostNote(e.target.value)}
-              placeholder="Optional note (kya hua, kyun gaya)..."
+              placeholder="Optional note (what happened and why)..."
               rows={2}
               className="mt-3 w-full resize-none rounded-xl border border-border bg-background/50 px-3 py-2 text-sm text-navy outline-none focus:border-red-400"
             />
@@ -1026,6 +1163,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       const textFields: [string, string][] = [
         ["location", "Location"],
+        ["sublocation", "Sub-location"],
         ["bhk", "BHK"],
         ["purpose", "Purpose"],
         ["timeline", "Timeline"],
@@ -1052,7 +1190,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       const oldLoan = loanLabel(lead.loanRequired);
       const nextLoan =
-        quals.loanRequired === true ? "Yes" : quals.loanRequired === false ? "No" : "—";
+        quals.loanRequired === true ? "Yes" : quals.loanRequired === false ? "No" : "";
       if (oldLoan !== nextLoan) {
         patch.loanRequired =
           quals.loanRequired === true ? true : quals.loanRequired === false ? false : null;
@@ -1060,7 +1198,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       }
 
       if (Object.keys(patch).length === 0) {
-        showToast("Koi change nahi");
+        showToast("No changes");
         setEditingReq(false);
         return;
       }
@@ -1071,7 +1209,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       setEditingReq(false);
       reload();
     } catch {
-      showToast("Save nahi ho paya");
+      showToast("Could not save");
     } finally {
       setBusy(false);
     }
@@ -1088,7 +1226,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       }
       reload();
     } catch {
-      showToast("Tag generate nahi hua");
+      showToast("Could not generate tag");
     } finally {
       setBusy(false);
     }
@@ -1100,12 +1238,61 @@ export default function LeadDetail({ data, currentUser }: Props) {
       showToast("Tag copied");
       postActivity({ type: "tag_copied", notes: "Lead tag copied" }).catch(() => {});
     } catch {
-      showToast("Copy nahi hua — manually select karo");
+      showToast("Could not copy. Please select manually.");
     }
   }
 
   function handleShareTag() {
     postActivity({ type: "tag_copied", notes: "Lead tag shared on WhatsApp" }).catch(() => {});
+  }
+
+  function openVisit() {
+    if (showVisit) {
+      setShowVisit(false);
+      return;
+    }
+    setVisitDefaults({
+      date: "",
+      time: "11:00",
+      project: lead.preferredProject || lead.originalProject || "",
+      meetingPoint: "",
+    });
+    setShowVisit(true);
+  }
+
+  function openVisitWithFamily() {
+    const done = visits
+      .filter((v) => v.status === "visit_done")
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const last = done[0];
+    setVisitDefaults({
+      date: nextSaturdayIST(),
+      time: "11:00",
+      project: last?.projectId || lead.preferredProject || lead.originalProject || "",
+      meetingPoint: last?.meetingPoint || "Project site, Vasai",
+    });
+    setShowVisit(true);
+    postActivity({
+      type: "visit_proposed",
+      notes: "2nd family visit suggested (post-visit feedback HOT / liked YES); booking form prefilled",
+    }).catch(() => {});
+  }
+
+  function nextSaturdayIST(): string {
+    const now = new Date();
+    const IST_OFFSET = 5.5 * 3600 * 1000;
+    const ist = new Date(now.getTime() + IST_OFFSET);
+    const day = ist.getUTCDay();
+    const daysUntilSat = (6 - day + 7) % 7 || 7;
+    ist.setUTCDate(ist.getUTCDate() + daysUntilSat);
+    return ist.toISOString().slice(0, 10);
+  }
+
+  function handleShareSecondVisit() {
+    postActivity({
+      type: "message_whatsapp_opened",
+      notes: "2nd visit suggestion message opened on WhatsApp",
+    }).catch(() => {});
   }
 }
 
@@ -1120,6 +1307,7 @@ function RequirementEditor({
 }) {
   const [form, setForm] = useState({
     location: lead.location || "vasai_west",
+    sublocation: lead.sublocation || "",
     bhk: String(lead.bhk || "2").replace(/\s*BHK\s*$/i, ""),
     budgetMin: String(lead.budgetMin ?? ""),
     budgetMax: String(lead.budgetMax ?? ""),
@@ -1153,6 +1341,15 @@ function RequirementEditor({
           <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className={input}>
             {Object.entries(LOCATION_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-muted">Sub-location</label>
+          <select value={form.sublocation} onChange={(e) => setForm({ ...form, sublocation: e.target.value })} className={input}>
+            <option value="">None</option>
+            {SUB_LOCATIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
         </div>
@@ -1198,7 +1395,7 @@ function RequirementEditor({
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted">Loan Required</label>
           <select value={form.loanRequired} onChange={(e) => setForm({ ...form, loanRequired: e.target.value })} className={input}>
-            <option value="">—</option>
+            <option value="">Select</option>
             <option value="yes">Yes</option>
             <option value="no">No</option>
           </select>
@@ -1210,7 +1407,7 @@ function RequirementEditor({
       </div>
       <div>
         <label className="mb-1 block text-xs font-semibold text-muted">Family Requirements</label>
-        <input value={form.familyRequirements} onChange={(e) => setForm({ ...form, familyRequirements: e.target.value })} className={input} placeholder="e.g. 3 members, parents ke liye" />
+        <input value={form.familyRequirements} onChange={(e) => setForm({ ...form, familyRequirements: e.target.value })} className={input} placeholder="e.g. 3 members, parents included" />
       </div>
       <div>
         <label className="mb-1 block text-xs font-semibold text-muted">Other Preferences</label>
@@ -1256,7 +1453,7 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 function locationLabel(v: any): string {
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") return "";
   return LOCATION_LABELS[v] || String(v);
 }
 
@@ -1265,7 +1462,7 @@ function displayReqVal(key: string, v: any): string {
   if (key === "location") return locationLabel(v);
   if (key === "purpose") return purposeLabel(v);
   if (key === "timeline") return timelineLabel(v);
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") return "";
   return String(v);
 }
 
@@ -1273,7 +1470,7 @@ function budgetRangeLabel(min: any, max: any): string {
   if (min && max && min !== max) return `₹${min}–${max}L`;
   if (min) return `₹${min}L`;
   if (max) return `₹${max}L`;
-  return "—";
+  return "";
 }
 
 function buildLeadTag(
@@ -1282,16 +1479,16 @@ function buildLeadTag(
   currentUserName: string
 ): string {
   const phone = (lead.whatsappNumber || lead.phone || "").replace(/\D/g, "");
-  const last5 = phone ? phone.slice(-5) : "—";
+  const last5 = phone ? phone.slice(-5) : "";
   const upcoming = visits
     .filter((v) => v.status !== "cancelled" && v.status !== "no_show" && v.date)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const visit = upcoming.length > 0 ? String(upcoming[0].date) : "Not Booked";
   return [
-    "PATANG FUTURE HOMES — LEAD TAG",
-    `Client: ${lead.name || "—"}`,
-    `Caller: ${lead.assignedCallerName || currentUserName || "—"}`,
-    `SM: ${lead.assignedSmName || "—"}`,
+    "PATANG FUTURE HOMES · LEAD TAG",
+    `Client: ${lead.name || ""}`,
+    `Caller: ${lead.assignedCallerName || currentUserName || ""}`,
+    `SM: ${lead.assignedSmName || ""}`,
     `Number: ${last5}`,
     `Visit Date: ${visit}`,
     "Firm: Patang Future Homes",
@@ -1305,7 +1502,7 @@ function budgetLabel(lead: Record<string, any>): string {
   if (min && max && min !== max) return `₹${min}–${max}L`;
   if (min) return `₹${min}L`;
   if (max) return `₹${max}L`;
-  return "—";
+  return "";
 }
 
 function purposeLabel(p: string): string {
@@ -1314,7 +1511,7 @@ function purposeLabel(p: string): string {
     investment: "Investment",
     both: "Both",
   };
-  return map[p] || "—";
+  return map[p] || "";
 }
 
 function timelineLabel(t: string): string {
@@ -1325,13 +1522,13 @@ function timelineLabel(t: string): string {
     "6_plus_months": "6+ months",
     exploring: "Exploring",
   };
-  return map[t] || "—";
+  return map[t] || "";
 }
 
 function loanLabel(v: boolean | number | null): string {
   if (v === true || v === 1) return "Yes";
   if (v === false || v === 0) return "No";
-  return "—";
+  return "";
 }
 
 function formatDateTime(iso: string): string {

@@ -19,9 +19,9 @@ export default async function TemplatesPage() {
       <div>
         <h1 className="text-xl font-bold text-primary">Message Templates</h1>
         <p className="mt-0.5 text-sm text-muted">
-          {isAdmin
-            ? "Shared templates manage karein — sabhi ko dikhte hain."
-            : "Aapke personal templates yahan manage hote hain."}
+{isAdmin
+            ? "Manage shared templates. These are visible to the whole team."
+            : "Manage your personal templates here."}
         </p>
       </div>
       <UserTemplates isAdmin={isAdmin} />

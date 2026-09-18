@@ -18,8 +18,8 @@ export default function LeadsPageContent({ role = "caller" }: { role?: string })
           </h1>
           <p className="mt-0.5 text-sm text-muted">
             {isCaller
-              ? "New leads jaldi jaldi handle karo. Priority pehle."
-              : "Assign kiye gaye leads"}
+              ? "Handle new leads quickly. Prioritize what is overdue."
+              : "Leads assigned to you"}
           </p>
         </div>
         <button

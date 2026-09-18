@@ -35,7 +35,7 @@ export function buildMyReportText(opts: {
 }): string {
   const { date, employeeName, role, metrics } = opts;
   const lines = [
-    "PATANG FUTURE HOMES — DAILY REPORT",
+    "PATANG FUTURE HOMES DAILY REPORT",
     "",
     `Date: ${formatReportDate(date)}`,
     `Employee: ${employeeName}`,
@@ -77,7 +77,7 @@ export function buildTeamReportText(opts: {
 }): string {
   const { date, totals, callers, salesManagers } = opts;
   const lines = [
-    "PATANG FUTURE HOMES — TEAM DAILY REPORT",
+    "PATANG FUTURE HOMES TEAM DAILY REPORT",
     "",
     `Date: ${formatReportDate(date)}`,
     "",

@@ -1,0 +1,22 @@
+[
+  {
+    "sr_no": 261,
+    "project": "Sunshine Meadows",
+    "note": "duplicate row skipped"
+  },
+  {
+    "sr_no": 139,
+    "project": "Judith Andrew",
+    "note": "excluded row (possible data error): price=77.60 Lacs, carpet=7076"
+  },
+  {
+    "sr_no": 245,
+    "project": "Skylark",
+    "note": "excluded row (possible data error): price=10.00 Lacs, carpet=560"
+  },
+  {
+    "sr_no": 69,
+    "project": "Heavens",
+    "note": "duplicate row skipped"
+  }
+]

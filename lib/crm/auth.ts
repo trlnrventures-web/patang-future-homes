@@ -12,13 +12,18 @@ export type AuthUser = {
   name: string;
   email: string;
   role: string;
+  mustChangePassword?: boolean;
 };
+
+function isSecureEnv(): boolean {
+  return process.env.NODE_ENV !== "development";
+}
 
 export async function signToken(user: AuthUser): Promise<string> {
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setExpirationTime("7d")
     .sign(SECRET);
 }
 
@@ -40,15 +45,19 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   return verifyToken(token);
 }
 
+export const SESSION_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+const COOKIE_FLAGS = `Path=/; HttpOnly; SameSite=Strict;${isSecureEnv() ? " Secure;" : ""}`;
+
 export function setAuthCookie(token: string) {
   return {
-    "Set-Cookie": `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
+    "Set-Cookie": `${COOKIE_NAME}=${token}; ${COOKIE_FLAGS} Max-Age=${SESSION_SECONDS}`,
   };
 }
 
 export function clearAuthCookie() {
   return {
-    "Set-Cookie": `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+    "Set-Cookie": `${COOKIE_NAME}=; ${COOKIE_FLAGS} Max-Age=0`,
   };
 }
 

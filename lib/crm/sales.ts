@@ -88,6 +88,35 @@ export function canAccessSales(
 }
 
 export function toRupees(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return "—";
+  if (value == null || Number.isNaN(value)) return "N/A";
   return `₹${value.toLocaleString("en-IN")}`;
+}
+
+export type DealHealth = {
+  level: "healthy" | "cooling" | "at_risk";
+  label: string;
+  cls: string;
+  days: number;
+};
+
+export function daysSinceIso(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
+export function elapsedSinceMs(sinceMs: number): number {
+  return Date.now() - sinceMs;
+}
+
+export function dealHealthFor(lastActiveIso: string | null | undefined): DealHealth {
+  const days = daysSinceIso(lastActiveIso);
+  if (days <= 2) {
+    return { level: "healthy", label: "Healthy", cls: "bg-emerald-100 text-emerald-800", days };
+  }
+  if (days <= 5) {
+    return { level: "cooling", label: "Cooling", cls: "bg-amber-100 text-amber-800", days };
+  }
+  return { level: "at_risk", label: "At Risk", cls: "bg-red-100 text-red-700", days };
 }

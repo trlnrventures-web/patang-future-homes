@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
-import { Badge, PhoneIcon, WhatsAppIcon } from "./ui";
+import { Badge } from "./ui";
+import LeadCard from "./LeadCard";
+import InboxSnapshot from "./InboxSnapshot";
+import CallQueue from "./CallQueue";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
 import { slaStatusMeta, type SlaStatus } from "@/lib/crm/sla";
-import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 
 type InboxLead = {
   id: number;
@@ -47,7 +48,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
-const PRIORITY_DOT: Record<string, string> = {
+const PRIORITY_BAR: Record<string, string> = {
   p1_new: "bg-red-500",
   p2_approaching_sla: "bg-amber-500",
   p3_overdue_call: "bg-red-600",
@@ -72,6 +73,7 @@ export default function CallerInbox() {
   const [tab, setTab] = useState("new");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [queueOpen, setQueueOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,7 +87,7 @@ export default function CallerInbox() {
       const data = await res.json();
       setLeads(data.leads);
     } catch {
-      setError("Inbox load nahi ho paya. Dobara try karein.");
+      setError("Could not load the inbox. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -96,13 +98,24 @@ export default function CallerInbox() {
     return () => clearTimeout(t);
   }, [load]);
 
+  const closeQueue = () => {
+    setQueueOpen(false);
+    load();
+  };
+
   return (
     <div className="space-y-3">
+      {queueOpen && <CallQueue onExit={closeQueue} />}
+
+      {!loading && leads.length > 0 && (
+        <InboxSnapshot leads={leads} onStartQueue={() => setQueueOpen(true)} />
+      )}
+
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Naam, phone, project, campaign search..."
+        placeholder="Search by name, phone, project, or campaign..."
         className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary"
       />
       <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -128,118 +141,69 @@ export default function CallerInbox() {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 animate-pulse rounded-2xl bg-gray-100" />
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-[9.5rem] animate-pulse rounded-2xl bg-gray-100" />
           ))}
         </div>
       ) : leads.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-10 text-center">
-          <p className="text-sm font-semibold text-navy">Is queue mein koi lead nahi hai</p>
+          <p className="text-sm font-semibold text-navy">No leads in this queue</p>
           <p className="mt-1 text-xs text-muted">
-            Dobara check karein ya kisi aur tab pe dekhen.
+            Check again later or switch to a different tab.
           </p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {leads.map((lead) => (
-            <div
+            <LeadCard
               key={lead.id}
-              className="overflow-hidden rounded-2xl border border-border bg-white"
-            >
-              <div className="flex">
-                <div className={`w-1 shrink-0 ${PRIORITY_DOT[lead.priority] || "bg-gray-200"}`} />
-                <div className="min-w-0 flex-1 p-3.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <h3 className="truncate text-sm font-bold text-navy">{lead.name}</h3>
-                        <Badge color={slaStatusMeta(lead.slaStatus as SlaStatus).cls}>
-                          {slaStatusMeta(lead.slaStatus as SlaStatus).label}
-                        </Badge>
-                      </div>
-                      <a
-                        href={`tel:+${lead.phone.replace(/\D/g, "")}`}
-                        className="mt-0.5 block text-xs font-semibold text-primary"
-                      >
-                        {lead.phone}
-                      </a>
-                    </div>
-                    <span className="shrink-0 text-[10px] text-soft">{lead.leadAge}</span>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                    <Badge color="bg-primary/5 text-primary">
-                      {SOURCE_LABELS[lead.source] || lead.source}
-                    </Badge>
-                    <Badge color={statusColor(lead.status)}>
-                      {LEAD_STATUS_LABELS[lead.status] || lead.status}
-                    </Badge>
-                    {lead.originalProject && (
-                      <span className="rounded-md bg-background px-2 py-1">
-                        {lead.originalProject}
-                      </span>
-                    )}
-                    {lead.campaignName && (
-                      <span className="rounded-md bg-background px-2 py-1">
-                        {lead.campaignName}
-                      </span>
-                    )}
-                    {lead.assignedSmName && (
-                      <span className="rounded-md bg-violet-50 px-2 py-1 font-semibold text-violet-700">
-                        SM: {lead.assignedSmName}
-                      </span>
-                    )}
-                  </div>
-
-                  {lead.concern && (
-                    <div className="mt-1.5 text-[11px] font-semibold text-amber-700">
-                      Concern: {lead.concern}
-                    </div>
-                  )}
-
-                  <div className="mt-2 flex items-center gap-3 border-t border-border pt-2 text-[11px]">
-                    <span className="font-semibold text-navy">
-                      Next: <span className="text-primary">{lead.nextAction}</span>
+              lead={{
+                id: lead.id,
+                name: lead.name,
+                phone: lead.phone,
+                whatsappNumber: lead.whatsappNumber,
+                statusLabel: LEAD_STATUS_LABELS[lead.status] || lead.status,
+                statusCls: statusColor(lead.status),
+                slaLabel: slaStatusMeta(lead.slaStatus as SlaStatus).label,
+                slaCls: slaStatusMeta(lead.slaStatus as SlaStatus).cls,
+                nextAction: lead.nextAction,
+                nextFollowUpDisplay: lead.nextFollowUp || null,
+                hasOverdueFollowUp: lead.hasOverdueFollowUp,
+              }}
+              accentCls={PRIORITY_BAR[lead.priority] || "bg-gray-200"}
+              badges={
+                lead.assignedSmName ? (
+                  <Badge color="bg-violet-50 text-violet-700">SM: {lead.assignedSmName}</Badge>
+                ) : undefined
+              }
+              pills={
+                <>
+                  <span className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    {SOURCE_LABELS[lead.source] || lead.source}
+                  </span>
+                  {lead.originalProject && (
+                    <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                      {lead.originalProject}
                     </span>
-                    {lead.nextFollowUp && (
-                      <span className={lead.hasOverdueFollowUp ? "font-semibold text-red-600" : "text-soft"}>
-                        {lead.hasOverdueFollowUp ? "Overdue: " : "Due: "}
-                        {lead.nextFollowUp}
-                      </span>
-                    )}
-                    {lead.attemptCount > 0 && (
-                      <span className="ml-auto text-soft">Attempts: {lead.attemptCount}</span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <a
-                      href={`tel:+${lead.phone.replace(/\D/g, "")}`}
-                      className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-xs font-bold text-white"
-                    >
-                      <PhoneIcon />
-                      CALL
-                    </a>
-                    <a
-                      href={`https://wa.me/${formatPhoneForWhatsApp(lead.whatsappNumber || lead.phone)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2.5 text-xs font-bold text-white"
-                    >
-                      <WhatsAppIcon />
-                      WHATSAPP
-                    </a>
-                    <Link
-                      href={`/crm/leads/${lead.id}`}
-                      className="flex items-center justify-center rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs font-bold text-primary"
-                    >
-                      OPEN →
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  )}
+                  {lead.campaignName && (
+                    <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                      {lead.campaignName}
+                    </span>
+                  )}
+                  {lead.concern && (
+                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                      {lead.concern}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-soft">{lead.leadAge}</span>
+                  {lead.attemptCount > 0 && (
+                    <span className="text-[10px] text-soft">Attempts: {lead.attemptCount}</span>
+                  )}
+                </>
+              }
+            />
           ))}
         </div>
       )}

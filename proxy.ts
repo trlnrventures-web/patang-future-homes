@@ -11,6 +11,7 @@ const CRM_HOST = /^crm\./i;
 const MAIN_URL = "https://patangfuturehomes.com";
 const PUBLIC_PATHS = ["/crm/login"];
 const PUBLIC_API_PATHS = ["/crm/api/auth/login", "/crm/api/auth/logout"];
+const FORCE_CHANGE_PASSWORD_PATH = "/crm/change-password";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -57,10 +58,13 @@ export async function proxy(request: NextRequest) {
     if (isPublicPage) {
       if (token) {
         try {
-          await jwtVerify(token, SECRET);
+          const { payload } = await jwtVerify(token, SECRET);
+          if (payload.mustChangePassword && pathname !== FORCE_CHANGE_PASSWORD_PATH) {
+            return NextResponse.redirect(new URL(FORCE_CHANGE_PASSWORD_PATH, request.url));
+          }
           return NextResponse.redirect(new URL("/crm/dashboard", request.url));
         } catch {
-          // invalid token — show login
+          // invalid token: show login
         }
       }
       return NextResponse.next();
@@ -72,7 +76,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
     try {
-      await jwtVerify(token, SECRET);
+      const { payload } = await jwtVerify(token, SECRET);
+      if (payload.mustChangePassword && pathname !== FORCE_CHANGE_PASSWORD_PATH) {
+        return NextResponse.redirect(new URL(FORCE_CHANGE_PASSWORD_PATH, request.url));
+      }
       return NextResponse.next();
     } catch {
       const url = new URL("/crm/login", request.url);

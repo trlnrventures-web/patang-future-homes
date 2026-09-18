@@ -70,7 +70,7 @@ export default function HorizontalScroll({
         />
       )}
 
-      {/* Scroll arrows — desktop only */}
+      {/* Scroll arrows: desktop only */}
       {showArrows && canScrollLeft && (
         <button
           type="button"

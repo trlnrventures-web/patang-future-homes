@@ -18,10 +18,83 @@ export type ShowFlatImage = {
   src: string;
 };
 
+export const SUB_LOCATIONS = [
+  "Sai Nagar",
+  "Navyug Nagar",
+  "Diwanman",
+  "Gokul Aagan",
+  "Krishna Township",
+  "Bhabola",
+  "Stella",
+  "Barampur",
+  "Shastri Nagar",
+  "Anand Nagar",
+  "Manickpur",
+  "Ambadi Road",
+  "Om Nagar",
+  "Navpada",
+  "Suncity",
+  "Navghar",
+  "Papdi",
+  "Koliwada",
+  "Chulna",
+  "Kaul Heritage City",
+  "Golani Naka",
+  "Suruchi Beach",
+  "Umela",
+  "Fatherwadi",
+] as const;
+
+export function subLocationTokens(value?: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(/[\/,&]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function subLocationMatches(projectValue?: string | null, leadValue?: string | null): boolean {
+  const pTokens = subLocationTokens(projectValue);
+  if (pTokens.length === 0 || !leadValue) return false;
+  const lTokens = subLocationTokens(leadValue);
+  const norm = (s: string) => s.toLowerCase().trim();
+  return pTokens.some((pt) => lTokens.some((lt) => norm(pt) === norm(lt)));
+}
+
+export type PriceValidityInfo = {
+  validUntil: string;
+  daysLeft: number;
+  expired: boolean;
+  label: string;
+};
+
+export function priceValidityInfo(project: { priceValidUntil?: string }): PriceValidityInfo | null {
+  if (!project.priceValidUntil) return null;
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const end = new Date(`${project.priceValidUntil}T23:59:59+05:30`).getTime();
+  const now = new Date().getTime(); // server time; IST shift handled below
+  const nowIst = now + IST_OFFSET_MS;
+  const daysLeft = Math.round((end - nowIst) / (24 * 60 * 60 * 1000));
+  const expired = daysLeft < 0;
+  const fmt = new Date(project.priceValidUntil).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    timeZone: "IST",
+  });
+  if (expired || daysLeft > 14) return null;
+  const label =
+    daysLeft === 0
+      ? `⏰ Price valid till today (${fmt})`
+      : `⏰ Price valid till ${fmt} · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
+  return { validUntil: project.priceValidUntil, daysLeft, expired, label };
+}
+
 export type Project = {
   slug: string;
   title: string;
   location: string;
+  subLocation?: string;
+  priceValidUntil?: string;
   area: "west" | "east";
   type: "shop" | "flat" | "bungalow";
   status: "New Launch" | "Under Construction";

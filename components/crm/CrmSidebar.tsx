@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LogoutButton from "./LogoutButton";
 
 const NAV_ITEMS: { href: string; label: string; icon: string; roles?: string[] }[] = [
   { href: "/crm/dashboard", label: "Dashboard", icon: "M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" },
   { href: "/crm/leads", label: "Leads", icon: "M17 20h5v-2a3 3 0 0 0-5-2.11M9 20H4v-2a3 3 0 0 1 5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 16v-2a3 3 0 0 0-5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
   { href: "/crm/marketing", label: "Marketing", icon: "M3 3v18M3 5h18M5 3v2M7 8l3 2M7 13l3 4 5-9M17 5l4 13M15 12h4", roles: ["admin", "sales_head", "marketing"] },
   { href: "/crm/reports", label: "Daily Report", icon: "M8 13v5M12 9v9M16 5v13M3 3v18h18M3 5h14M17 5l3 3V3.5" },
-  { href: "/crm/messages", label: "Messages", icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10ZM8 10h8M8 14h5" },
+  { href: "/crm/attendance", label: "Attendance", icon: "M12 7v5l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
+  { href: "/crm/leaderboard", label: "Leaderboard", icon: "M8 21h8M12 17v4M17 3h4v4M7 7h10v4M17 11a5 5 0 0 1-10 0 5 5 0 0 1 10 0Z" },
+  { href: "/crm/incentives", label: "Incentives", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6", roles: ["admin", "sales_head", "sales_manager", "caller"] },
 ];
 
 const SETTINGS_ITEMS = [
@@ -61,15 +64,13 @@ export default function CrmSidebar({
 
   return (
     <div className="flex h-full flex-col border-r border-border bg-white">
-      <div className="flex items-center gap-2.5 px-4 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-            <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
-          </svg>
-        </div>
-        <div>
-          <div className="text-sm font-bold text-primary">Patang CRM</div>
-          <div className="text-[11px] text-muted">Vasai West Sales</div>
+      <div className="px-4 py-4">
+        <div className="inline-block rounded-xl bg-navy p-2.5">
+          <img
+            src="/brand/PFH_512_white_nobg_horizontal.png"
+            alt="Patang CRM"
+            className="h-8 w-auto"
+          />
         </div>
       </div>
 
@@ -99,6 +100,7 @@ export default function CrmSidebar({
                 <Item key={s.href} {...s} />
               )
             )}
+            <LogoutButton />
           </div>
         </div>
       </div>

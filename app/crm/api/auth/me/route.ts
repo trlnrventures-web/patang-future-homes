@@ -28,6 +28,8 @@ export async function GET() {
       email: dbUser.email,
       role: dbUser.role,
       phone: dbUser.phone,
+      mustChangePassword: !!dbUser.mustChangePassword,
+      lastLoginAt: dbUser.lastLoginAt,
     },
   });
 }

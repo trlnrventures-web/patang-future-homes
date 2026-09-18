@@ -1,4 +1,5 @@
 import type { Configuration, Project } from "@/lib/projects";
+import { priceValidityInfo } from "@/lib/projects";
 
 const WHATSAPP_NUMBER = "917249138197";
 
@@ -124,6 +125,15 @@ export default function ConfigPriceCard({ project }: { project: Project }) {
 
   return (
     <div className="flex flex-col gap-3.5">
+      {(() => {
+        const pv = priceValidityInfo(project);
+        if (!pv) return null;
+        return (
+          <div className="rounded-[14px] border border-amber-300 bg-gradient-to-r from-amber-50 to-white p-4 text-center">
+            <span className="text-xs font-bold text-amber-700">{pv.label}</span>
+          </div>
+        );
+      })()}
       {groups.map((group) => {
         const location = project.location ?? "Vasai";
         const configuration = group.bhk

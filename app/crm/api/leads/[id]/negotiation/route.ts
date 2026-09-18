@@ -261,7 +261,7 @@ export async function POST(
         leadId: lead.id,
         userId: user.id,
         type: "negotiation_lost",
-        notes: `Negotiation lost — ${NEGOTIATION_LOST_REASONS.find((r) => r.value === reason)?.label || reason}`,
+        notes: `Negotiation lost: ${NEGOTIATION_LOST_REASONS.find((r) => r.value === reason)?.label || reason}`,
         createdAt: now,
       })
       .run();

@@ -38,12 +38,13 @@ export default function Navbar() {
     <header className="relative border-b border-ink/10 bg-background/95 backdrop-blur-sm">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
         {/* Logo lockup */}
-        <Link href="/" className="flex flex-col leading-none">
-          <span className="font-display text-xl font-bold tracking-wide text-primary">
-            PATANG
-          </span>
-          <span className="text-[10px] font-medium uppercase tracking-[0.3em] text-muted">
-            Future Homes
+        <Link href="/" aria-label="Patang Future Homes">
+          <span className="inline-block rounded-xl bg-navy p-1.5">
+            <img
+              src="/brand/PFH_512_white_nobg_horizontal.png"
+              alt="Patang Future Homes"
+              className="h-9 w-auto"
+            />
           </span>
         </Link>
 
@@ -134,12 +135,13 @@ export default function Navbar() {
           </svg>
         </button>
 
-        <div className="flex flex-col gap-1 mb-8">
-          <span className="font-display text-lg font-bold tracking-wide text-primary">
-            PATANG
-          </span>
-          <span className="text-[10px] font-medium uppercase tracking-[0.3em] text-muted">
-            Future Homes
+        <div className="mb-8">
+          <span className="inline-block rounded-xl bg-navy p-1.5">
+            <img
+              src="/brand/PFH_512_white_nobg_horizontal.png"
+              alt="Patang Future Homes"
+              className="h-9 w-auto"
+            />
           </span>
         </div>
 

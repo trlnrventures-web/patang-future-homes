@@ -5,6 +5,7 @@ import { desc } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
+import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
 
 export type InboxTab =
   | "new"
@@ -62,7 +63,7 @@ function nextActionFor(lead: {
     case "booked":
       return "Booking follow-up";
     default:
-      return "—";
+      return "Next step";
   }
 }
 
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
     .all();
 
   if (user.role === "caller") {
-    rows = rows.filter((l) => l.assignedCallerId === user.id);
+    rows = q ? rows : rows.filter(isInCallerScope);
   } else if (user.role === "sales_manager") {
     rows = rows.filter((l) => l.assignedSmId === user.id);
   }
@@ -155,15 +156,16 @@ export async function GET(request: NextRequest) {
 
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u.name]));
+  const earliestFollowUp = buildEarliestFollowUpMap(db);
 
   const enriched = filtered.map((l) => {
     const slaStatus = computeSlaStatus(l.createdAt, l.firstCallAt);
     const priority = getPriority(l);
-    const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt;
+    const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt || earliestFollowUp.get(l.id) || null;
     const hasOverdueFollowUp = nextFollowUpIso != null && new Date(nextFollowUpIso).getTime() < now.getTime() && !terminal.has(l.status);
 
     const checkHours = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(
-      (l.nextFollowUp || "").replace(" ", "T")
+      (nextFollowUpIso || "").replace(" ", "T")
     );
     const nextFollowUpDisplay = checkHours
       ? `${checkHours[1].slice(5).split("-").reverse().join("/")} ${checkHours[2]}`

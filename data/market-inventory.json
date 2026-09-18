@@ -1,0 +1,786 @@
+[
+  {
+    "project": "Sunshine Meadows",
+    "location": "Papadi",
+    "priceRangeLacs": [
+      35.09,
+      148
+    ],
+    "carpetRangeSqft": [
+      378,
+      1350
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Akhand Phase 3",
+    "location": "Yashwant Smart City",
+    "priceRangeLacs": [
+      37.5,
+      64.69
+    ],
+    "carpetRangeSqft": [
+      430,
+      735
+    ],
+    "possession": "2 Years",
+    "developer": ""
+  },
+  {
+    "project": "Legacy Avenue",
+    "location": "Papadi",
+    "priceRangeLacs": [
+      40.93,
+      77
+    ],
+    "carpetRangeSqft": [
+      369,
+      719
+    ],
+    "possession": "2 Years",
+    "developer": "Platinum (Baskar Ali)"
+  },
+  {
+    "project": "Ariana",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      41.28,
+      59.91
+    ],
+    "carpetRangeSqft": [
+      359,
+      521
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Flamingo Tower 1 & 2&3",
+    "location": "Om Nagar",
+    "priceRangeLacs": [
+      42.97,
+      76.64
+    ],
+    "carpetRangeSqft": [
+      444,
+      680
+    ],
+    "possession": "6 Months",
+    "developer": "Sunshine"
+  },
+  {
+    "project": "Shripal Satva",
+    "location": "Papadi",
+    "priceRangeLacs": [
+      44.5,
+      51.5
+    ],
+    "carpetRangeSqft": [
+      458,
+      518
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Casa Serena",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      47.25,
+      97.13
+    ],
+    "carpetRangeSqft": [
+      429,
+      890
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Sethi Crown",
+    "location": "Om Nagar",
+    "priceRangeLacs": [
+      47.28,
+      86.25
+    ],
+    "carpetRangeSqft": [
+      443,
+      773
+    ],
+    "possession": "3 Years",
+    "developer": "Sethi Realtors"
+  },
+  {
+    "project": "Agnes Pride",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      47.46,
+      88.62
+    ],
+    "carpetRangeSqft": [
+      452,
+      844
+    ],
+    "possession": "6 Months",
+    "developer": "Agnes Developers"
+  },
+  {
+    "project": "Marigold",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      47.73,
+      78.8
+    ],
+    "carpetRangeSqft": [
+      468,
+      780
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Ekta Residency",
+    "location": "Om Nagar",
+    "priceRangeLacs": [
+      48.21,
+      80.11
+    ],
+    "carpetRangeSqft": [
+      449,
+      746
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Alpine",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      52.08,
+      88.7
+    ],
+    "carpetRangeSqft": [
+      465,
+      792
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Sky Aura",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      53.13,
+      123
+    ],
+    "carpetRangeSqft": [
+      770,
+      1515
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Ruturaj Harmony",
+    "location": "DG Nagar",
+    "priceRangeLacs": [
+      53.3,
+      72
+    ],
+    "carpetRangeSqft": [
+      466,
+      630
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Sky Vista",
+    "location": "Papadi",
+    "priceRangeLacs": [
+      54.06,
+      250
+    ],
+    "carpetRangeSqft": [
+      795,
+      1750
+    ],
+    "possession": "1 Year",
+    "developer": "Divine Construction"
+  },
+  {
+    "project": "Judith Andrew",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      55.04,
+      86.08
+    ],
+    "carpetRangeSqft": [
+      688,
+      726
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Blossom 6A",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      56.21,
+      98.56
+    ],
+    "carpetRangeSqft": [
+      511,
+      896
+    ],
+    "possession": "6 Months",
+    "developer": "Rajhans"
+  },
+  {
+    "project": "Falcon",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      56.73,
+      82
+    ],
+    "carpetRangeSqft": [
+      477,
+      695
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Opal Flora",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      56.87,
+      69.3
+    ],
+    "carpetRangeSqft": [
+      517,
+      630
+    ],
+    "possession": "6 Months",
+    "developer": "Rajhans Opal"
+  },
+  {
+    "project": "Skylark",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      57.23,
+      88.76
+    ],
+    "carpetRangeSqft": [
+      490,
+      760
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Heavens",
+    "location": "Paarnaka",
+    "priceRangeLacs": [
+      57.5,
+      250
+    ],
+    "carpetRangeSqft": [
+      547,
+      1500
+    ],
+    "possession": "3 Months – 6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Imperial Icon",
+    "location": "Dindayal Nagar",
+    "priceRangeLacs": [
+      62.47,
+      62.47
+    ],
+    "carpetRangeSqft": [
+      490,
+      490
+    ],
+    "possession": "RTMI",
+    "developer": "Imperial"
+  },
+  {
+    "project": "Family Serenity Plot Atlantis",
+    "location": "Papadi",
+    "priceRangeLacs": [
+      63,
+      75
+    ],
+    "carpetRangeSqft": [
+      800,
+      850
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Casa Tereza",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      65,
+      85
+    ],
+    "carpetRangeSqft": [
+      520,
+      720
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Rajhans Moonstone",
+    "location": "Rajhans",
+    "priceRangeLacs": [
+      66,
+      76
+    ],
+    "carpetRangeSqft": [
+      484,
+      530
+    ],
+    "possession": "RTMI",
+    "developer": "Rajhans"
+  },
+  {
+    "project": "Emerald",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      66.24,
+      141
+    ],
+    "carpetRangeSqft": [
+      557,
+      1146
+    ],
+    "possession": "6 Months",
+    "developer": ""
+  },
+  {
+    "project": "Dhananjay Vision",
+    "location": "Anand Nagar",
+    "priceRangeLacs": [
+      66.4,
+      285
+    ],
+    "carpetRangeSqft": [
+      429,
+      1889
+    ],
+    "possession": "6 Months",
+    "developer": "Dhananjay"
+  },
+  {
+    "project": "Imperial Dhanraj",
+    "location": "Samta Nagar",
+    "priceRangeLacs": [
+      67.33,
+      114
+    ],
+    "carpetRangeSqft": [
+      481,
+      860
+    ],
+    "possession": "2 Years",
+    "developer": "Imperial"
+  },
+  {
+    "project": "Blossom 6B",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      67.84,
+      91.41
+    ],
+    "carpetRangeSqft": [
+      517,
+      831
+    ],
+    "possession": "6 Months",
+    "developer": "Rajhans"
+  },
+  {
+    "project": "Blossom 6C&D",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      69,
+      96.37
+    ],
+    "carpetRangeSqft": [
+      600,
+      798
+    ],
+    "possession": "6 Months",
+    "developer": "Rajhans"
+  },
+  {
+    "project": "Florence 2",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      70,
+      156
+    ],
+    "carpetRangeSqft": [
+      580,
+      1500
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Family Serenity Plot Virat",
+    "location": "Nallasopara",
+    "priceRangeLacs": [
+      71,
+      71
+    ],
+    "carpetRangeSqft": [
+      820,
+      820
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Pearl Garden",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      74.5,
+      105
+    ],
+    "carpetRangeSqft": [
+      605,
+      880
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Jasmine",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      77.11,
+      103
+    ],
+    "carpetRangeSqft": [
+      714,
+      950
+    ],
+    "possession": "6 Months",
+    "developer": "Happy Homes"
+  },
+  {
+    "project": "Divine Orchid",
+    "location": "Bangli Road",
+    "priceRangeLacs": [
+      79.56,
+      109
+    ],
+    "carpetRangeSqft": [
+      680,
+      939
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Regal Pride",
+    "location": "Suyog Nagar / Chulna",
+    "priceRangeLacs": [
+      81.9,
+      90.48
+    ],
+    "carpetRangeSqft": [
+      1050,
+      1160
+    ],
+    "possession": "RTMI",
+    "developer": "Suvidha"
+  },
+  {
+    "project": "Canary",
+    "location": "Yashwant County",
+    "priceRangeLacs": [
+      82.21,
+      118
+    ],
+    "carpetRangeSqft": [
+      1200,
+      1735
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Bless",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      82.34,
+      104
+    ],
+    "carpetRangeSqft": [
+      716,
+      910
+    ],
+    "possession": "2 Years",
+    "developer": ""
+  },
+  {
+    "project": "Maryland",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      84.15,
+      108.2
+    ],
+    "carpetRangeSqft": [
+      765,
+      974
+    ],
+    "possession": "2 Years",
+    "developer": ""
+  },
+  {
+    "project": "PAM (One Time / Paarnaka)",
+    "location": "Paarnaka",
+    "priceRangeLacs": [
+      84.32,
+      84.32
+    ],
+    "carpetRangeSqft": [
+      634,
+      634
+    ],
+    "possession": "2.5 Years",
+    "developer": ""
+  },
+  {
+    "project": "Dunlin",
+    "location": "Yashwant County / Suncity",
+    "priceRangeLacs": [
+      86.4,
+      152
+    ],
+    "carpetRangeSqft": [
+      727,
+      1232
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Celestial",
+    "location": "Parnaka",
+    "priceRangeLacs": [
+      89.7,
+      128
+    ],
+    "carpetRangeSqft": [
+      1150,
+      1600
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Dream Aura",
+    "location": "Rajhans Dreams",
+    "priceRangeLacs": [
+      90.2,
+      132.38
+    ],
+    "carpetRangeSqft": [
+      631,
+      929
+    ],
+    "possession": "3 Months",
+    "developer": "Rajhans"
+  },
+  {
+    "project": "Khatushyam Empire",
+    "location": "Suncity",
+    "priceRangeLacs": [
+      96.19,
+      285
+    ],
+    "carpetRangeSqft": [
+      810,
+      1800
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Classic Heritage",
+    "location": "Suncity",
+    "priceRangeLacs": [
+      97.56,
+      185
+    ],
+    "carpetRangeSqft": [
+      813,
+      1485
+    ],
+    "possession": "Not specified",
+    "developer": "Sethi Infra"
+  },
+  {
+    "project": "Vedant Riverside",
+    "location": "Nallasopara",
+    "priceRangeLacs": [
+      99,
+      99
+    ],
+    "carpetRangeSqft": [
+      690,
+      690
+    ],
+    "possession": "Not specified",
+    "developer": ""
+  },
+  {
+    "project": "Vishwakarma Heights",
+    "location": "Samta Nagar",
+    "priceRangeLacs": [
+      108,
+      200
+    ],
+    "carpetRangeSqft": [
+      1080,
+      1080
+    ],
+    "possession": "6 Months",
+    "developer": "Vishwakarma Builders"
+  },
+  {
+    "project": "Tower 91",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      122,
+      122
+    ],
+    "carpetRangeSqft": [
+      1150,
+      1150
+    ],
+    "possession": "1 Year",
+    "developer": ""
+  },
+  {
+    "project": "Ramdev Heights",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      122.38,
+      122.38
+    ],
+    "carpetRangeSqft": [
+      965,
+      965
+    ],
+    "possession": "Not specified",
+    "developer": ""
+  },
+  {
+    "project": "Platinum Aura",
+    "location": "Agarwal",
+    "priceRangeLacs": [
+      132,
+      132
+    ],
+    "carpetRangeSqft": [
+      1139,
+      1139
+    ],
+    "possession": "2 Years",
+    "developer": ""
+  },
+  {
+    "project": "Kanti Dhuri Sheraton",
+    "location": "Dindayal Nagar",
+    "priceRangeLacs": [
+      135,
+      193
+    ],
+    "carpetRangeSqft": [
+      1510,
+      2150
+    ],
+    "possession": "RTMI",
+    "developer": ""
+  },
+  {
+    "project": "Luxembourg",
+    "location": "Stella Road",
+    "priceRangeLacs": [
+      162.66,
+      239
+    ],
+    "carpetRangeSqft": [
+      1330,
+      1900
+    ],
+    "possession": "3 Years",
+    "developer": ""
+  },
+  {
+    "project": "Ambaramb",
+    "location": "Suyog Nagar",
+    "priceRangeLacs": [
+      163,
+      163
+    ],
+    "carpetRangeSqft": [
+      1254,
+      1254
+    ],
+    "possession": "3 Years",
+    "developer": "Shree Varad"
+  },
+  {
+    "project": "Miracle Tower",
+    "location": "Bhabhola",
+    "priceRangeLacs": [
+      167,
+      167
+    ],
+    "carpetRangeSqft": [
+      1321,
+      1321
+    ],
+    "possession": "3 Years",
+    "developer": ""
+  },
+  {
+    "project": "Nirmala Sadan",
+    "location": "Opp Mansarovar HO",
+    "priceRangeLacs": [
+      250,
+      264
+    ],
+    "carpetRangeSqft": [
+      2000,
+      2115
+    ],
+    "possession": "2 Years",
+    "developer": "Viva"
+  },
+  {
+    "project": "Emerald 2",
+    "location": "Rajhans Dreams",
+    "priceRangeLacs": [
+      350,
+      350
+    ],
+    "carpetRangeSqft": [
+      1900,
+      1900
+    ],
+    "possession": "RTMI",
+    "developer": "Rajhans"
+  }
+]

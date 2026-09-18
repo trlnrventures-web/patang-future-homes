@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
-import { projects } from "@/lib/projects";
+import { projects, SUB_LOCATIONS, subLocationMatches } from "@/lib/projects";
 import type { Project } from "@/lib/projects";
 
 const TYPE_OPTIONS = [
@@ -28,6 +28,11 @@ const LOCATION_OPTIONS = [
   { value: "all", label: "All Locations" },
   { value: "west", label: "Vasai West" },
   { value: "east", label: "Vasai East" },
+];
+
+const SUBLOCATION_OPTIONS = [
+  { value: "all", label: "All Sub-locations" },
+  ...SUB_LOCATIONS.map((s) => ({ value: s, label: s })),
 ];
 
 const TIER_OPTIONS = [
@@ -88,6 +93,7 @@ export default function PropertiesExplorer() {
   const [config, setConfig] = useState("all");
   const [listing, setListing] = useState("buy");
   const [location, setLocation] = useState("all");
+  const [sublocation, setSublocation] = useState("all");
   const [tier, setTier] = useState("all");
   const [maxPrice, setMaxPrice] = useState(PRICE_MAX);
   const [sort, setSort] = useState("newest");
@@ -104,6 +110,7 @@ export default function PropertiesExplorer() {
       if (type !== "all" && p.type !== type) return false;
       if (config !== "all" && !hasConfig(p, parseInt(config, 10))) return false;
       if (location !== "all" && p.area !== location) return false;
+      if (sublocation !== "all" && !subLocationMatches(p.subLocation, sublocation)) return false;
       if (tier !== "all" && p.tier !== tier) return false;
       if (listing === "rent") return false;
       const min = minPriceLakhs(p.priceRange);
@@ -132,7 +139,7 @@ export default function PropertiesExplorer() {
     }
 
     return list;
-  }, [type, config, listing, location, tier, maxPrice, sort]);
+  }, [type, config, listing, location, sublocation, tier, maxPrice, sort]);
 
   const shown = filtered.slice(0, visible);
   const allShown = visible >= filtered.length;
@@ -142,6 +149,9 @@ export default function PropertiesExplorer() {
   const locationLabel =
     LOCATION_OPTIONS.find((o) => o.value === location)?.label ??
     "All Locations";
+  const sublocationLabel =
+    SUBLOCATION_OPTIONS.find((o) => o.value === sublocation)?.label ??
+    "All Sub-locations";
   const tierLabel =
     TIER_OPTIONS.find((o) => o.value === tier)?.label ?? "All Tiers";
   const maxLabel =
@@ -155,6 +165,7 @@ export default function PropertiesExplorer() {
       setConfig("all");
       setListing("buy");
       setLocation("all");
+      setSublocation("all");
       setTier("all");
       setMaxPrice(PRICE_MAX);
       setSort("newest");
@@ -185,6 +196,12 @@ export default function PropertiesExplorer() {
       key: "location",
       label: locationLabel,
       clear: () => updateFilters(() => setLocation("all")),
+    });
+  if (sublocation !== "all")
+    chips.push({
+      key: "sublocation",
+      label: sublocationLabel,
+      clear: () => updateFilters(() => setSublocation("all")),
     });
   if (tier !== "all")
     chips.push({
@@ -250,6 +267,20 @@ export default function PropertiesExplorer() {
           className={selectClass}
         >
           {LOCATION_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Sub-location">
+        <select
+          value={sublocation}
+          onChange={(e) => updateFilters(() => setSublocation(e.target.value))}
+          className={selectClass}
+        >
+          {SUBLOCATION_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>

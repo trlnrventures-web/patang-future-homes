@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { Badge } from "./ui";
-import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/crm/leads";
+import LeadCard from "./LeadCard";
+import InboxSnapshot from "./InboxSnapshot";
+import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, bhkLabel } from "@/lib/crm/leads";
+import { dealHealthFor } from "@/lib/crm/sales";
 
 type Lead = {
   id: number;
   name: string;
   phone: string;
+  whatsappNumber: string | null;
+  source: string;
   originalProject: string | null;
   location: string | null;
   bhk: string | null;
@@ -18,6 +22,11 @@ type Lead = {
   assignedCallerName: string;
   createdAt: string;
   nextFollowUp: string | null;
+  nextFollowUpDisplay?: string | null;
+  nextAction?: string | null;
+  hasOverdueFollowUp?: boolean;
+  negotiationLastActive?: string | null;
+  slaStatus?: string;
 };
 
 const STATUS_FILTERS = ["all", "new", "calling", "qualified", "follow_up", "visit_booked", "visit_done", "negotiation", "booked", "no_response", "nurture", "lost"];
@@ -37,6 +46,9 @@ export default function LeadsList() {
   const [quick, setQuick] = useState("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,16 +58,20 @@ export default function LeadsList() {
       if (status !== "all") params.set("status", status);
       if (quick) params.set("quick", quick);
       if (query.trim()) params.set("q", query.trim());
+      params.set("page", String(page));
+      params.set("pageSize", "20");
       const res = await fetch(`/crm/api/leads?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       setLeads(data.leads);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
     } catch {
-      setError("Leads load karne mein dikkat aayi. Dobara try karein.");
+      setError("Could not load leads. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [status, quick, query]);
+  }, [status, quick, query, page]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -68,15 +84,15 @@ export default function LeadsList() {
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search naam, phone ya project..."
+          onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+          placeholder="Search name, phone, or project..."
           className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-navy outline-none transition-colors focus:border-primary"
         />
         <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {QUICK_FILTERS.map((f) => (
             <button
               key={f.key || "all"}
-              onClick={() => setQuick(f.key)}
+              onClick={() => { setQuick(f.key); setPage(1); }}
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                 quick === f.key
                   ? "bg-primary text-white"
@@ -91,7 +107,7 @@ export default function LeadsList() {
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
-              onClick={() => setStatus(s)}
+              onClick={() => { setStatus(s); setPage(1); }}
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                 status === s
                   ? "bg-primary text-white"
@@ -111,80 +127,143 @@ export default function LeadsList() {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-[9.5rem] animate-pulse rounded-2xl bg-gray-100" />
           ))}
         </div>
       ) : leads.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-8 text-center">
-          <p className="text-sm font-semibold text-navy">Koi lead nahi mila</p>
+          <p className="text-sm font-semibold text-navy">No leads found</p>
           <p className="mt-1 text-xs text-muted">
-            Filter change karke try karein, ya naya lead create karein.
+            Try changing the filters, or create a new lead.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {leads.map((lead) => (
-            <Link
-              key={lead.id}
-              href={`/crm/leads/${lead.id}`}
-              className="block rounded-xl border border-border bg-white px-3.5 py-3 transition-shadow hover:shadow-md"
+        <>
+          <InboxSnapshot leads={leads} />
+          <div className="flex items-center justify-between px-1 text-xs text-muted">
+            <button
+              onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setPage((p) => Math.max(1, p - 1)); }}
+              disabled={page <= 1}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 font-semibold text-navy disabled:opacity-40"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate text-sm font-bold text-navy">
-                      {lead.name}
-                    </h3>
-                    <Badge
-                      color={
-                        LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700"
-                      }
-                    >
-                      {LEAD_STATUS_LABELS[lead.status] || lead.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted">{lead.phone}</p>
-                </div>
-                <span className="shrink-0 text-[10px] text-soft">
-                  {timeAgo(lead.createdAt)}
-                </span>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                {lead.originalProject && (
-                  <span className="rounded-md bg-background px-1.5 py-0.5">
-                    📍 {lead.originalProject}
-                  </span>
-                )}
-                {lead.bhk && (
-                  <span className="rounded-md bg-background px-1.5 py-0.5">
-                    {bhkLabel(lead.bhk)}
-                  </span>
-                )}
-                {lead.budget && (
-                  <span className="rounded-md bg-background px-1.5 py-0.5">
-                    {lead.budget}
-                  </span>
-                )}
-                {lead.assignedSmName && (
-                  <span className="rounded-md bg-primary/5 px-1.5 py-0.5 font-semibold text-primary">
-                    SM: {lead.assignedSmName}
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+              ← Prev
+            </button>
+            <span>
+              Page {page} / {totalPages} · {total} leads
+            </span>
+            <button
+              onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setPage((p) => Math.min(totalPages, p + 1)); }}
+              disabled={page >= totalPages}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 font-semibold text-navy disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {leads.map((lead) => (
+              <LeadCard
+                key={lead.id}
+                lead={{
+                  id: lead.id,
+                  name: lead.name,
+                  phone: lead.phone,
+                  whatsappNumber: lead.whatsappNumber,
+                  statusLabel: LEAD_STATUS_LABELS[lead.status] || lead.status,
+                  statusCls: LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700",
+                  nextAction: lead.nextAction || undefined,
+                  nextFollowUpDisplay: lead.nextFollowUpDisplay || lead.nextFollowUp || null,
+                  hasOverdueFollowUp: lead.hasOverdueFollowUp,
+                }}
+                accentCls={accentFor(lead.status)}
+                badges={
+                  lead.status === "negotiation" && lead.negotiationLastActive ? (() => {
+                    const h = dealHealthFor(lead.negotiationLastActive);
+                    return (
+                      <Badge color={h.cls}>
+                        {h.label} · {h.days}d
+                      </Badge>
+                    );
+                  })() : undefined
+                }
+                pills={
+                  <>
+                    {lead.originalProject && (
+                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                        {lead.originalProject}
+                      </span>
+                    )}
+                    {lead.bhk && (
+                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                        {bhkLabel(lead.bhk)}
+                      </span>
+                    )}
+                    {lead.budget && (
+                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                        {lead.budget}
+                      </span>
+                    )}
+                    {lead.assignedSmName && (
+                      <span className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        SM: {lead.assignedSmName}
+                      </span>
+                    )}
+                  </>
+                }
+                footerNote={
+                  <span className="text-soft">{timeAgo(lead.createdAt)}</span>
+                }
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between px-1 text-xs text-muted">
+            <button
+              onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setPage((p) => Math.max(1, p - 1)); }}
+              disabled={page <= 1}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 font-semibold text-navy disabled:opacity-40"
+            >
+              ← Prev
+            </button>
+            <span>
+              Page {page} / {totalPages} · {total} leads
+            </span>
+            <button
+              onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setPage((p) => Math.min(totalPages, p + 1)); }}
+              disabled={page >= totalPages}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 font-semibold text-navy disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function bhkLabel(bhk: string | null): string {
-  if (!bhk) return "";
-  return /BHK/i.test(bhk) ? bhk : `${bhk} BHK`;
+function accentFor(status: string): string {
+  switch (status) {
+    case "new":
+      return "bg-red-500";
+    case "calling":
+    case "connected":
+    case "follow_up":
+      return "bg-amber-500";
+    case "qualified":
+    case "assigned":
+      return "bg-violet-500";
+    case "negotiation":
+      return "bg-fuchsia-500";
+    case "booked":
+      return "bg-emerald-500";
+    case "no_response":
+      return "bg-slate-400";
+    case "nurture":
+      return "bg-indigo-500";
+    default:
+      return "bg-gray-300";
+  }
 }
 
 function timeAgo(iso: string): string {

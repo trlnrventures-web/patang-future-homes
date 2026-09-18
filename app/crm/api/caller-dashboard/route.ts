@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, desc } from "drizzle-orm";
@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/crm/auth";
 import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
 import { getDailyMetricsForEmployee, istToday, istDayRange, type DailyMetrics } from "@/lib/crm/reports";
+import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
 
 export type DashboardLeadCard = {
   id: number;
@@ -76,17 +77,17 @@ function nextActionFor(lead: {
     case "booked":
       return "Booking follow-up";
     default:
-      return "—";
+      return "Next step";
   }
 }
 
-function enrichLead(l: (typeof schema.leads.$inferSelect), now: Date, userMap: Map<number, string>, terminal: Set<string>): DashboardLeadCard {
+function enrichLead(l: (typeof schema.leads.$inferSelect), now: Date, userMap: Map<number, string>, terminal: Set<string>, earliestFollowUp: Map<number, string>): DashboardLeadCard {
   const slaStatus = computeSlaStatus(l.createdAt, l.firstCallAt);
   const priority = getPriority(l);
-  const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt;
+  const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt || earliestFollowUp.get(l.id) || null;
   const hasOverdueFollowUp = nextFollowUpIso != null && new Date(nextFollowUpIso).getTime() < now.getTime() && !terminal.has(l.status);
 
-  const checkHours = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec((l.nextFollowUp || "").replace(" ", "T"));
+  const checkHours = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec((nextFollowUpIso || "").replace(" ", "T"));
   const nextFollowUpDisplay = checkHours
     ? `${checkHours[1].slice(5).split("-").reverse().join("/")} ${checkHours[2]}`
     : nextFollowUpIso
@@ -151,12 +152,12 @@ export async function GET() {
 
   const terminal = new Set(["invalid", "lost", "dnc", "booked"]);
 
-  const myLeads = db
+const myLeads = db
     .select()
     .from(schema.leads)
-    .where(eq(schema.leads.assignedCallerId, user.id))
     .orderBy(desc(schema.leads.createdAt))
-    .all();
+    .all()
+    .filter(isInCallerScope);
 
   const pendingFollowUps = db
     .select()
@@ -174,6 +175,7 @@ export async function GET() {
 
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u.name]));
+  const earliestFollowUp = buildEarliestFollowUpMap(db);
 
   const active = myLeads.filter((l) => !terminal.has(l.status));
 
@@ -193,11 +195,11 @@ export async function GET() {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     })
     .slice(0, 8)
-    .map((l) => enrichLead(l, now, userMap, terminal));
+    .map((l) => enrichLead(l, now, userMap, terminal, earliestFollowUp));
 
   const cardFor = (leadId: number) => {
     const l = myLeads.find((x) => x.id === leadId);
-    return l ? enrichLead(l, now, userMap, terminal) : null;
+    return l ? enrichLead(l, now, userMap, terminal, earliestFollowUp) : null;
   };
 
   const followUpsToday = [...todayPending.keys()]
@@ -207,16 +209,16 @@ export async function GET() {
     .sort((a, b) => (a.nextFollowUpIso || "").localeCompare(b.nextFollowUpIso || ""))
     .slice(0, 6);
 
-  const overdue = overdueLeads.map((l) => enrichLead(l, now, userMap, terminal)).slice(0, 6);
+  const overdue = overdueLeads.map((l) => enrichLead(l, now, userMap, terminal, earliestFollowUp)).slice(0, 6);
 
   const newToday = active
     .filter((l) => l.status === "new" && l.createdAt >= from && l.createdAt < to)
-    .map((l) => enrichLead(l, now, userMap, terminal))
+    .map((l) => enrichLead(l, now, userMap, terminal, earliestFollowUp))
     .slice(0, 6);
 
   const noResponse = active
     .filter((l) => l.status === "no_response")
-    .map((l) => enrichLead(l, now, userMap, terminal))
+    .map((l) => enrichLead(l, now, userMap, terminal, earliestFollowUp))
     .slice(0, 6);
 
   const metrics = getDailyMetricsForEmployee({ id: user.id, name: user.name, role: user.role }, date);

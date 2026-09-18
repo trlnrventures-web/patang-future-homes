@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import seoLandingPages from "@/data/seo-landing-pages.json";
-import { projects } from "@/lib/projects";
+import { projects, SUB_LOCATIONS, subLocationMatches } from "@/lib/projects";
 import PropertyCard from "@/components/PropertyCard";
 
 type SeoLandingPage = {
@@ -33,7 +33,7 @@ function bhkNumberFromSlug(slug: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
-function matchingProjects(locationSlug: string, bhk: number) {
+function matchingProjects(locationSlug: string, bhk: number, sub?: string | null) {
   const area = areaFromSlug(locationSlug);
   if (!area) return [];
   return projects.filter(
@@ -41,7 +41,8 @@ function matchingProjects(locationSlug: string, bhk: number) {
       p.area === area &&
       p.configurations.some((c) =>
         new RegExp(`^${bhk}\\s*BHK`, "i").test(c.type)
-      )
+      ) &&
+      (!sub || sub === "all" || subLocationMatches(p.subLocation, sub))
   );
 }
 
@@ -52,7 +53,10 @@ export function generateStaticParams() {
   }));
 }
 
-type Props = { params: Promise<{ location: string; bhk: string }> };
+type Props = {
+  params: Promise<{ location: string; bhk: string }>;
+  searchParams: Promise<{ sub?: string }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { location, bhk } = await params;
@@ -93,8 +97,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function BhkLandingPage({ params }: Props) {
+export default async function BhkLandingPage({ params, searchParams }: Props) {
   const { location, bhk } = await params;
+  const { sub } = await searchParams;
   const page = pages.find(
     (p) => p.locationSlug === location && p.bhkSlug === bhk
   );
@@ -104,7 +109,7 @@ export default async function BhkLandingPage({ params }: Props) {
   const bhkNumber = bhkNumberFromSlug(bhk);
   const bhkLabel = bhkNumber ? `${bhkNumber} BHK` : "Properties";
   const areaLabel = AREA_LABELS[location] ?? "Vasai";
-  const matching = matchingProjects(location, bhkNumber ?? 0);
+  const matching = matchingProjects(location, bhkNumber ?? 0, sub);
   const filterHref = `/properties?type=flat&area=${areaFromSlug(location)}&config=${
     bhkNumber ?? ""
   }`;
@@ -205,6 +210,30 @@ export default async function BhkLandingPage({ params }: Props) {
               View all in {areaLabel}
             </Link>
           </div>
+
+          <form className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Sub-location:
+            </span>
+            <select
+              name="sub"
+              defaultValue={sub || "all"}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-navy outline-none focus:border-primary"
+            >
+              <option value="all">All sub-locations</option>
+              {SUB_LOCATIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-secondary"
+            >
+              Filter
+            </button>
+          </form>
 
           {matching.length > 0 ? (
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

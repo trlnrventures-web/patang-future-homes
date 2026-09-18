@@ -35,7 +35,17 @@ function createTables(sqlite: Database.Database) {
       role TEXT NOT NULL DEFAULT 'caller',
       phone TEXT,
       active INTEGER NOT NULL DEFAULT 1,
+      week_off_day TEXT,
+      last_login_at TEXT,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      email TEXT PRIMARY KEY,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT,
+      updated_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS leads (
@@ -55,6 +65,7 @@ function createTables(sqlite: Database.Database) {
       original_project TEXT,
       original_message TEXT,
       location TEXT,
+      sublocation TEXT,
       budget TEXT,
       budget_min INTEGER,
       budget_max INTEGER,
@@ -125,6 +136,7 @@ function createTables(sqlite: Database.Database) {
       transport_requirement TEXT,
       status TEXT NOT NULL DEFAULT 'proposed',
       notes TEXT,
+      done_at TEXT,
       created_at TEXT NOT NULL DEFAULT ''
     );
 
@@ -251,6 +263,86 @@ function createTables(sqlite: Database.Database) {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
     );
 
+    CREATE TABLE IF NOT EXISTS attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'office',
+      field_duty_reason TEXT,
+      checkin_time TEXT,
+      checkout_time TEXT,
+      checkin_lat TEXT,
+      checkin_lng TEXT,
+      checkin_distance_m INTEGER,
+      checkout_lat TEXT,
+      checkout_lng TEXT,
+      checkout_distance_m INTEGER,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      rejection_reason TEXT,
+      decided_by INTEGER,
+      decided_at TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS lead_mentions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      mentioned_by_id INTEGER NOT NULL,
+      note_id INTEGER,
+      note_snippet TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (lead_id) REFERENCES leads(id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (mentioned_by_id) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+    CREATE INDEX IF NOT EXISTS idx_leave_requests_user ON leave_requests(user_id);
+    CREATE INDEX IF NOT EXISTS idx_leave_requests_status ON leave_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_lead_mentions_user ON lead_mentions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_lead_mentions_lead ON lead_mentions(lead_id);
+
+    CREATE TABLE IF NOT EXISTS incentive_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      month TEXT NOT NULL,
+      role TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      paid_by INTEGER,
+      paid_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (paid_by) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_incentive_payments_user_month ON incentive_payments(user_id, month);
+
+    CREATE TABLE IF NOT EXISTS reactivation_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_slug TEXT NOT NULL,
+      lead_id INTEGER NOT NULL,
+      user_id INTEGER,
+      match_score INTEGER DEFAULT 0,
+      dismissed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (lead_id) REFERENCES leads(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reactivation_alerts_user ON reactivation_alerts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reactivation_alerts_project ON reactivation_alerts(project_slug);
+
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
     CREATE INDEX IF NOT EXISTS idx_leads_caller ON leads(assigned_caller_id);
     CREATE INDEX IF NOT EXISTS idx_leads_sm ON leads(assigned_sm_id);
@@ -272,6 +364,26 @@ function createTables(sqlite: Database.Database) {
 
   migrateLeads(sqlite);
   migrateBookings(sqlite);
+  migrateUsers(sqlite);
+  migrateSiteVisits(sqlite);
+  migrateMessageTemplates(sqlite);
+}
+
+function migrateUsers(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("reset_requested_at")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN reset_requested_at TEXT");
+  }
+  if (!have.has("week_off_day")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN week_off_day TEXT");
+  }
+  if (!have.has("last_login_at")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN last_login_at TEXT");
+  }
+  if (!have.has("must_change_password")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 function migrateLeads(sqlite: Database.Database) {
@@ -288,6 +400,7 @@ function migrateLeads(sqlite: Database.Database) {
     ["next_attempt_at", "TEXT"],
     ["assigned_at", "TEXT"],
     ["assigned_by", "INTEGER"],
+    ["sublocation", "TEXT"],
   ];
   for (const [name, decl] of additions) {
     if (!have.has(name)) {
@@ -311,6 +424,14 @@ function migrateBookings(sqlite: Database.Database) {
     if (!have.has(name)) {
       sqlite.exec(`ALTER TABLE bookings ADD COLUMN ${name} ${decl}`);
     }
+  }
+}
+
+function migrateSiteVisits(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(site_visits)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("done_at")) {
+    sqlite.exec("ALTER TABLE site_visits ADD COLUMN done_at TEXT");
   }
 }
 
@@ -378,76 +499,127 @@ function ensureMarketingUser(sqlite: Database.Database) {
     .run("Marketing Team", email, hash, "marketing", "917249138197", now);
 }
 
+function migrateMessageTemplates(sqlite: Database.Database) {
+  const hasTemplates = sqlite
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_templates'")
+    .get();
+  if (!hasTemplates) return;
+
+  const LEGACY_CATEGORY_MAP: Record<string, string> = {
+    missed_call: "first_contact",
+    no_answer: "first_contact",
+    requirement_confirmation: "follow_up",
+    budget_alternative: "property_option",
+    site_visit_proposal: "visit_confirmation",
+    site_visit_confirmation: "visit_confirmation",
+    day_before_reminder: "visit_reminder",
+    same_day_reminder: "visit_reminder",
+    negotiation: "follow_up",
+    nurture: "follow_up",
+    custom: "follow_up",
+  };
+
+  for (const [oldCategory, newCategory] of Object.entries(LEGACY_CATEGORY_MAP)) {
+    sqlite
+      .prepare("UPDATE message_templates SET category = ? WHERE category = ?")
+      .run(newCategory, oldCategory);
+    sqlite
+      .prepare("UPDATE message_logs SET category = ? WHERE category = ?")
+      .run(newCategory, oldCategory);
+  }
+
+  const legacySeedNames = [
+    "First Contact - Meta Lead",
+    "First Contact - Website Lead",
+    "Missed Call Follow-up",
+    "Missed Call - Retry",
+    "No Answer - Try Again",
+    "No Answer - WhatsApp",
+    "Requirement Confirmation",
+    "Requirement - Budget Check",
+    "Property Option Share",
+    "Property Option - New Listing",
+    "Alternative Project Suggestion",
+    "Alternative Project - New Option",
+    "Budget Alternative",
+    "Budget Alternative - Lower Range",
+    "Follow-up - General",
+    "Follow-up - After Discussion",
+    "Follow-up - Value Based",
+    "Site Visit Proposal",
+    "Site Visit - Multiple Options",
+    "Site Visit Confirmation",
+    "Site Visit - Quick Confirm",
+    "Day Before Visit Reminder",
+    "Day Before - Detailed",
+    "Same Day Visit Reminder",
+    "Same Day - Quick",
+    "Post Visit - Feedback",
+    "Post Visit - Next Step",
+    "Negotiation - Best Price",
+    "Negotiation - Limited Time",
+    "Nurture - Monthly Update",
+    "Nurture - Festival Offer",
+  ];
+  const deleteSeed = sqlite.prepare(
+    "DELETE FROM message_templates WHERE is_personal = 0 AND name = ?"
+  );
+  for (const name of legacySeedNames) {
+    deleteSeed.run(name);
+  }
+}
+
 function seedMessageTemplates(sqlite: Database.Database) {
   const templates = [
-    // FIRST CONTACT
-    { name: "First Contact - Meta Lead", category: "first_contact", body: "Hi {{name}} sir, Patang Future Homes se call ho raha hai. Aapne Vasai West property ke liye enquiry ki thi. Aapki requirement thodi samajh leta hoon, phir uske according suitable options bata deta hoon." },
-    { name: "First Contact - Website Lead", category: "first_contact", body: "Hi {{name}} sir, Patang Future Homes se baat ho rahi hai. Humari website pe aapki property enquiry aayi thi. Aap kis area mein dekh rahe ho aur budget kitna hai?" },
-
-    // MISSED CALL
-    { name: "Missed Call Follow-up", category: "missed_call", body: "Hi {{name}} sir, aapse call connect ho nahi paaya. Kya aap bata sakte kab free rahega? Main us time pe call kar leta hoon." },
-    { name: "Missed Call - Retry", category: "missed_call", body: "{{name}} sir, abhi aapka miss call aaya tha Patang Future Homes se. Property ke baare mein kuch baat karni thi. Kab convenient rahega aap?" },
-
-    // NO ANSWER
-    { name: "No Answer - Try Again", category: "no_answer", body: "Hi {{name}} sir, kuch der pehle call kiya tha but connect nahi ho paaya. Aap bata sakte kab reachable rahoge? Property options shortlist kiye hain, share karna chahta hoon." },
-    { name: "No Answer - WhatsApp", category: "no_answer", body: "Hi {{name}} sir, Patang Future Homes se call kiya tha but aap busy lag rahe the. Koi baat nahi. Aapki requirement ke according Vasai West mein kuch options hain. Jab free ho tab bataiye, details share kar deta hoon." },
-
-    // REQUIREMENT CONFIRMATION
-    { name: "Requirement Confirmation", category: "requirement_confirmation", body: "Hi {{name}} sir, aapki requirement confirm kar leta hoon:\n\nLocation: {{location}}\nBudget: {{budget}}\nConfig: {{bhk}} BHK\nTimeline: {{timeline}}\n\nYe sahi hai ya koi change hai?" },
-    { name: "Requirement - Budget Check", category: "requirement_confirmation", body: "{{name}} sir, aapka budget {{budget}} hai aur {{bhk}} BHK chahiye Vasai West mein. Aapko loan ki zaroorat hogi kya? Aur koi specific location preference hai?" },
-
-    // PROPERTY OPTION
-    { name: "Property Option Share", category: "property_option", body: "Hi {{name}} sir, aapki requirement ke according {{project}} mein ek accha option hai:\n\n{{bhk}} BHK\nBudget: {{budget}}\nLocation: {{location}}\n\nAgar interested ho toh site visit fix kar sakte hain." },
-    { name: "Property Option - New Listing", category: "property_option", body: "{{name}} sir, aapki requirement ke according ek naya option aaya hai — {{project}}, {{location}} mein. {{bhk}} BHK, {{budget}} range mein. Details share karu?" },
-
-    // ALTERNATIVE PROJECT
-    { name: "Alternative Project Suggestion", category: "alternative_project", body: "Hi {{name}} sir, agar {{original_project}} aapki requirement mein fit nahi aa raha toh koi issue nahi. Aapke {{budget}} budget aur {{bhk}} BHK requirement ke according Vasai West mein kuch aur options bhi check kiye hain." },
-    { name: "Alternative Project - New Option", category: "alternative_project", body: "{{name}} sir, aapne pehle {{original_project}} mein interest dikhaya tha. Uske alawa Vasai West mein {{project}} bhi dekh sakte ho — {{bhk}} BHK, {{budget}} range mein, aur location bhi acchi hai." },
-
-    // BUDGET ALTERNATIVE
-    { name: "Budget Alternative", category: "budget_alternative", body: "Hi {{name}} sir, agar {{original_project}} ka budget thoda zyada lag raha hai toh koi issue nahi. Aapke budget ke according Vasai West mein aur bhi options available hain. Main 2-3 suitable options bata deta hoon." },
-    { name: "Budget Alternative - Lower Range", category: "budget_alternative", body: "{{name}} sir, aapki requirement ke hisaab se {{budget}} range mein Vasai West mein acche options mil rahe hain. {{bhk}} BHK, ready possession bhi available hai kuch projects mein. Details chahiye?" },
-
-    // FOLLOW-UP
-    { name: "Follow-up - General", category: "follow_up", body: "Hi {{name}} sir, aapki Vasai West property requirement ke regarding follow-up kar raha hoon. Aapke budget aur requirement ke according kuch options shortlist kiye hain. Aap chaho toh main details share kar deta hoon." },
-    { name: "Follow-up - After Discussion", category: "follow_up", body: "{{name}} sir, jo options discuss kiye the uske baare mein socha? Koi update hai toh bataiye, aur koi naya option bhi dekh raha hoon aapke liye." },
-    { name: "Follow-up - Value Based", category: "follow_up", body: "{{name}} sir, ek useful update hai — Vasai West mein abhi kuch projects mein festive offer chal raha hai. Agar aap abhi decide kar lete ho toh acchi deal mil sakti hai. Discuss karein?" },
-
-    // SITE VISIT PROPOSAL
-    { name: "Site Visit Proposal", category: "site_visit_proposal", body: "Hi {{name}} sir, aapki {{project}} site visit schedule kar sakte hain. Aapko kaun sa din convenient rahega? Main uss din ke liye slot fix kar deta hoon." },
-    { name: "Site Visit - Multiple Options", category: "site_visit_proposal", body: "{{name}} sir, aapke liye 2-3 projects shortlist kiye hain. Ek saath 2 projects bhi dekh sakte ho ek din mein. Kab free ho aap?" },
-
-    // SITE VISIT CONFIRMATION
-    { name: "Site Visit Confirmation", category: "site_visit_confirmation", body: "Hi {{name}} sir, aapki {{project}} site visit {{visit_date}} ko {{visit_time}} par confirm ho gayi hai. Meeting point: {{location}}. Aap nikalne se pehle ek baar confirm kar dijiyega." },
-    { name: "Site Visit - Quick Confirm", category: "site_visit_confirmation", body: "{{name}} sir, {{project}} ki site visit {{visit_time}} par hai. Please confirm kar dijiye ki aap aa rahe ho." },
-
-    // DAY-BEFORE VISIT REMINDER
-    { name: "Day Before Visit Reminder", category: "day_before_reminder", body: "Hi {{name}} sir, kal aapki {{project}} ki site visit hai. Please yaad rakhiyega. Agar koi change ho toh bata dijiye, hum adjust kar lenge." },
-    { name: "Day Before - Detailed", category: "day_before_reminder", body: "{{name}} sir, kal {{visit_date}} ko {{project}} ki site visit scheduled hai {{visit_time}} par. Location: {{location}}. Koi questions ho toh poochh sakte ho." },
-
-    // SAME-DAY VISIT REMINDER
-    { name: "Same Day Visit Reminder", category: "same_day_reminder", body: "Hi {{name}} sir, aaj {{project}} ki site visit hai. {{visit_time}} par aana hai. Nikalne se pehle ek baar message kar dijiye." },
-    { name: "Same Day - Quick", category: "same_day_reminder", body: "{{name}} sir, aaj ki site visit yaad rahe? {{project}} — {{visit_time}}. Main wahan milunga." },
-
-    // POST-VISIT
-    { name: "Post Visit - Feedback", category: "post_visit", body: "Hi {{name}} sir, aaj {{project}} ki site visit ho gayi. Kaisa laga aapko? Koi feedback hai toh bataiye, aage kya karna hai wo discuss kar lete hain." },
-    { name: "Post Visit - Next Step", category: "post_visit", body: "{{name}} sir, site visit ke baare mein socha? Agar pasand aaya hai toh aage ka process bata deta hoon. Koi doubt hai toh clear kar lete hain." },
-
-    // NEGOTIATION
-    { name: "Negotiation - Best Price", category: "negotiation", body: "{{name}} sir, aapke budget ke hisaab se developer se baat ki hai. Best possible price mil raha hai. Agar aap ready ho toh final kar sakte hain." },
-    { name: "Negotiation - Limited Time", category: "negotiation", body: "{{name}} sir, {{project}} mein abhi acchi deal aa rahi hai. Ye price limited time ke liye hai. Agar interested ho toh jaldi discuss kar lete hain." },
-
-    // NURTURE
-    { name: "Nurture - Monthly Update", category: "nurture", body: "Hi {{name}} sir, Patang Future Homes se update — Vasai West mein kuch naye projects aa rahe hain aur kuch existing mein price revision bhi ho sakta hai. Agar abhi bhi property dekh rahe ho toh bataiye." },
-    { name: "Nurture - Festival Offer", category: "nurture", body: "{{name}} sir, festive season mein Vasai West ke kuch projects mein special offers chal rahe hain. Agar abhi bhi soch rahe ho toh ek baar discuss kar lete hain." },
+    {
+      name: "First Contact",
+      category: "first_contact",
+      body: "Hi {{first_name}}, this is the team at Patang Future Homes. Thank you for your enquiry about a property in {{location}}. Could you share your exact requirement so we can shortlist the best options for you?",
+    },
+    {
+      name: "Follow-up",
+      category: "follow_up",
+      body: "Hi {{first_name}}, I hope you are doing well. I was following up on your enquiry about a property in {{location}}. We have shortlisted a few suitable options and would be happy to share the details. When is a good time to connect?",
+    },
+    {
+      name: "Property Option",
+      category: "property_option",
+      body: "Hi {{first_name}}, as per your requirement, we have a suitable option in {{project}}, {{location}}: {{bhk}} BHK within a budget of {{budget}}. Would you like to know more, or shall we schedule a site visit?",
+    },
+    {
+      name: "Visit Confirmation",
+      category: "visit_confirmation",
+      body: "Hi {{first_name}}, your site visit to {{project}} is confirmed for {{visit_date}} at {{visit_time}}. The meeting point is {{location}}. Kindly confirm this at your end before you head out.",
+    },
+    {
+      name: "Visit Reminder",
+      category: "visit_reminder",
+      body: "Hi {{first_name}}, a gentle reminder about your scheduled site visit to {{project}} on {{visit_date}} at {{visit_time}}, at {{location}}. Please let us know if there is any change in your plan.",
+    },
+    {
+      name: "Post-Visit",
+      category: "post_visit",
+      body: "Hi {{first_name}}, thank you for visiting {{project}} today. We hope you liked what you saw. Please share your feedback and any questions you may have, so we can help with the next steps.",
+    },
+    {
+      name: "Alternative Project",
+      category: "alternative_project",
+      body: "Hi {{first_name}}, since {{original_project}} may not fully match your requirement, we have also shortlisted a few other options in {{location}} within your budget of {{budget}}. Would you like us to share the details?",
+    },
   ];
 
   const now = new Date().toISOString();
+  const hasCategory = sqlite.prepare(
+    "SELECT COUNT(*) AS c FROM message_templates WHERE is_personal = 0 AND category = ?"
+  );
   const insert = sqlite.prepare(
     "INSERT INTO message_templates (name, category, body, active, is_personal, created_by, created_at) VALUES (?, ?, ?, 1, 0, 1, ?)"
   );
 
   for (const t of templates) {
-    insert.run(t.name, t.category, t.body, now);
+    const existing = hasCategory.get(t.category) as { c: number };
+    if (existing.c === 0) {
+      insert.run(t.name, t.category, t.body, now);
+    }
   }
 }

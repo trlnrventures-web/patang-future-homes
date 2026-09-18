@@ -34,6 +34,7 @@ export async function GET(
       budgetMin: lead.budgetMin,
       budgetMax: lead.budgetMax,
       location: lead.location,
+      subLocation: lead.sublocation,
       bhk: lead.bhk,
       timeline: lead.timeline,
       purpose: lead.purpose,

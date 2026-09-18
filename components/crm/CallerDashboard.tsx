@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Badge, PhoneIcon, WhatsAppIcon } from "./ui";
+import { Badge, ChevronIcon, PhoneIcon, WhatsAppIcon } from "./ui";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
 import { slaStatusMeta, type SlaStatus } from "@/lib/crm/sla";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import type { DailyMetrics } from "@/lib/crm/reports";
 import { formatReportDate } from "@/lib/crm/report-text";
+import CallQueue from "./CallQueue";
 
 type Card = {
   id: number;
@@ -58,11 +59,11 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const SECTIONS: { key: keyof Queues; title: string; accent?: boolean; empty: string }[] = [
-  { key: "callNow", title: "CALL NOW", accent: true, empty: "Is waqt koi urgent call nahi hai" },
-  { key: "followUpsToday", title: "FOLLOW-UPS TODAY", empty: "Aaj ka koi follow-up scheduled nahi hai" },
-  { key: "overdue", title: "OVERDUE", empty: "Koi overdue follow-up nahi hai" },
-  { key: "newToday", title: "NEW TODAY", empty: "Aaj koi naya lead nahi aaya" },
-  { key: "noResponse", title: "NO RESPONSE", empty: "No-response list khali hai" },
+  { key: "callNow", title: "CALL NOW", accent: true, empty: "No urgent call pending right now" },
+  { key: "followUpsToday", title: "FOLLOW-UPS TODAY", empty: "No follow-ups scheduled today" },
+  { key: "overdue", title: "OVERDUE", empty: "No overdue follow-ups" },
+  { key: "newToday", title: "NEW TODAY", empty: "No new leads today" },
+  { key: "noResponse", title: "NO RESPONSE", empty: "No-response list is empty" },
 ];
 
 export default function CallerDashboard({ name }: { name: string }) {
@@ -76,6 +77,7 @@ export default function CallerDashboard({ name }: { name: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [showQueue, setShowQueue] = useState(false);
 
   useEffect(() => {
     const tick = () => {
@@ -102,7 +104,7 @@ export default function CallerDashboard({ name }: { name: string }) {
         setMetrics(data.metrics);
         setCounts(data.counts);
       } catch {
-        if (!cancelled) setError("Dashboard load nahi ho paya");
+        if (!cancelled) setError("Could not load the dashboard. Please try again.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -145,7 +147,7 @@ export default function CallerDashboard({ name }: { name: string }) {
 
   const kpiItems = [
     { label: "CALL NOW", value: counts?.callNow ?? 0, key: "callNow", color: "bg-red-50 text-red-700" },
-    { label: "Overdue", value: counts?.overdue ?? 0, key: "overdue", color: "bg-red-600 text-white" },
+    { label: "Overdue", value: counts?.overdue ?? 0, key: "overdue", color: "bg-red-50 text-red-700" },
     { label: "Follow-ups Today", value: counts?.followUpsToday ?? 0, key: "followUpsToday", color: "bg-sky-50 text-sky-700" },
     { label: "New Today", value: counts?.newToday ?? 0, key: "newToday", color: "bg-amber-50 text-amber-800" },
     { label: "No Response", value: counts?.noResponse ?? 0, key: "noResponse", color: "bg-slate-50 text-slate-700" },
@@ -160,7 +162,7 @@ export default function CallerDashboard({ name }: { name: string }) {
       {/* Sticky compact header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold text-primary">{greeting}, {name.split(" ")[0]} ji</div>
+          <div className="text-xs font-semibold text-primary">{greeting}, {name.split(" ")[0]}</div>
           <div className="mt-0.5 text-sm font-bold text-navy">
             {istDate ? formatReportDate(istDate) : ""}
             <span className="ml-2 rounded-md bg-background px-2 py-0.5 text-[10px] font-semibold text-muted">
@@ -169,6 +171,12 @@ export default function CallerDashboard({ name }: { name: string }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowQueue(true)}
+            className="rounded-xl bg-navy px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-navy/90"
+          >
+            ▶ START CALL QUEUE
+          </button>
           <Link href="/crm/reports" className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-primary">
             MY REPORT
           </Link>
@@ -197,22 +205,22 @@ export default function CallerDashboard({ name }: { name: string }) {
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Naam, phone, project, campaign search..."
+        placeholder="Search by name, phone, project, or campaign..."
         className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary"
       />
 
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-28 animate-pulse rounded-2xl bg-gray-100" />
+            <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />
           ))}
         </div>
       ) : totalActive === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-10 text-center">
           <p className="text-sm font-semibold text-navy">
-            {query.trim() ? "Is search se koi lead nahi mila" : "Saare queues clear hain"}
+            {query.trim() ? "No leads match this search" : "All queues are clear"}
           </p>
-          <p className="mt-1 text-xs text-muted">Aaj ka kaam khatam ya abhi koi lead hai nahi.</p>
+          <p className="mt-1 text-xs text-muted">Nothing pending for now. Check again shortly.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -285,6 +293,8 @@ export default function CallerDashboard({ name }: { name: string }) {
         </div>
       </div>
       <div className="h-12 sm:hidden" />
+
+      {showQueue && <CallQueue onExit={() => setShowQueue(false)} />}
     </div>
   );
 }
@@ -300,77 +310,70 @@ function MiniP({ label, value }: { label: string; value?: number }) {
 
 function LeadCard({ card, primary }: { card: Card; primary?: boolean }) {
   return (
-    <div className={`overflow-hidden rounded-2xl border ${primary ? "border-primary/30 bg-primary/5" : "border-border bg-white"}`}>
-      <div className="flex">
-        <div className={`w-1 shrink-0 ${PRIORITY_DOT[card.priority] || "bg-gray-200"}`} />
-        <div className="min-w-0 flex-1 p-3.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h3 className="truncate text-sm font-bold text-navy">{card.name}</h3>
-                <Badge color={slaStatusMeta(card.slaStatus as SlaStatus).cls}>
-                  {slaStatusMeta(card.slaStatus as SlaStatus).label}
-                </Badge>
-              </div>
-              <a href={`tel:+${card.phone.replace(/\D/g, "")}`} className="mt-0.5 block text-xs font-semibold text-primary">
-                {card.phone}
-              </a>
-            </div>
-            <span className="shrink-0 text-[10px] text-soft">{card.leadAge}</span>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-            <Badge color="bg-primary/5 text-primary">{SOURCE_LABELS[card.source] || card.source}</Badge>
+    <div className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors ${primary ? "border-primary/30 bg-primary/5" : "border-border bg-white hover:border-primary/30"}`}>
+      <span className={`h-9 w-1 shrink-0 rounded-full ${PRIORITY_DOT[card.priority] || "bg-gray-200"}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-bold text-navy">{card.name}</span>
+          <span className="shrink-0">
+            <Badge color={slaStatusMeta(card.slaStatus as SlaStatus).cls}>
+              {slaStatusMeta(card.slaStatus as SlaStatus).label}
+            </Badge>
+          </span>
+          <span className="shrink-0">
             <Badge color={statusColor(card.status)}>{LEAD_STATUS_LABELS[card.status] || card.status}</Badge>
-            {card.originalProject && <span className="rounded-md bg-background px-2 py-1">{card.originalProject}</span>}
-            {card.campaignName && <span className="rounded-md bg-background px-2 py-1">{card.campaignName}</span>}
-            {card.assignedSmName && (
-              <span className="rounded-md bg-violet-50 px-2 py-1 font-semibold text-violet-700">SM: {card.assignedSmName}</span>
-            )}
-          </div>
-
-          {card.concern && (
-            <div className="mt-1.5 text-[11px] font-semibold text-amber-700">Concern: {card.concern}</div>
-          )}
-
-          <div className="mt-2 flex items-center gap-3 border-t border-border pt-2 text-[11px]">
-            <span className="font-semibold text-navy">
-              Next: <span className="text-primary">{card.nextAction}</span>
-            </span>
-            {card.nextFollowUp && (
-              <span className={card.hasOverdueFollowUp ? "font-semibold text-red-600" : "text-soft"}>
-                {card.hasOverdueFollowUp ? "Overdue: " : "Due: "}
-                {card.nextFollowUp}
-              </span>
-            )}
-            {card.attemptCount > 0 && <span className="ml-auto text-soft">Attempts: {card.attemptCount}</span>}
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <a
-              href={`tel:+${card.phone.replace(/\D/g, "")}`}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-xs font-bold text-white"
-            >
-              <PhoneIcon />
-              CALL
-            </a>
-            <a
-              href={`https://wa.me/${formatPhoneForWhatsApp(card.whatsappNumber || card.phone)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2.5 text-xs font-bold text-white"
-            >
-              <WhatsAppIcon />
-              WHATSAPP
-            </a>
-            <Link
-              href={`/crm/leads/${card.id}`}
-              className="flex items-center justify-center rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs font-bold text-primary"
-            >
-              OPEN →
-            </Link>
-          </div>
+          </span>
         </div>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="shrink-0 font-semibold text-primary">{card.phone}</span>
+          <Badge color="bg-primary/5 text-primary">{SOURCE_LABELS[card.source] || card.source}</Badge>
+          {card.originalProject && <span className="rounded-md bg-background px-1.5 py-0.5 text-muted">{card.originalProject}</span>}
+          {card.campaignName && <span className="rounded-md bg-background px-1.5 py-0.5 text-muted">{card.campaignName}</span>}
+          {card.assignedSmName && (
+            <span className="rounded-md bg-violet-50 px-1.5 py-0.5 font-semibold text-violet-700">SM: {card.assignedSmName}</span>
+          )}
+        </div>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-[10px]">
+          <span className="font-semibold text-navy">
+            Next:{" "}
+            <span className={card.hasOverdueFollowUp && card.nextFollowUp ? "text-red-600" : "text-primary"}>{card.nextAction}</span>
+          </span>
+          <span className={card.hasOverdueFollowUp ? "font-semibold text-red-600" : "text-soft"}>
+            {card.nextFollowUp
+              ? `${card.hasOverdueFollowUp ? "Overdue: " : "Due: "}${card.nextFollowUp}`
+              : "Not scheduled"}
+          </span>
+          {card.concern && (
+            <span className="truncate font-semibold text-amber-700">Concern: {card.concern}</span>
+          )}
+          <span className="text-soft">{card.leadAge}</span>
+          {card.attemptCount > 0 && <span className="text-soft">Attempts: {card.attemptCount}</span>}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <a
+          href={`tel:+${card.phone.replace(/\D/g, "")}`}
+          title="Call lead"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
+        >
+          <PhoneIcon />
+        </a>
+        <a
+          href={`https://wa.me/${formatPhoneForWhatsApp(card.whatsappNumber || card.phone)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open WhatsApp"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-[#25D366]/10 hover:text-[#1fb858]"
+        >
+          <WhatsAppIcon />
+        </a>
+        <Link
+          href={`/crm/leads/${card.id}`}
+          title="Open lead"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
+        >
+          <ChevronIcon />
+        </Link>
       </div>
     </div>
   );

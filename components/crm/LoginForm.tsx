@@ -5,8 +5,8 @@ import { useAuth } from "./AuthProvider";
 
 export default function LoginForm() {
   const { setUser } = useAuth();
-  const [email, setEmail] = useState("admin@patangfuturehomes.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +31,9 @@ export default function LoginForm() {
 
       const data = await res.json();
       setUser(data.user);
-      window.location.href = "/crm/dashboard";
+      window.location.href = data.user?.mustChangePassword
+        ? "/crm/change-password"
+        : "/crm/dashboard";
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -82,10 +84,6 @@ export default function LoginForm() {
       >
         {loading ? "Signing in..." : "Sign In"}
       </button>
-
-      <p className="mt-2 text-center text-xs text-muted">
-        Owner: admin@patangfuturehomes.com · admin123
-      </p>
     </form>
   );
 }

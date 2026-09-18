@@ -144,7 +144,7 @@ export async function PATCH(
         leadId: lead.id,
         userId: user.id,
         type: "booking_confirmed",
-        notes: `Booking confirmed — ${booking.unit || "Unit not specified"}, ₹${Number(update.bookingAmount ?? booking.bookingAmount ?? 0).toLocaleString("en-IN")}`,
+        notes: `Booking confirmed for ${booking.unit || "Unit not specified"}, ₹${Number(update.bookingAmount ?? booking.bookingAmount ?? 0).toLocaleString("en-IN")}`,
         createdAt: now,
       })
       .run();
@@ -164,7 +164,7 @@ export async function PATCH(
     if (lead.status === "booked") {
       db.update(schema.leads).set({
         status: "negotiation",
-        nextAction: "Recover lead — contact customer",
+        nextAction: "Recover lead: contact customer",
         updatedAt: now,
       }).where(eq(schema.leads.id, lead.id)).run();
     }
@@ -187,7 +187,7 @@ export async function PATCH(
         leadId: lead.id,
         userId: user.id,
         type: "booking_cancelled",
-        notes: `Booking cancelled — ${reason}`,
+        notes: `Booking cancelled: ${reason}`,
         createdAt: now,
       })
       .run();

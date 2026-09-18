@@ -39,7 +39,7 @@ export default function NewLeadForm({ isOpen, onClose }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showToast(err.error || "Lead nahi bana");
+        showToast(err.error || "Could not create lead");
         setBusy(false);
         return;
       }

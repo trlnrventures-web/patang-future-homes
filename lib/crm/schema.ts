@@ -12,7 +12,74 @@ export const users = sqliteTable("users", {
     .default("caller"),
   phone: text("phone"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  resetRequestedAt: text("reset_requested_at"),
+  mustChangePassword: integer("must_change_password", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  lastLoginAt: text("last_login_at"),
+  weekOffDay: text("week_off_day"),
   createdAt: text("created_at").notNull().default(""),
+});
+
+export const attendance = sqliteTable("attendance", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  date: text("date").notNull(),
+  mode: text("mode", { enum: ["office", "field_duty"] })
+    .notNull()
+    .default("office"),
+  fieldDutyReason: text("field_duty_reason"),
+  checkinTime: text("checkin_time"),
+  checkoutTime: text("checkout_time"),
+  checkinLat: text("checkin_lat"),
+  checkinLng: text("checkin_lng"),
+  checkinDistanceM: integer("checkin_distance_m"),
+  checkoutLat: text("checkout_lat"),
+  checkoutLng: text("checkout_lng"),
+  checkoutDistanceM: integer("checkout_distance_m"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const leaveRequests = sqliteTable("leave_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected"] })
+    .notNull()
+    .default("pending"),
+  rejectionReason: text("rejection_reason"),
+  decidedBy: integer("decided_by").references(() => users.id),
+  decidedAt: text("decided_at"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const leadMentions = sqliteTable("lead_mentions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  mentionedById: integer("mentioned_by_id")
+    .notNull()
+    .references(() => users.id),
+  noteId: integer("note_id"),
+  noteSnippet: text("note_snippet"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const loginAttempts = sqliteTable("login_attempts", {
+  email: text("email").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: text("locked_until"),
+  updatedAt: text("updated_at"),
 });
 
 export const leads = sqliteTable("leads", {
@@ -36,6 +103,7 @@ export const leads = sqliteTable("leads", {
   originalProject: text("original_project"),
   originalMessage: text("original_message"),
   location: text("location"),
+  sublocation: text("sublocation"),
   budget: text("budget"),
   budgetMin: integer("budget_min"),
   budgetMax: integer("budget_max"),
@@ -159,6 +227,7 @@ export const siteVisits = sqliteTable("site_visits", {
     .notNull()
     .default("proposed"),
   notes: text("notes"),
+  doneAt: text("done_at"),
   createdAt: text("created_at").notNull().default(""),
 });
 
@@ -331,4 +400,29 @@ export const bookings = sqliteTable("bookings", {
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(""),
   updatedAt: text("updated_at").notNull().default(""),
+});
+
+export const incentivePayments = sqliteTable("incentive_payments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  month: text("month").notNull(),
+  role: text("role").notNull(),
+  amount: integer("amount").notNull(),
+  paidBy: integer("paid_by").references(() => users.id),
+  paidAt: text("paid_at").notNull().default(""),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const reactivationAlerts = sqliteTable("reactivation_alerts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectSlug: text("project_slug").notNull(),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id),
+  userId: integer("user_id").references(() => users.id),
+  matchScore: integer("match_score").default(0),
+  dismissed: integer("dismissed", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(""),
 });

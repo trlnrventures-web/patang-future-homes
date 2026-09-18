@@ -15,6 +15,7 @@ import {
   BOOKING_STATUS_LABELS,
   BOOKING_STATUS_COLORS,
   toRupees,
+  dealHealthFor,
 } from "@/lib/crm/sales";
 
 export type NegotiationData = {
@@ -29,9 +30,10 @@ export type NegotiationData = {
 type Props = {
   data: NegotiationData;
   currentUser: { id: number; role: string };
+  openFeedbackVisitId?: number | null;
 };
 
-export default function NegotiationWorkspace({ data, currentUser }: Props) {
+export default function NegotiationWorkspace({ data, currentUser, openFeedbackVisitId }: Props) {
   const [lead, setLead] = useState(data.lead);
   const [negotiation, setNegotiation] = useState(data.negotiation);
   const [activities, setActivities] = useState(data.activities);
@@ -54,6 +56,19 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
   const [lostActionAt, setLostActionAt] = useState("");
   const [matches, setMatches] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState(negotiation?.status || "");
+
+  // Post-visit feedback
+  const [feedbackFormFor, setFeedbackFormFor] = useState<number | null>(openFeedbackVisitId ?? null);
+  const [fb, setFb] = useState({
+    interest: "",
+    likedProperty: "",
+    mainObjection: "",
+    expectedBudget: "",
+    otherProjects: "",
+    nextAction: "",
+    nextFollowUp: "",
+    notes: "",
+  });
 
   // Booking form
   const [bookProject, setBookProject] = useState("");
@@ -390,6 +405,72 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
     }
   }, [lead, currentUser, postActivity, showToast, visitDate, visitTime, visitPoint, visitProject, visitNote, negotiation]);
 
+  const handleMarkVisitDone = useCallback(async (visitId: number) => {
+    setBusy(true);
+    try {
+      await postActivity({ type: "visit_done", visitId });
+      setVisits((prev) =>
+        prev.map((v) =>
+          v.id === visitId
+            ? { ...v, status: "visit_done", doneAt: v.doneAt || new Date().toISOString() }
+            : v
+        )
+      );
+      showToast("Visit marked done");
+      refreshLead();
+    } catch {
+      showToast("Failed to mark done");
+    } finally {
+      setBusy(false);
+    }
+  }, [postActivity, showToast, refreshLead]);
+
+  const handleSubmitFeedback = useCallback(async () => {
+    if (!feedbackFormFor) return;
+    if (!fb.interest) {
+      showToast("Select an interest level");
+      return;
+    }
+    const nextFollowUp = fb.nextFollowUp
+      ? new Date(`${fb.nextFollowUp}:00+05:30`).toISOString()
+      : undefined;
+    setBusy(true);
+    try {
+      await postActivity({
+        type: "post_visit_feedback",
+        visitId: feedbackFormFor,
+        interest: fb.interest,
+        likedProperty: fb.likedProperty || undefined,
+        mainObjection: fb.mainObjection || undefined,
+        expectedBudget: fb.expectedBudget || undefined,
+        otherProjects: fb.otherProjects || undefined,
+        nextAction: fb.nextAction || undefined,
+        nextFollowUp,
+        notes: fb.notes || undefined,
+      });
+      setVisits((prev) =>
+        prev.map((v) =>
+          v.id === feedbackFormFor
+            ? {
+                ...v,
+                status: "visit_done",
+                doneAt: v.doneAt || new Date().toISOString(),
+                feedback: { ...fb, visitId: feedbackFormFor },
+              }
+            : v
+        )
+      );
+      setFeedbackFormFor(null);
+      setFb({ interest: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
+      showToast("Feedback saved");
+      refreshLead();
+    } catch {
+      showToast("Could not save feedback");
+    } finally {
+      setBusy(false);
+    }
+  }, [feedbackFormFor, fb, postActivity, showToast, refreshLead]);
+
   const handleLoadMatches = useCallback(async () => {
     if (showMatches) { setShowMatches(false); return; }
     setBusy(true);
@@ -398,7 +479,7 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
       setMatches(d.matches || []);
       setShowMatches(true);
     } catch {
-      showToast("Matches load nahi hue");
+      showToast("Could not load matches");
     } finally {
       setBusy(false);
     }
@@ -409,6 +490,12 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
   const latestVisitFull = latestVisit;
   const leadStatusColor = LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700";
   const leadStatusLabel = LEAD_STATUS_LABELS[lead.status] || lead.status;
+
+  const latestActivityAt = activities[0]?.createdAt;
+  const healthLastActive = negotiation
+    ? [negotiation.updatedAt, latestActivityAt].filter(Boolean).sort().pop() || negotiation.updatedAt
+    : null;
+  const dealHealth = healthLastActive ? dealHealthFor(healthLastActive) : null;
 
   return (
     <div className="space-y-5">
@@ -436,7 +523,7 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
           {lead.assignedCallerName && <span>Caller: {lead.assignedCallerName}</span>}
           {lead.assignedSmName && <span>SM: {lead.assignedSmName}</span>}
-          <span>Original: {lead.originalProject || "—"}</span>
+          <span>Original: {lead.originalProject || ""}</span>
         </div>
       </div>
 
@@ -686,13 +773,20 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
       {/* ===== Negotiation Status + Details ===== */}
       {negotiation && (
         <>
-          {/* Status selector — clean compact style */}
+          {/* Status selector: clean compact style */}
           <div className="rounded-2xl border border-border bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-primary">Negotiation Status</h3>
-              <Badge color={NEGOTIATION_STATUS_COLORS[negotiation.status] || "bg-gray-100 text-gray-700"}>
-                {NEGOTIATION_STATUS_LABELS[negotiation.status] || negotiation.status}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge color={NEGOTIATION_STATUS_COLORS[negotiation.status] || "bg-gray-100 text-gray-700"}>
+                  {NEGOTIATION_STATUS_LABELS[negotiation.status] || negotiation.status}
+                </Badge>
+                {dealHealth && active && (
+                  <Badge color={dealHealth.cls}>
+                    Deal: {dealHealth.label} · {dealHealth.days}d
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {NEGOTIATION_STATUSES.filter((s) => s.value !== "negotiation_lost").map((s) => (
@@ -866,7 +960,7 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
             </p>
             <p>
               <span className="text-muted">Project: </span>
-              {data.projectMap[latestVisitFull.projectId] || latestVisitFull.projectId || "—"}
+              {data.projectMap[latestVisitFull.projectId] || latestVisitFull.projectId || ""}
             </p>
             {latestVisitFull.feedback && (
               <>
@@ -884,6 +978,32 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
                   <p className="text-xs text-muted">{latestVisitFull.feedback.notes}</p>
                 )}
               </>
+            )}
+            {["booked", "confirmed", "arrived"].includes(latestVisitFull.status) && !latestVisitFull.feedback && (
+              <div className="pt-1">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => handleMarkVisitDone(latestVisitFull.id)}
+                >
+                  MARK VISIT DONE
+                </Button>
+              </div>
+            )}
+            {latestVisitFull.status === "visit_done" && !latestVisitFull.feedback && (
+              <div className="pt-1">
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setFb({ interest: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
+                    setFeedbackFormFor(latestVisitFull.id);
+                  }}
+                >
+                  SUBMIT POST-VISIT FEEDBACK
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -905,6 +1025,102 @@ export default function NegotiationWorkspace({ data, currentUser }: Props) {
           </div>
         )}
       </div>
+
+      {feedbackFormFor != null && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmitFeedback();
+          }}
+          className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-primary">Post-Visit Feedback</h4>
+            <button
+              type="button"
+              onClick={() => setFeedbackFormFor(null)}
+              className="text-xs font-semibold text-muted hover:text-navy"
+            >
+              Cancel ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <select
+              required
+              value={fb.interest}
+              onChange={(e) => setFb({ ...fb, interest: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Interest *</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="cold">Cold</option>
+            </select>
+            <select
+              value={fb.likedProperty}
+              onChange={(e) => setFb({ ...fb, likedProperty: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Liked property</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="maybe">Maybe</option>
+            </select>
+            <select
+              value={fb.mainObjection}
+              onChange={(e) => setFb({ ...fb, mainObjection: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Main objection</option>
+              {OBJECTION_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Expected budget"
+              value={fb.expectedBudget}
+              onChange={(e) => setFb({ ...fb, expectedBudget: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Other projects"
+              value={fb.otherProjects}
+              onChange={(e) => setFb({ ...fb, otherProjects: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <input
+              type="datetime-local"
+              value={fb.nextFollowUp}
+              onChange={(e) => setFb({ ...fb, nextFollowUp: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Next action"
+              value={fb.nextAction}
+              onChange={(e) => setFb({ ...fb, nextAction: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <textarea
+              rows={2}
+              placeholder="Feedback notes"
+              value={fb.notes}
+              onChange={(e) => setFb({ ...fb, notes: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm sm:col-span-2"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" variant="success" disabled={busy}>
+              SAVE FEEDBACK
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setFeedbackFormFor(null)}>
+              CANCEL
+            </Button>
+          </div>
+        </form>
+      )}
 
       {/* ===== Bookings ===== */}
       {bookings.length > 0 && (

@@ -134,7 +134,7 @@ export async function POST(
       leadId: lead.id,
       userId: user.id,
       type: "booking_created",
-      notes: `Booking initiated for ${project.title}${inserted.unit ? ` — Unit ${inserted.unit}` : ""}`,
+      notes: `Booking initiated for ${project.title}${inserted.unit ? `, Unit ${inserted.unit}` : ""}`,
       createdAt: now,
     })
     .run();

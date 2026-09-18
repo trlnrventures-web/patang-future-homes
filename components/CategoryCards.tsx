@@ -83,7 +83,7 @@ export default function CategoryCards() {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
 
-              {/* Bottom gradient overlay — 40% height */}
+              {/* Bottom gradient overlay: 40% height */}
               <div
                 className="absolute inset-0"
                 style={{

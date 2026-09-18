@@ -1,7 +1,9 @@
-import { projects, type Project } from "@/lib/projects";
+import { projects, subLocationMatches, type Project } from "@/lib/projects";
+import rawMarketInventory from "@/data/market-inventory.json";
 import type { MatchingWeights } from "./settings";
 
 export type MatchLevel = "strong" | "medium" | "low";
+export type MatchSource = "primary" | "market";
 
 const DEFAULT_WEIGHTS: MatchingWeights = {
   budget: 30,
@@ -11,6 +13,17 @@ const DEFAULT_WEIGHTS: MatchingWeights = {
   purpose: 10,
   preferences: 10,
 };
+
+export type MarketInventoryEntry = {
+  project: string;
+  developer?: string;
+  location: string;
+  priceRangeLacs: [number, number];
+  carpetRangeSqft: [number, number];
+  possession: string;
+};
+
+const marketInventory = rawMarketInventory as MarketInventoryEntry[];
 
 export type PropertyMatch = {
   projectSlug: string;
@@ -26,12 +39,17 @@ export type PropertyMatch = {
   level: MatchLevel;
   bhkOptions: string[];
   reasons: { label: string; ok: boolean }[];
+  source: MatchSource;
+  developer?: string;
+  subLocation?: string;
+  priceValidUntil?: string;
 };
 
 type Setter = {
   budgetMin?: number | null;
   budgetMax?: number | null;
   location?: string | null;
+  subLocation?: string | null;
   bhk?: string | null;
   timeline?: string | null;
   purpose?: string | null;
@@ -118,7 +136,111 @@ function budgetFits(pMin: number, pMax: number, bMin?: number | null, bMax?: num
   return pMin <= leadMax + 5 && pMax >= leadMin - 5;
 }
 
-export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeights = DEFAULT_WEIGHTS): PropertyMatch[] {
+function inferBhkFromCarpet(carpetMin: number, carpetMax: number): string[] {
+  const opts: string[] = [];
+  if (carpetMax >= 350) opts.push("1");
+  if (carpetMax >= 560) opts.push("2");
+  if (carpetMax >= 880) opts.push("3");
+  return opts.length ? opts : ["2"];
+}
+
+function marketArea(location: string): "west" | "east" {
+  return /east/i.test(location) ? "east" : "west";
+}
+
+function marketPossessionYear(possession: string): number {
+  const now = new Date().getFullYear();
+  const v = possession.toLowerCase();
+  if (/ready|rtmi|month/i.test(v)) return now;
+  const m = v.match(/(\d(?:\.\d)?)\s*years?/i);
+  if (m) return now + Math.max(0, Math.round(parseFloat(m[1]) - 1));
+  return now + 1;
+}
+
+function scoreMarketEntry(
+  e: MarketInventoryEntry,
+  setter: Setter,
+  weights: MatchingWeights,
+  maxWeight: number
+): PropertyMatch {
+  const reasons: { label: string; ok: boolean }[] = [];
+  let w = 0;
+  const [pMin, pMax] = e.priceRangeLacs;
+  const hasBudget = setter.budgetMin != null || setter.budgetMax != null;
+  const bMin = setter.budgetMin ?? 0;
+  const bMax = setter.budgetMax ?? Infinity;
+
+  if (hasBudget) {
+    if (budgetFits(pMin, pMax, bMin, bMax)) {
+      w += weights.budget;
+      reasons.push({ label: "Budget fits", ok: true });
+    } else {
+      reasons.push({ label: "Budget out of range", ok: false });
+    }
+  }
+
+  const area = marketArea(e.location);
+  if (areaMatches(area, e.location, setter.location)) {
+    w += weights.location;
+    reasons.push({ label: e.location, ok: true });
+  } else {
+    reasons.push({ label: e.location, ok: false });
+  }
+
+  const bhkOpts = inferBhkFromCarpet(e.carpetRangeSqft[0], e.carpetRangeSqft[1]);
+  if (setter.bhk && setter.bhk !== "other") {
+    if (bhkOpts.includes(setter.bhk)) {
+      w += weights.bhk;
+      reasons.push({ label: `${setter.bhk} BHK available`, ok: true });
+    } else {
+      reasons.push({ label: `No ${setter.bhk} BHK`, ok: false });
+    }
+  }
+
+  if (setter.timeline && setter.timeline !== "exploring") {
+    const py = marketPossessionYear(e.possession);
+    if (py <= timelineBudgetYear(setter.timeline)) {
+      w += weights.timeline;
+      reasons.push({ label: "Suitable possession timeline", ok: true });
+    } else {
+      reasons.push({ label: `Possession ${e.possession}`, ok: false });
+    }
+  }
+
+  if (setter.purpose && setter.purpose !== "self_use") {
+    w += weights.purpose / 2;
+    reasons.push({ label: "Residential project", ok: true });
+  }
+
+  if (setter.preferredProject) {
+    if (e.project.toLowerCase().includes(setter.preferredProject.toLowerCase())) {
+      w += weights.preferences;
+      reasons.push({ label: "Preferred project", ok: true });
+    }
+  }
+
+  const score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
+  const level: MatchLevel = score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
+
+  return {
+    projectSlug: `partner-${e.project.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    title: e.project,
+    location: `${e.location} · Partner`,
+    tier: null,
+    type: "flat",
+    priceRange: `₹${Math.round(pMin)}L – ₹${Math.round(pMax)}L`,
+    possessionDate: e.possession,
+    reraId: "",
+    score,
+    level,
+    bhkOptions: bhkOpts,
+    reasons: reasons.slice(0, 5),
+    source: "market",
+    developer: e.developer || undefined,
+  };
+}
+
+export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeights = DEFAULT_WEIGHTS, includeMarket = true): PropertyMatch[] {
   const maxWeight = weights.budget + weights.location + weights.bhk + weights.timeline + weights.purpose + weights.preferences;
   const hasBudget = setter.budgetMin != null || setter.budgetMax != null;
   const bMin = setter.budgetMin ?? 0;
@@ -155,6 +277,11 @@ export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeig
       } else {
         reasons.push({ label: `No ${setter.bhk} BHK`, ok: false });
       }
+    }
+
+    if (setter.subLocation && subLocationMatches(p.subLocation, setter.subLocation)) {
+      w += Math.round(weights.location / 2);
+      reasons.push({ label: `Sub-location: ${p.subLocation}`, ok: true });
     }
 
     if (setter.timeline && setter.timeline !== "exploring") {
@@ -210,7 +337,16 @@ export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeig
       level,
       bhkOptions: bhkOpts,
       reasons: reasons.slice(0, 5),
+      source: "primary",
+      subLocation: p.subLocation,
+      priceValidUntil: p.priceValidUntil,
     });
+  }
+
+  if (includeMarket) {
+    for (const e of marketInventory) {
+      results.push(scoreMarketEntry(e, setter, weights, maxWeight));
+    }
   }
 
   return results

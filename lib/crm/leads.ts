@@ -1,3 +1,82 @@
+import { and, eq } from "drizzle-orm";
+import { getDb } from "./db";
+import * as schema from "./schema";
+
+const FINAL_LEAD_STATUSES = new Set(["booked", "lost", "invalid", "dnc", "no_response"]);
+
+/** Statuses a caller still owns/qualifies even after an SM is attached. */
+export const CALLER_SCOPE_STATUSES = new Set([
+  "new",
+  "calling",
+  "connected",
+  "qualified",
+  "no_response",
+  "nurture",
+]);
+
+/**
+ * A lead is a caller's primary responsibility when it is unassigned to an SM
+ * (still being qualified) OR it is still in the qualification pipeline even
+ * though an SM may already be attached.
+ */
+export function isInCallerScope(l: { status: string; assignedSmId: number | null }): boolean {
+  return l.assignedSmId == null || CALLER_SCOPE_STATUSES.has(l.status);
+}
+
+export type CrmDb = ReturnType<typeof getDb>;
+
+/** Earliest pending scheduled follow-up per lead, keyed by leadId. */
+export function buildEarliestFollowUpMap(db: CrmDb): Map<number, string> {
+  const map = new Map<number, string>();
+  const rows = db
+    .select()
+    .from(schema.followUps)
+    .where(eq(schema.followUps.status, "pending"))
+    .all();
+  for (const f of rows) {
+    if (!f.scheduledFor) continue;
+    const existing = map.get(f.leadId);
+    if (!existing || f.scheduledFor < existing) {
+      map.set(f.leadId, f.scheduledFor);
+    }
+  }
+  return map;
+}
+
+export function resolveDefaultCallerId(
+  db: CrmDb,
+  opts: { preferredId?: number | null } = {}
+): number | null {
+  const callers = db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.role, "caller"), eq(schema.users.active, true)))
+    .orderBy(schema.users.id)
+    .all();
+
+  if (callers.length === 0) return null;
+
+  if (opts.preferredId != null && callers.some((c) => c.id === opts.preferredId)) {
+    return opts.preferredId;
+  }
+
+  const allLeads = db.select().from(schema.leads).all();
+  const openCounts = new Map(callers.map((c) => [c.id, 0]));
+  for (const lead of allLeads) {
+    if (lead.assignedCallerId != null && openCounts.has(lead.assignedCallerId)) {
+      if (!FINAL_LEAD_STATUSES.has(lead.status)) {
+        openCounts.set(lead.assignedCallerId, openCounts.get(lead.assignedCallerId)! + 1);
+      }
+    }
+  }
+
+  const sorted = [...callers].sort((a, b) => {
+    const diff = (openCounts.get(a.id) ?? 0) - (openCounts.get(b.id) ?? 0);
+    return diff !== 0 ? diff : a.id - b.id;
+  });
+  return sorted[0].id;
+}
+
 export const LEAD_STATUSES = [
   { value: "new", label: "New" },
   { value: "calling", label: "Calling" },
@@ -147,10 +226,10 @@ export function leadStatusGroupLabel(status: string): string {
 }
 
 export function bhkLabel(v: string | null | undefined): string {
-  if (!v) return "—";
+  if (!v) return "";
   const n = String(v).replace(/\s*BHK\s*$/i, "").trim();
-  if (!n) return "—";
-  return `${n} BHK`;
+  if (!n) return "";
+  return /^\d+$/.test(n) ? `${n} BHK` : n;
 }
 
 export const CALLER_ACTIVITY_KEYS = [

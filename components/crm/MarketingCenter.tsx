@@ -107,13 +107,13 @@ type IntegrationRow = {
 };
 
 const fmt = (n: number | null | undefined): string =>
-  n === null || n === undefined ? "—" : Number(n).toLocaleString("en-IN");
+  n === null || n === undefined ? "" : Number(n).toLocaleString("en-IN");
 
 const fmtMoney = (n: number | null | undefined): string =>
-  n === null || n === undefined ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
+  n === null || n === undefined ? "" : `₹${Number(n).toLocaleString("en-IN")}`;
 
 const pct = (a: number, b: number): string =>
-  b > 0 ? `${Math.round((a / b) * 100)}%` : "—";
+  b > 0 ? `${Math.round((a / b) * 100)}%` : "";
 
 export default function MarketingCenter({
   name,
@@ -403,7 +403,7 @@ function CampaignsTab({
                   </Link>
                 </td>
                 <td className="px-3 py-2.5 text-muted">{SOURCE_LABELS[c.platform] || c.platform}</td>
-                <td className="px-3 py-2.5 text-muted">{c.project || "—"}</td>
+                <td className="px-3 py-2.5 text-muted">{c.project || ""}</td>
                 <td className="px-3 py-2.5 text-center font-semibold text-navy">{fmt(c.leads)}</td>
                 <td className="px-3 py-2.5 text-center text-muted">{fmt(c.qualified)}</td>
                 <td className="px-3 py-2.5 text-center text-muted">{fmt(c.visitsBooked)}</td>
@@ -534,7 +534,7 @@ function OverviewTab({
 
   const funnel = [
     { label: "LEADS", count: overview.totalLeads },
-    { label: "CONTACTED", count: overview.totalLeads, note: "—" },
+    { label: "CONTACTED", count: overview.totalLeads, note: "" },
     { label: "QUALIFIED", count: overview.totalQualified, note: pct(overview.totalQualified, overview.totalLeads) },
     { label: "VISITS", count: overview.totalVisitsBooked, note: pct(overview.totalVisitsBooked, overview.totalQualified) },
     { label: "BOOKINGS", count: overview.totalBookings, note: pct(overview.totalBookings, overview.totalVisitsBooked) },
@@ -554,7 +554,7 @@ function OverviewTab({
                 <div className="text-lg font-bold text-primary">{fmt(f.count)}</div>
                 <div className="text-[10px] font-semibold text-muted">{f.label}</div>
               </div>
-              {f.note && f.note !== "—" && (
+              {f.note && (
                 <div className="text-[11px] font-semibold text-muted">{f.note}</div>
               )}
               {i < funnel.length - 1 && <div className="text-sm text-muted">↓</div>}

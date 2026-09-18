@@ -3,6 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { isInCallerScope } from "@/lib/crm/leads";
 
 export async function GET(
   _request: NextRequest,
@@ -21,10 +22,8 @@ export async function GET(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  // Role access check
-  if (user.role === "caller" && lead.assignedCallerId !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Role access check: callers may open any lead (they can search handed-off
+  // leads too). Sales managers see only leads assigned to them.
   if (user.role === "sales_manager" && lead.assignedSmId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -50,6 +49,14 @@ export async function GET(
     .where(eq(schema.siteVisits.leadId, lead.id))
     .orderBy(schema.siteVisits.date)
     .all();
+
+  const latestFeedback = db
+    .select()
+    .from(schema.postVisitFeedback)
+    .where(eq(schema.postVisitFeedback.leadId, lead.id))
+    .orderBy(schema.postVisitFeedback.createdAt)
+    .all()
+    .pop() ?? null;
 
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u]));
@@ -78,6 +85,7 @@ export async function GET(
     followUps,
     visits: enrichVisits,
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
+    latestFeedback,
   });
 }
 
@@ -97,7 +105,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  if (user.role === "caller" && existing.assignedCallerId !== user.id) {
+  if (user.role === "caller" && !isInCallerScope(existing)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -113,7 +121,7 @@ export async function PATCH(
     const allowedFields: (keyof typeof schema.leads.$inferInsert)[] = [
       "name", "phone", "whatsappNumber", "email", "source", "campaignName",
       "adSetName", "adName", "formName", "utmSource", "utmMedium", "utmCampaign",
-      "originalMessage", "location", "budget", "budgetMin",
+      "originalMessage", "location", "sublocation", "budget", "budgetMin",
       "budgetMax", "bhk", "purpose", "timeline", "preferredProject",
       "familyRequirements", "loanRequired", "otherPreferences", "notes",
       "status", "leadScore", "nextFollowUp", "assignedCallerId", "assignedSmId",

@@ -9,6 +9,8 @@ export type CrmUser = {
   email: string;
   role: string;
   phone: string | null;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
 };
 
 export async function getCurrentUser(): Promise<CrmUser | null> {
@@ -25,6 +27,8 @@ export async function getCurrentUser(): Promise<CrmUser | null> {
     email: user.email,
     role: user.role,
     phone: user.phone,
+    mustChangePassword: !!user.mustChangePassword,
+    lastLoginAt: user.lastLoginAt,
   };
 }
 
@@ -137,7 +141,7 @@ export async function getDashboardData(user: CrmUser) {
       avgFirstResponseSec,
       avgFirstResponseDisplay: avgFirstResponseSec != null
         ? avgFirstResponseSec < 60 ? `${avgFirstResponseSec}s` : `${Math.round(avgFirstResponseSec / 60)}m`
-        : "—",
+        : "N/A",
     };
   })() : null;
 

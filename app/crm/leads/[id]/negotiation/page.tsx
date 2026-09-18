@@ -17,8 +17,10 @@ export const metadata: Metadata = {
 
 export default async function NegotiationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/crm/login");
@@ -26,6 +28,10 @@ export default async function NegotiationPage({
   const { id } = await params;
   const leadId = Number(id);
   if (Number.isNaN(leadId)) notFound();
+
+  const query = await searchParams;
+  const feedbackParam = typeof query.feedback === "string" ? query.feedback : undefined;
+  const openFeedbackVisitId = feedbackParam && /^\d+$/.test(feedbackParam) ? Number(feedbackParam) : null;
 
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
@@ -124,7 +130,11 @@ export default async function NegotiationPage({
         </div>
       </div>
 
-      <NegotiationWorkspace data={data} currentUser={{ id: user.id, role: user.role }} />
+      <NegotiationWorkspace
+        data={data}
+        currentUser={{ id: user.id, role: user.role }}
+        openFeedbackVisitId={openFeedbackVisitId}
+      />
     </div>
   );
 }

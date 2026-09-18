@@ -1,20 +1,11 @@
 export const MESSAGE_CATEGORIES = [
   { value: "first_contact", label: "First Contact" },
-  { value: "missed_call", label: "Missed Call" },
-  { value: "no_answer", label: "No Answer" },
-  { value: "requirement_confirmation", label: "Requirement Confirmation" },
-  { value: "property_option", label: "Property Option" },
-  { value: "alternative_project", label: "Alternative Project" },
-  { value: "budget_alternative", label: "Budget Alternative" },
   { value: "follow_up", label: "Follow-up" },
-  { value: "site_visit_proposal", label: "Site Visit Proposal" },
-  { value: "site_visit_confirmation", label: "Site Visit Confirmation" },
-  { value: "day_before_reminder", label: "Day-Before Visit Reminder" },
-  { value: "same_day_reminder", label: "Same-Day Visit Reminder" },
+  { value: "property_option", label: "Property Option" },
+  { value: "visit_confirmation", label: "Visit Confirmation" },
+  { value: "visit_reminder", label: "Visit Reminder" },
   { value: "post_visit", label: "Post-Visit" },
-  { value: "negotiation", label: "Negotiation" },
-  { value: "nurture", label: "Nurture" },
-  { value: "custom", label: "Custom" },
+  { value: "alternative_project", label: "Alternative Project" },
 ] as const;
 
 export const MESSAGE_CATEGORY_LABELS: Record<string, string> =
@@ -98,12 +89,12 @@ export function buildLeadContext(
   const possession = typeof lead.possession === "string" ? lead.possession : "";
 
   return {
-    name: name || "Sir",
-    first_name: name.split(" ")[0] || "Sir",
+    name: name || "Customer",
+    first_name: name.split(" ")[0] || "there",
     project: (lead.preferredProject as string) || (lead.project as string) || "",
     original_project: stores,
     location: (lead.location as string) || "Vasai West",
-    bhk: (lead.bhk as string) || "",
+    bhk: ((lead.bhk as string) || "").replace(/\s*BHK\s*$/i, "").trim(),
     budget: fullBudget,
     budget_min: lead.budgetMin ? String(lead.budgetMin) : "",
     budget_max: lead.budgetMax ? String(lead.budgetMax) : "",
@@ -167,23 +158,32 @@ export function renderMessage(
 }
 
 export function suggestCategory(lead: Record<string, unknown>): string {
-  const status = String(lead.status || "");
+  const status = String(lead.status || "").toLowerCase();
   const concern = String(lead.concern || "").toLowerCase();
 
-  if (concern.includes("budget")) return "budget_alternative";
+  const visitDateRaw = lead.nextVisitDate ?? lead.visitDate;
+  if (typeof visitDateRaw === "string" && visitDateRaw) {
+    const istNow = new Date(Date.now() + (5 * 60 + 30) * 60 * 1000);
+    const todayIso = istNow.toISOString().slice(0, 10);
+    if (visitDateRaw < todayIso) return "post_visit";
+    const [vy, vm, vd] = visitDateRaw.split("-").map(Number);
+    const [ty, tm, td] = todayIso.split("-").map(Number);
+    const diff = Math.round((Date.UTC(vy, vm - 1, vd) - Date.UTC(ty, tm - 1, td)) / 86400000);
+    if (diff <= 1) return "visit_reminder";
+    return "visit_confirmation";
+  }
+
+  if (concern.includes("budget")) return "property_option";
   if (concern.includes("project") || concern.includes("location")) return "alternative_project";
 
-  if (status === "no_response") return "no_answer";
-  if (status === "new" || status === "calling") return "first_contact";
-  if (status === "connected") return "requirement_confirmation";
-  if (status === "visit_booked" || status === "visit_confirmed") return "site_visit_confirmation";
+  if (status === "no_response" || status === "new" || status === "calling") return "first_contact";
+  if (status === "visit_proposed" || status === "visit_booked" || status === "visit_confirmed") {
+    return "visit_confirmation";
+  }
   if (status === "visit_done") return "post_visit";
-  if (status === "negotiation") return "negotiation";
-  if (status === "nurture") return "nurture";
-  if (status === "follow_up") return "follow_up";
   if (status === "qualified" || status === "assigned") return "property_option";
 
-  return "first_contact";
+  return "follow_up";
 }
 
 export function formatPhoneForWhatsApp(phone: string): string {

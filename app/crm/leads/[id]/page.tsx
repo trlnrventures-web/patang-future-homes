@@ -37,8 +37,8 @@ export default async function LeadDetailPage({
 
   if (!lead) notFound();
 
-  // Role access check
-  if (user.role === "caller" && lead.assignedCallerId !== user.id) notFound();
+// Role access check: callers may open any lead (handed-off ones stay
+  // searchable). Sales managers only their own.
   if (user.role === "sales_manager" && lead.assignedSmId !== user.id) notFound();
 
   const users = db.select().from(schema.users).all();
@@ -63,7 +63,7 @@ export default async function LeadDetailPage({
     .orderBy(schema.followUps.scheduledFor)
     .all();
 
-  const visits = db
+const visits = db
     .select()
     .from(schema.siteVisits)
     .where(eq(schema.siteVisits.leadId, lead.id))
@@ -73,6 +73,14 @@ export default async function LeadDetailPage({
       ...v,
       smName: userMap.get(v.smId)?.name || "",
     }));
+
+  const latestFeedback = db
+    .select()
+    .from(schema.postVisitFeedback)
+    .where(eq(schema.postVisitFeedback.leadId, lead.id))
+    .orderBy(schema.postVisitFeedback.createdAt)
+    .all()
+    .pop() ?? null;
 
   const sharedTemplates = db
     .select()
@@ -116,10 +124,11 @@ export default async function LeadDetailPage({
         ? userMap.get(lead.assignedSmId)?.name || ""
         : "",
     },
-    activities,
+activities,
     followUps,
     visits,
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
+    latestFeedback,
   };
 
   return (

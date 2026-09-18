@@ -90,7 +90,7 @@ export default function TemplateManager({
       setForm({ name: "", category: "follow_up", body: "", active: true });
       load();
     } else {
-      showToast("Save nahi ho paya");
+      showToast("Could not save template");
     }
   };
 
@@ -108,7 +108,7 @@ export default function TemplateManager({
       setEditingId(null);
       load();
     } else {
-      showToast("Update nahi hua");
+      showToast("Could not update template");
     }
   };
 
@@ -297,7 +297,7 @@ export default function TemplateManager({
           {isAdmin && (
             <section className="space-y-3">
               <h2 className="text-sm font-bold text-primary">Shared Templates ({shared.length})</h2>
-              {shared.length === 0 && <p className="text-xs text-muted">Koi shared template nahi.</p>}
+              {shared.length === 0 && <p className="text-xs text-muted">No shared templates yet.</p>}
               {shared.filter((t) => t.active).map(renderTemplate)}
               {shared.filter((t) => !t.active).map(renderTemplate)}
             </section>
@@ -308,7 +308,7 @@ export default function TemplateManager({
             </h2>
             {mine.length === 0 && (
               <p className="rounded-xl border border-dashed border-border bg-white p-4 text-xs text-muted">
-                Aapke personal templates yahan dikhenge. Message Center se aap &quot;Save as my template&quot; dabayein.
+                Your personal templates will appear here. Use &quot;Save as my template&quot; from the Message Center.
               </p>
             )}
             {mine.map(renderTemplate)}

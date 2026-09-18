@@ -557,7 +557,7 @@ export function getCampaignDetail(campaignId: number, range: Range) {
     })),
     leads: leadsDetail.map((l) => ({
       ...l,
-      smName: l.assignedSmId ? smNames[l.assignedSmId] || "—" : "Not assigned",
+      smName: l.assignedSmId ? smNames[l.assignedSmId] || "Unknown" : "Not assigned",
       booking: bookingByLead[l.id] || null,
     })),
   };
