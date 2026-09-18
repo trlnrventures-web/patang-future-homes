@@ -77,6 +77,40 @@ export function resolveDefaultCallerId(
   return sorted[0].id;
 }
 
+export function resolveDefaultSmId(
+  db: CrmDb,
+  opts: { preferredId?: number | null } = {}
+): number | null {
+  const sms = db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.role, "sales_manager"), eq(schema.users.active, true)))
+    .orderBy(schema.users.id)
+    .all();
+
+  if (sms.length === 0) return null;
+
+  if (opts.preferredId != null && sms.some((s) => s.id === opts.preferredId)) {
+    return opts.preferredId;
+  }
+
+  const allLeads = db.select().from(schema.leads).all();
+  const openCounts = new Map(sms.map((s) => [s.id, 0]));
+  for (const lead of allLeads) {
+    if (lead.assignedSmId != null && openCounts.has(lead.assignedSmId)) {
+      if (!FINAL_LEAD_STATUSES.has(lead.status)) {
+        openCounts.set(lead.assignedSmId, openCounts.get(lead.assignedSmId)! + 1);
+      }
+    }
+  }
+
+  const sorted = [...sms].sort((a, b) => {
+    const diff = (openCounts.get(a.id) ?? 0) - (openCounts.get(b.id) ?? 0);
+    return diff !== 0 ? diff : a.id - b.id;
+  });
+  return sorted[0].id;
+}
+
 export const LEAD_STATUSES = [
   { value: "new", label: "New" },
   { value: "calling", label: "Calling" },

@@ -3,7 +3,11 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
-import { isInCallerScope } from "@/lib/crm/leads";
+import {
+  isInCallerScope,
+  resolveDefaultCallerId,
+  resolveDefaultSmId,
+} from "@/lib/crm/leads";
 
 export async function GET(
   _request: NextRequest,
@@ -133,6 +137,79 @@ export async function PATCH(
         update[key] = body[key];
       }
     }
+
+    // ---- Assignment: caller / SM / auto-rebalance ----
+    let newCaller = existing.assignedCallerId;
+    let newSm = existing.assignedSmId;
+    let assignmentNote = "";
+
+    if (
+      "assignedCallerId" in body ||
+      "assignedSmId" in body ||
+      body.assignCaller === "auto" ||
+      body.assignSm === "auto"
+    ) {
+      if (body.assignCaller === "auto") {
+        newCaller = resolveDefaultCallerId(db);
+      } else if ("assignedCallerId" in body) {
+        newCaller = body.assignedCallerId ? Number(body.assignedCallerId) : null;
+      }
+      if (body.assignSm === "auto") {
+        newSm = resolveDefaultSmId(db);
+      } else if ("assignedSmId" in body) {
+        newSm = body.assignedSmId ? Number(body.assignedSmId) : null;
+      }
+
+      if (
+        newCaller !== existing.assignedCallerId ||
+        newSm !== existing.assignedSmId
+      ) {
+        if (newCaller != null) {
+          const caller = db
+            .select()
+            .from(schema.users)
+            .where(eq(schema.users.id, newCaller))
+            .get();
+          if (!caller || caller.role !== "caller") {
+            return NextResponse.json({ error: "Invalid caller" }, { status: 400 });
+          }
+        }
+        if (newSm != null) {
+          const sm = db
+            .select()
+            .from(schema.users)
+            .where(eq(schema.users.id, newSm))
+            .get();
+          if (!sm || sm.role !== "sales_manager") {
+            return NextResponse.json({ error: "Invalid sales manager" }, { status: 400 });
+          }
+        }
+        update.assignedCallerId = newCaller;
+        update.assignedSmId = newSm;
+        update.assignedAt = now;
+        update.assignedBy = user.id;
+        if (newSm != null && newSm !== existing.assignedSmId) {
+          update.status = "assigned";
+          update.nextAction = "sm_follow_up";
+        }
+        const names = new Map(
+          db.select().from(schema.users).all().map((u) => [u.id, u.name])
+        );
+        const parts: string[] = [];
+        if (newCaller !== existing.assignedCallerId) {
+          parts.push(
+            newCaller != null ? `Caller → ${names.get(newCaller) || ""}` : "Caller cleared"
+          );
+        }
+        if (newSm !== existing.assignedSmId) {
+          parts.push(
+            newSm != null ? `SM → ${names.get(newSm) || ""}` : "SM cleared"
+          );
+        }
+        assignmentNote = `Assigned: ${parts.join(" · ")}`;
+      }
+    }
+
     update.updatedAt = now;
 
     db.update(schema.leads).set(update).where(eq(schema.leads.id, Number(id))).run();
@@ -144,6 +221,17 @@ export async function PATCH(
         userId: user.id,
         type: "status_change",
         notes: `${existing.status} → ${body.status}: ${statusActivity}`,
+        createdAt: now,
+      }).run();
+    }
+
+    // Log assignment changes
+    if (assignmentNote) {
+      db.insert(schema.activities).values({
+        leadId: existing.id,
+        userId: user.id,
+        type: "assignment",
+        notes: assignmentNote,
         createdAt: now,
       }).run();
     }

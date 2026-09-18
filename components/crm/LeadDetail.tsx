@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import {
   LEAD_STATUS_LABELS,
@@ -49,7 +50,11 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const [showVisit, setShowVisit] = useState(false);
   const [showCallback, setShowCallback] = useState(false);
   const [selectedSm, setSelectedSm] = useState<number | "">("");
+  const [selectedCaller, setSelectedCaller] = useState<number | "">("");
   const [sms, setSms] = useState<Record<number, any>>({});
+  const [callers, setCallers] = useState<Record<number, any>>({});
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [matches, setMatches] = useState<PropertyMatch[]>([]);
   const [matchesLoaded, setMatchesLoaded] = useState(false);
   const [showMatches, setShowMatches] = useState(false);
@@ -66,9 +71,12 @@ export default function LeadDetail({ data, currentUser }: Props) {
   });
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
+  const callerUsers = data.users.filter((u) => u.role === "caller");
   const isCaller = currentUser.role === "caller";
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
   const canAssign = isCaller || isAdmin;
+  const canAssignCaller = isAdmin;
+  const router = useRouter();
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -119,10 +127,13 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
   useEffect(() => {
     if (canAssign) {
-      fetch("/crm/api/team/sms")
+      fetch("/crm/api/team/assignees")
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
-          if (d?.sms) setSms(Object.fromEntries(d.sms.map((s: any) => [s.id, s])));
+          if (d) {
+            setSms(Object.fromEntries(d.sms.map((s: any) => [s.id, s])));
+            setCallers(Object.fromEntries(d.callers.map((c: any) => [c.id, c])));
+          }
         })
         .catch(() => {});
     }
@@ -205,16 +216,56 @@ export default function LeadDetail({ data, currentUser }: Props) {
     }
   };
 
-  const handleAssign = async () => {
-    if (!selectedSm) return;
+  const handleAssignCaller = async (callerId: number | "auto") => {
     setBusy(true);
     try {
-      await postActivity({ type: "assignment", smId: selectedSm });
-      showToast("Lead assigned");
+      await patchLead(callerId === "auto" ? { assignCaller: "auto" } : { assignedCallerId: callerId });
+      setSelectedCaller("");
+      showToast("Caller assigned");
       reload();
     } catch {
-      showToast("Could not assign");
+      showToast("Could not assign caller");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAssignSm = async (smId: number | "auto") => {
+    setBusy(true);
+    try {
+      await patchLead(smId === "auto" ? { assignSm: "auto" } : { assignedSmId: smId });
+      setSelectedSm("");
+      showToast("SM assigned");
+      reload();
+    } catch {
+      showToast("Could not assign SM");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClearAssignment = async (kind: "caller" | "sm") => {
+    setBusy(true);
+    try {
+      await patchLead(kind === "caller" ? { assignedCallerId: null } : { assignedSmId: null });
+      showToast(kind === "caller" ? "Caller cleared" : "SM cleared");
+      reload();
+    } catch {
+      showToast("Could not update assignment");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteLead = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/crm/api/leads/${lead.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("failed");
+      showToast("Lead deleted");
+      router.push("/crm/leads");
+    } catch {
+      showToast("Could not delete lead");
       setBusy(false);
     }
   };
@@ -326,10 +377,72 @@ export default function LeadDetail({ data, currentUser }: Props) {
             {lead.attemptCount} attempt{lead.attemptCount > 1 ? "s" : ""}
           </Badge>
         )}
+        {lead.assignedCallerName && (
+          <Badge color="bg-sky-100 text-sky-800">Caller: {lead.assignedCallerName}</Badge>
+        )}
         {lead.assignedSmName && (
           <Badge color="bg-violet-100 text-violet-800">SM: {lead.assignedSmName}</Badge>
         )}
       </div>
+
+      {/* ===== Phone / contact ===== */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-white p-4">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-soft">Phone Number</div>
+          <div className="mt-0.5 truncate text-lg font-bold text-navy">
+            {phone || lead.phone || "—"}
+          </div>
+          {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
+            <div className="mt-0.5 text-xs text-muted">
+              WhatsApp: <span className="font-semibold text-navy">{lead.whatsappNumber}</span>
+            </div>
+          )}
+          {lead.email && (
+            <div className="mt-0.5 text-xs text-muted">
+              Email: <span className="font-semibold text-navy">{lead.email}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`tel:+${phone}`}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white"
+          >
+            <PhoneIcon />
+            CALL
+          </a>
+          <a
+            href={`https://wa.me/${waNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white"
+          >
+            <WhatsAppIcon />
+            WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* ===== Admin controls ===== */}
+      {isAdmin && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-white p-3">
+          <div className="text-xs font-semibold text-muted">Admin controls</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowEdit(true)}
+              className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
+            >
+              ✎ Edit Lead
+            </button>
+            <button
+              onClick={() => setShowDelete(true)}
+              className="rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-100"
+            >
+              Delete Lead
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ===== Quick actions ===== */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -695,88 +808,166 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Lead Tag + SM handoff/assign ===== */}
+      {/* ===== Lead Tag + Assignment ===== */}
       <div className="grid gap-4 sm:grid-cols-2">
-      <div className={`rounded-2xl border border-primary/15 bg-white p-4 ${(canAssign && !lead.assignedSmId) || lead.assignedSmName ? "" : "sm:col-span-2"}`}>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
-          {!tagShown && (
-            <button
-              onClick={handleGenerateTag}
-              disabled={busy}
-              className="rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              Generate Lead Tag
-            </button>
+        <div className={`rounded-2xl border border-primary/15 bg-white p-4 ${canAssign ? "" : "sm:col-span-2"}`}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
+            {!tagShown && (
+              <button
+                onClick={handleGenerateTag}
+                disabled={busy}
+                className="rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                Generate Lead Tag
+              </button>
+            )}
+          </div>
+          {tagShown ? (
+            <div>
+              <pre className="whitespace-pre-wrap rounded-xl bg-navy p-3 text-[11px] leading-relaxed text-white">{tagText}</pre>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button onClick={handleCopyTag} disabled={busy}>Copy Tag Message</Button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(tagText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleShareTag}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                >
+                  Share on WhatsApp
+                </a>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted">
+              Generate a summary of the client and visit details to share easily on WhatsApp.
+            </p>
           )}
         </div>
-        {tagShown ? (
-          <div>
-            <pre className="whitespace-pre-wrap rounded-xl bg-navy p-3 text-[11px] leading-relaxed text-white">{tagText}</pre>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button onClick={handleCopyTag} disabled={busy}>Copy Tag Message</Button>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(tagText)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleShareTag}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
-              >
-                Share on WhatsApp
-              </a>
+
+        {/* ===== Lead Assignment (all options) ===== */}
+        {canAssign && (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary">Lead Assignment</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {lead.assignedCallerName && (
+                  <Badge color="bg-sky-100 text-sky-800">Caller: {lead.assignedCallerName}</Badge>
+                )}
+                {lead.assignedSmName && (
+                  <Badge color="bg-violet-100 text-violet-800">SM: {lead.assignedSmName}</Badge>
+                )}
+                {!lead.assignedCallerId && !lead.assignedSmId && (
+                  <Badge color="bg-gray-100 text-gray-600">Unassigned</Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Caller */}
+            {canAssignCaller && (
+              <div className="rounded-xl bg-white/70 p-3">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy">Caller</span>
+                  {lead.assignedCallerName && (
+                    <button
+                      onClick={() => handleClearAssignment("caller")}
+                      disabled={busy}
+                      className="text-[10px] font-semibold text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Clear caller
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    value={selectedCaller}
+                    onChange={(e) => setSelectedCaller(e.target.value ? Number(e.target.value) : "")}
+                    className="flex-1 rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm text-navy outline-none"
+                  >
+                    <option value="">
+                      {lead.assignedCallerName ? `Current: ${lead.assignedCallerName}` : "Select caller..."}
+                    </option>
+                    {callerUsers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.id === lead.assignedCallerId ? " (current)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleAssignCaller("auto")}
+                      disabled={busy || callerUsers.length === 0}
+                    >
+                      Auto
+                    </Button>
+                    <Button
+                      onClick={() => selectedCaller !== "" && handleAssignCaller(selectedCaller as number)}
+                      disabled={busy || selectedCaller === ""}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                </div>
+                {selectedCaller && <WorkloadTiles w={callers[selectedCaller]} />}
+              </div>
+            )}
+
+            {/* Sales Manager */}
+            <div className={`rounded-xl bg-white/70 p-3 ${canAssignCaller ? "mt-2.5" : ""}`}>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-xs font-bold text-navy">Sales Manager</span>
+                {lead.assignedSmName && (
+                  <button
+                    onClick={() => handleClearAssignment("sm")}
+                    disabled={busy}
+                    className="text-[10px] font-semibold text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Clear SM
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select
+                  value={selectedSm}
+                  onChange={(e) => setSelectedSm(e.target.value ? Number(e.target.value) : "")}
+                  className="flex-1 rounded-xl border border-violet-300 bg-white px-3 py-2 text-sm text-navy outline-none"
+                >
+                  <option value="">
+                    {lead.assignedSmName ? `Current: ${lead.assignedSmName}` : "Select SM..."}
+                  </option>
+                  {smUsers.map((sm) => (
+                    <option key={sm.id} value={sm.id}>
+                      {sm.name}
+                      {sm.id === lead.assignedSmId ? " (current)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleAssignSm("auto")}
+                    disabled={busy || smUsers.length === 0}
+                  >
+                    Auto
+                  </Button>
+                  <Button
+                    onClick={() => selectedSm !== "" && handleAssignSm(selectedSm as number)}
+                    disabled={busy || selectedSm === ""}
+                  >
+                    Assign
+                  </Button>
+                </div>
+              </div>
+              {selectedSm && <WorkloadTiles w={sms[selectedSm]} />}
             </div>
           </div>
-        ) : (
-          <p className="text-xs text-muted">
-            Generate a summary of the client and visit details to share easily on WhatsApp.
-          </p>
         )}
       </div>
 
-      {/* ===== Assign to SM ===== */}
-      {canAssign && !lead.assignedSmId && (
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-          <h3 className="mb-2 text-sm font-bold text-primary">
-            Assign to Sales Manager
-          </h3>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              value={selectedSm}
-              onChange={(e) => setSelectedSm(Number(e.target.value))}
-              className="flex-1 rounded-xl border border-violet-300 bg-white px-4 py-2.5 text-sm text-navy outline-none"
-            >
-              <option value="">Select SM...</option>
-              {smUsers.map((sm) => (
-                <option key={sm.id} value={sm.id}>
-                  {sm.name}
-                </option>
-              ))}
-            </select>
-            <Button onClick={handleAssign} disabled={busy || !selectedSm}>
-              Assign
-            </Button>
-          </div>
-          {selectedSm && (
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(() => {
-                const w = sms[selectedSm];
-                if (!w) return <p className="col-span-full text-xs text-muted">Loading workload...</p>;
-                return [
-                  ["Active Leads", w.activeLeads],
-                  ["Today's Follow-ups", w.todaysFollowUps],
-                  ["Visits Upcoming", w.upcomingVisits],
-                  ["Overdue", w.overdueFollowUps],
-                ].map(([label, val]) => (
-                  <div key={label as string} className="rounded-xl bg-white px-3 py-2 text-center">
-                    <div className="text-lg font-bold text-navy">{val}</div>
-                    <div className="text-[10px] text-soft">{label}</div>
-                  </div>
-                ));
-              })()}
-            </div>
-          )}
-        </div>
-      )}
+      {/* ===== SM Handoff ===== */}
       {lead.assignedSmName && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -810,7 +1001,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
-      </div>
 
       {/* ===== Property matches ===== */}
       {(showMatches || matches.length > 0) && (
@@ -1151,6 +1341,32 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
+
+      {/* ===== Edit lead modal ===== */}
+      {showEdit && (
+        <LeadEditor lead={lead} onSave={handleSaveEdit} onCancel={() => setShowEdit(false)} />
+      )}
+
+      {/* ===== Delete lead modal ===== */}
+      {showDelete && (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-5">
+            <h3 className="text-sm font-bold text-red-700">Delete this lead?</h3>
+            <p className="mt-1 text-xs text-muted">
+              <span className="font-semibold text-navy">{lead.name}</span> will be marked as invalid
+              (soft delete) — it stops appearing in all lists while the audit trail is kept.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button onClick={handleDeleteLead} disabled={busy}>
+                Yes, delete
+              </Button>
+              <Button variant="ghost" onClick={() => setShowDelete(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1294,6 +1510,154 @@ export default function LeadDetail({ data, currentUser }: Props) {
       notes: "2nd visit suggestion message opened on WhatsApp",
     }).catch(() => {});
   }
+
+  async function handleSaveEdit(vals: Record<string, any>) {
+    setBusy(true);
+    try {
+      await patchLead(vals);
+      await postActivity({ type: "note", notes: "Lead details edited" });
+      showToast("Lead updated");
+      setShowEdit(false);
+      reload();
+    } catch {
+      showToast("Could not save");
+    } finally {
+      setBusy(false);
+    }
+  }
+}
+
+function WorkloadTiles({ w }: { w: any }) {
+  if (!w) {
+    return <p className="mt-3 text-xs text-muted">Loading workload...</p>;
+  }
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {[
+        ["Active Leads", w.activeLeads],
+        ["Today's Follow-ups", w.todaysFollowUps],
+        ["Visits Upcoming", w.upcomingVisits],
+        ["Overdue", w.overdueFollowUps],
+      ].map(([label, val]) => (
+        <div key={label as string} className="rounded-xl bg-white px-3 py-2 text-center">
+          <div className="text-lg font-bold text-navy">{val}</div>
+          <div className="text-[10px] text-soft">{label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const LEAD_SOURCES = [
+  { value: "meta", label: "Meta" },
+  { value: "facebook", label: "Facebook" },
+  { value: "google", label: "Google" },
+  { value: "website", label: "Website" },
+  { value: "walk_in", label: "Walk-in" },
+  { value: "referral", label: "Referral" },
+  { value: "other", label: "Other" },
+];
+
+function LeadEditor({
+  lead,
+  onSave,
+  onCancel,
+}: {
+  lead: Record<string, any>;
+  onSave: (vals: Record<string, any>) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: lead.name || "",
+    phone: lead.phone || "",
+    whatsappNumber: lead.whatsappNumber || "",
+    email: lead.email || "",
+    source: lead.source || "meta",
+    campaignName: lead.campaignName || "",
+    adSetName: lead.adSetName || "",
+    adName: lead.adName || "",
+  });
+
+  const input =
+    "w-full rounded-xl border border-border bg-background/50 px-3 py-2.5 text-sm text-navy outline-none focus:border-primary";
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      whatsappNumber: form.whatsappNumber.trim() || null,
+      email: form.email.trim() || null,
+      source: form.source,
+      campaignName: form.campaignName.trim() || null,
+      adSetName: form.adSetName.trim() || null,
+      adName: form.adName.trim() || null,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+      <form
+        onSubmit={submit}
+        className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5"
+      >
+        <h3 className="text-sm font-bold text-primary">Edit Lead</h3>
+        <p className="mt-0.5 text-xs text-muted">
+          Update contact and acquisition details for this lead.
+        </p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Name</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} required />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Phone</label>
+              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">WhatsApp Number</label>
+              <input value={form.whatsappNumber} onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })} className={input} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Email</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Source</label>
+              <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className={input}>
+                {LEAD_SOURCES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Campaign</label>
+              <input value={form.campaignName} onChange={(e) => setForm({ ...form, campaignName: e.target.value })} className={input} placeholder="e.g. WhatsApp - Vasai Towers" />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Ad Set</label>
+              <input value={form.adSetName} onChange={(e) => setForm({ ...form, adSetName: e.target.value })} className={input} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Ad Name</label>
+              <input value={form.adName} onChange={(e) => setForm({ ...form, adName: e.target.value })} className={input} />
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Button type="submit">Save</Button>
+          <Button variant="ghost" onClick={onCancel} type="button">
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 function RequirementEditor({

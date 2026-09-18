@@ -17,6 +17,7 @@ export type InboxTab =
   | "ready_to_assign"
   | "recently_assigned"
   | "follow_up"
+  | "lost"
   | "all";
 
 function nextActionFor(lead: {
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
     .all();
 
   if (user.role === "caller") {
-    rows = q ? rows : rows.filter(isInCallerScope);
+    rows = q || tab === "lost" ? rows : rows.filter(isInCallerScope);
   } else if (user.role === "sales_manager") {
     rows = rows.filter((l) => l.assignedSmId === user.id);
   }
@@ -148,6 +149,9 @@ export async function GET(request: NextRequest) {
       filtered = rows.filter((l) =>
         ["follow_up", "visit_proposed", "visit_booked", "visit_confirmed", "negotiation", "assigned"].includes(l.status)
       );
+      break;
+    case "lost":
+      filtered = rows.filter((l) => l.status === "lost");
       break;
     default:
       filtered = rows.filter((l) => !["invalid", "lost", "dnc"].includes(l.status));

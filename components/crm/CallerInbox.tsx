@@ -45,6 +45,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "ready_to_assign", label: "Ready to Assign" },
   { key: "recently_assigned", label: "Assigned" },
   { key: "follow_up", label: "Follow-ups" },
+  { key: "lost", label: "Lost" },
   { key: "all", label: "All" },
 ];
 

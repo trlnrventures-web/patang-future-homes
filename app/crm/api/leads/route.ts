@@ -35,9 +35,10 @@ export async function GET(request: NextRequest) {
 
   // Role-based filtering
   // Caller: primary focus is every unassigned/qualification-stage lead. A search
-  // query bypasses the scope so they can still find leads handed off to an SM.
+  // query or an explicit status filter bypasses the scope so they can still find
+  // handed-off leads (including lost ones).
   if (user.role === "caller") {
-    rows = q ? rows : rows.filter(isInCallerScope);
+    rows = q || status ? rows : rows.filter(isInCallerScope);
   } else if (user.role === "sales_manager") {
     rows = rows.filter((l) => l.assignedSmId === user.id);
   }

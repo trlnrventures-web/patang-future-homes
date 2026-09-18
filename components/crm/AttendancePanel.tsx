@@ -266,25 +266,40 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
       </div>
 
       {/* This week + leave balance */}
-      <div className="rounded-2xl border border-border bg-white p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-bold text-primary">This Week</div>
-          <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
-            Leave Taken: {data.leaveDaysThisMonth} day{data.leaveDaysThisMonth === 1 ? "" : "s"} this month
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-white p-5">
+          <div className="mb-3 text-sm font-bold text-primary">This Week</div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {data.week.map((h: DayCard) => (
+              <div
+                key={h.date}
+                className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${TYPE_COLORS[h.type] || "bg-gray-100"}`}
+                title={`${h.date} · ${h.label} · In ${h.in} · Out ${h.out}`}
+              >
+                <div className="text-[10px] font-semibold text-muted">{h.day}</div>
+                <div className={`h-1.5 w-1.5 rounded-full ${TYPE_DOT[h.type] || "bg-gray-300"}`} />
+                <div className="text-[10px] font-medium">{h.in}</div>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {data.week.map((h: DayCard) => (
-            <div
-              key={h.date}
-              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${TYPE_COLORS[h.type] || "bg-gray-100"}`}
-              title={`${h.date} · ${h.label} · In ${h.in} · Out ${h.out}`}
-            >
-              <div className="text-[10px] font-semibold text-muted">{h.day}</div>
-              <div className={`h-1.5 w-1.5 rounded-full ${TYPE_DOT[h.type] || "bg-gray-300"}`} />
-              <div className="text-[10px] font-medium">{h.in}</div>
+
+        <div className="rounded-2xl border border-border bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-bold text-primary">Leave Balance</div>
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+              Week Off: {data.weekOffDay}
+            </span>
+          </div>
+          <div className="flex items-end gap-2">
+            <div className="text-3xl font-bold text-primary">{data.leaveDaysThisMonth}</div>
+            <div className="pb-1 text-xs text-muted">
+              day{data.leaveDaysThisMonth === 1 ? "" : "s"} used this month
             </div>
-          ))}
+          </div>
+          <div className="mt-3 rounded-xl bg-background px-3 py-2 text-[11px] text-muted">
+            Approved leaves count toward this month&apos;s balance and reset every month.
+          </div>
         </div>
       </div>
 
