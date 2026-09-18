@@ -4,6 +4,23 @@ import * as schema from "./schema";
 
 const FINAL_LEAD_STATUSES = new Set(["booked", "lost", "invalid", "dnc", "no_response"]);
 
+export function nextActionLabel(value: string | null | undefined): string {
+  if (!value || value === "none") return "";
+  const map: Record<string, string> = {
+    sm_follow_up: "SM follow-up",
+    qualification: "Qualification",
+    callback: "Call back",
+    follow_up: "Follow-up",
+    nurture: "Nurture",
+    site_visit: "Site visit",
+    post_visit_feedback: "Post-visit feedback",
+    property_matching: "Find property",
+    review_assignment: "Review assignment",
+    visit: "Site visit",
+  };
+  return map[value] || value;
+}
+
 /** Statuses a caller still owns/qualifies even after an SM is attached. */
 export const CALLER_SCOPE_STATUSES = new Set([
   "new",
@@ -63,6 +80,7 @@ export function resolveDefaultCallerId(
   const allLeads = db.select().from(schema.leads).all();
   const openCounts = new Map(callers.map((c) => [c.id, 0]));
   for (const lead of allLeads) {
+    if (lead.deletedAt) continue;
     if (lead.assignedCallerId != null && openCounts.has(lead.assignedCallerId)) {
       if (!FINAL_LEAD_STATUSES.has(lead.status)) {
         openCounts.set(lead.assignedCallerId, openCounts.get(lead.assignedCallerId)! + 1);
@@ -97,6 +115,7 @@ export function resolveDefaultSmId(
   const allLeads = db.select().from(schema.leads).all();
   const openCounts = new Map(sms.map((s) => [s.id, 0]));
   for (const lead of allLeads) {
+    if (lead.deletedAt) continue;
     if (lead.assignedSmId != null && openCounts.has(lead.assignedSmId)) {
       if (!FINAL_LEAD_STATUSES.has(lead.status)) {
         openCounts.set(lead.assignedSmId, openCounts.get(lead.assignedSmId)! + 1);

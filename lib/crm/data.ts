@@ -43,16 +43,17 @@ export async function getDashboardData(user: CrmUser) {
   const today = nowIso.slice(0, 10);
 
   let myLeads: (typeof schema.leads.$inferSelect)[] = [];
+  const activeLeadCond = (l: typeof schema.leads.$inferSelect) => !l.deletedAt;
 
   if (user.role === "caller") {
-    myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedCallerId, user.id)).all();
+    myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedCallerId, user.id)).all().filter(activeLeadCond);
   } else if (user.role === "sales_manager") {
-    myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedSmId, user.id)).all();
+    myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedSmId, user.id)).all().filter(activeLeadCond);
   } else {
-    myLeads = db.select().from(schema.leads).all();
+    myLeads = db.select().from(schema.leads).all().filter(activeLeadCond);
   }
 
-  const allLeads = db.select().from(schema.leads).all();
+  const allLeads = db.select().from(schema.leads).all().filter(activeLeadCond);
   const allSiteVisits = db.select().from(schema.siteVisits).all();
   const allBookings = db.select().from(schema.bookings).all();
   const users = db.select().from(schema.users).all();

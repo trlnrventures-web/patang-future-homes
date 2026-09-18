@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import {
   isInCallerScope,
@@ -23,6 +23,9 @@ export async function GET(
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
 
   if (!lead) {
+    return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+  }
+  if (lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
@@ -106,6 +109,9 @@ export async function PATCH(
   const db = getDb();
   const existing = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
   if (!existing) {
+    return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+  }
+  if (existing.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
@@ -271,9 +277,14 @@ export async function DELETE(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  // Instead of hard-deleting, mark as invalid to maintain audit trail
+  // Soft-delete: keep the row for audit trail but hide it everywhere via
+  // deletedAt. Also mark as invalid so any status-based aggregations skip it.
   db.update(schema.leads)
-    .set({ status: "invalid", updatedAt: new Date().toISOString() })
+    .set({
+      status: "invalid",
+      deletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
     .where(eq(schema.leads.id, Number(id)))
     .run();
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/crm/data";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/crm/leads";
 import { Badge } from "@/components/crm/ui";
@@ -29,10 +29,10 @@ export default async function LeadDetailPage({
   if (Number.isNaN(leadId)) notFound();
 
   const db = getDb();
-  const lead = db
+const lead = db
     .select()
     .from(schema.leads)
-    .where(eq(schema.leads.id, leadId))
+    .where(and(eq(schema.leads.id, leadId), isNull(schema.leads.deletedAt)))
     .get();
 
   if (!lead) notFound();
@@ -157,7 +157,7 @@ activities,
 
       <LeadDetail data={leadData} currentUser={user} />
 
-      <div className="mt-8" id="message-center">
+      <div className="mt-8 scroll-mt-24" id="message-center">
         <h2 className="mb-3 text-base font-bold text-primary">
           Hinglish Message Center
         </h2>

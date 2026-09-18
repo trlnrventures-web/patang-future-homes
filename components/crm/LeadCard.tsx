@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge, ChevronIcon, PhoneIcon, WhatsAppIcon } from "./ui";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 
@@ -25,21 +26,53 @@ type Props = {
   pills?: ReactNode;
   footerNote?: ReactNode;
   accentCls?: string;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 };
 
-export default function LeadCard({ lead, badges, pills, footerNote, accentCls }: Props) {
+export default function LeadCard({ lead, badges, pills, footerNote, accentCls, selected, onToggleSelect }: Props) {
+  const router = useRouter();
   const overdue = !!lead.hasOverdueFollowUp && !!lead.nextFollowUpDisplay;
 
+  const open = () => router.push(`/crm/leads/${lead.id}`);
+  const stop = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
-    <div className="relative flex min-h-[9.5rem] flex-col overflow-hidden rounded-2xl border border-border bg-white p-3 transition-colors hover:border-primary/30">
+    <div
+      onClick={onToggleSelect ? (e) => { e.stopPropagation(); onToggleSelect(); } : open}
+      className={`relative flex min-h-[9.5rem] cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-3 transition-colors ${
+        selected
+          ? "border-primary ring-2 ring-primary/30"
+          : "border-border hover:border-primary/30"
+      }`}
+    >
       {accentCls && <span className={`absolute left-0 top-0 h-full w-1 ${accentCls}`} />}
       <div className="flex min-w-0 items-center gap-1.5">
-        <Link
-          href={`/crm/leads/${lead.id}`}
+        {onToggleSelect && (
+          <button
+            type="button"
+            aria-label="Select lead"
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+              selected ? "border-primary bg-primary" : "border-muted/50 bg-white"
+            }`}
+          >
+            {selected && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}
+          </button>
+        )}
+        <span
+          onClick={open}
           className="truncate text-sm font-bold text-navy transition-colors hover:text-primary"
         >
           {lead.name}
-        </Link>
+        </span>
         {lead.statusLabel && (
           <Badge color={lead.statusCls || "bg-background text-muted"}>{lead.statusLabel}</Badge>
         )}
@@ -67,10 +100,11 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls }:
           </div>
           {footerNote && <div className="mt-0.5">{footerNote}</div>}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1" onClick={stop}>
           <a
             href={`tel:+${lead.phone.replace(/\D/g, "")}`}
             title="Call lead"
+            onClick={stop}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
           >
             <PhoneIcon />
@@ -80,6 +114,7 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls }:
             target="_blank"
             rel="noopener noreferrer"
             title="Open WhatsApp"
+            onClick={stop}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-[#25D366]/10 hover:text-[#1fb858]"
           >
             <WhatsAppIcon />
@@ -87,6 +122,7 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls }:
           <Link
             href={`/crm/leads/${lead.id}`}
             title="Open lead"
+            onClick={stop}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
           >
             <ChevronIcon />

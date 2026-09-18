@@ -7,7 +7,6 @@ import InboxSnapshot from "./InboxSnapshot";
 import CallQueue from "./CallQueue";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
 import { slaStatusMeta, type SlaStatus } from "@/lib/crm/sla";
-
 type InboxLead = {
   id: number;
   name: string;
@@ -75,6 +74,76 @@ export default function CallerInbox() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [queueOpen, setQueueOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const runBulkStatus = async () => {
+    if (!bulkStatus || selected.size === 0) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/crm/api/leads/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selected], action: "status", status: bulkStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) setNotice(data.error || "Bulk update failed");
+      else {
+        setNotice(`Updated ${data.updated} lead(s)`);
+        setSelected(new Set());
+        setBulkOpen(false);
+        setBulkStatus("");
+        load();
+        setTimeout(() => setNotice(""), 4000);
+      }
+    } catch {
+      setNotice("Bulk update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    if (selected.size === 0) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/crm/api/leads/bulk?ids=${[...selected].join(",")}`);
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      const rows = data.leads as Record<string, unknown>[];
+      const headers = ["ID", "Name", "Phone", "WhatsApp", "Email", "Source", "Status", "Location", "Sub-location", "Budget", "BHK", "Project", "Preferred Project", "Assigned Caller", "Assigned SM", "Created At"];
+      const esc = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [headers.join(","), ...rows.map((r) => [r.id, r.name, r.phone, r.whatsappNumber, r.email, r.source, r.status, r.location, r.sublocation, r.budget, r.bhk, r.originalProject, r.preferredProject, r.assignedCaller, r.assignedSm, r.createdAt].map(esc).join(","))];
+      const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setNotice("Export failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,20 +174,36 @@ export default function CallerInbox() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-24">
       {queueOpen && <CallQueue onExit={closeQueue} />}
+
+      {notice && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+          {notice}
+        </div>
+      )}
 
       {!loading && leads.length > 0 && (
         <InboxSnapshot leads={leads} onStartQueue={() => setQueueOpen(true)} />
       )}
 
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search by name, phone, project, or campaign..."
-        className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, phone, project, or campaign..."
+          className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary"
+        />
+        {selected.size > 0 && (
+          <button
+            onClick={() => setSelected(new Set())}
+            className="shrink-0 rounded-xl border border-border bg-white px-3 py-3 text-xs font-semibold text-navy hover:bg-primary/5"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (
           <button
@@ -172,6 +257,8 @@ export default function CallerInbox() {
                 nextFollowUpDisplay: lead.nextFollowUp || null,
                 hasOverdueFollowUp: lead.hasOverdueFollowUp,
               }}
+              selected={selected.has(lead.id)}
+              onToggleSelect={() => toggleSelect(lead.id)}
               accentCls={PRIORITY_BAR[lead.priority] || "bg-gray-200"}
               badges={
                 lead.assignedSmName ? (
@@ -206,6 +293,71 @@ export default function CallerInbox() {
               }
             />
           ))}
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-navy">{selected.size} selected</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setBulkOpen(true)}
+                disabled={busy}
+                className="rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-navy hover:bg-primary/5 disabled:opacity-50"
+              >
+                Change Status
+              </button>
+              <button
+                onClick={exportCsv}
+                disabled={busy}
+                className="rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-navy hover:bg-primary/5 disabled:opacity-50"
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-sm font-bold text-navy">Change status of {selected.size} lead(s)</h3>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {Object.entries(LEAD_STATUS_LABELS)
+                .filter(([s]) => !["invalid", "dnc"].includes(s))
+                .map(([s, label]) => (
+                  <button
+                    key={s}
+                    onClick={() => setBulkStatus(s)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                      bulkStatus === s
+                        ? "bg-primary text-white"
+                        : "border border-border bg-white text-muted hover:bg-primary/5"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => { setBulkOpen(false); setBulkStatus(""); }}
+                disabled={busy}
+                className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-semibold text-navy"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={runBulkStatus}
+                disabled={busy || !bulkStatus}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {busy ? "Working..." : "Confirm"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

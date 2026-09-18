@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { desc } from "drizzle-orm";
+import { desc, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
-import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
+import { buildEarliestFollowUpMap, isInCallerScope, nextActionLabel } from "@/lib/crm/leads";
 
 export type InboxTab =
   | "new"
@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
   let rows = db
     .select()
     .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
     .orderBy(desc(schema.leads.createdAt))
     .all();
 

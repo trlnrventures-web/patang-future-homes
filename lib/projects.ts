@@ -129,9 +129,12 @@ export type Project = {
   };
   metaTitle: string;
   metaDescription: string;
+  isActive?: boolean;
 };
 
-export const projects: Project[] = rawProjects as Project[];
+export const projects: Project[] = (rawProjects as Project[]).filter(
+  (p) => p.isActive !== false
+);
 
 export function getProject(slug: string): Project | undefined {
   return projects.find((p) => p.slug === slug);

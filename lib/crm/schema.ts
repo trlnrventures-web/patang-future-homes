@@ -147,6 +147,7 @@ export const leads = sqliteTable("leads", {
   assignedBy: integer("assigned_by"),
   createdAt: text("created_at").notNull().default(""),
   updatedAt: text("updated_at").notNull().default(""),
+  deletedAt: text("deleted_at"),
 });
 
 export const crmSettings = sqliteTable("crm_settings", {

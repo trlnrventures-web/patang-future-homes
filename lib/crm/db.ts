@@ -401,6 +401,7 @@ function migrateLeads(sqlite: Database.Database) {
     ["assigned_at", "TEXT"],
     ["assigned_by", "INTEGER"],
     ["sublocation", "TEXT"],
+    ["deleted_at", "TEXT"],
   ];
   for (const [name, decl] of additions) {
     if (!have.has(name)) {

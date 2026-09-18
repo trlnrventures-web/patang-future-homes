@@ -344,6 +344,12 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
   const requiredFieldsFilled = Boolean(lead.bhk && (lead.budget || (lead.budgetMin && lead.budgetMax)) && lead.location);
 
+  const scrollToSection = useCallback((id: string) => {
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, []);
+
   const qualificationFields = [
     { key: "Location", filled: Boolean(lead.location) },
     { key: "BHK", filled: Boolean(lead.bhk) },
@@ -448,6 +454,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <a
           href={`tel:+${phone}`}
+          onClick={() => scrollToSection("call-outcome")}
           className="flex flex-col items-center gap-1.5 rounded-xl bg-primary px-3 py-3 text-white"
         >
           <PhoneIcon />
@@ -457,6 +464,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           href={`https://wa.me/${waNumber}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => scrollToSection("message-center")}
           className="flex flex-col items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-3 text-white"
         >
           <WhatsAppIcon />
@@ -464,6 +472,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </a>
         <a
           href="#message-center"
+          onClick={(e) => { e.preventDefault(); scrollToSection("message-center"); }}
           className="flex flex-col items-center gap-1.5 rounded-xl bg-secondary px-3 py-3 text-white"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -472,7 +481,11 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <span className="text-xs font-bold">MESSAGE</span>
         </a>
         <button
-          onClick={() => setShowFollowUp((s) => !s)}
+          onClick={() => {
+            const willShow = !showFollowUp;
+            setShowFollowUp(willShow);
+            if (willShow) scrollToSection("follow-up-form");
+          }}
           className="flex flex-col items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-amber-700"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -481,7 +494,10 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <span className="text-xs font-bold">FOLLOW-UP</span>
         </button>
         <button
-          onClick={openVisit}
+          onClick={() => {
+            openVisit();
+            scrollToSection("visit-form");
+          }}
           className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-3 text-emerald-700"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -494,6 +510,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           onClick={() => {
             setShowMatches(true);
             loadMatches();
+            scrollToSection("matching-properties");
           }}
           className="flex flex-col items-center gap-1.5 rounded-xl bg-accent px-3 py-3 text-primary"
         >
@@ -562,7 +579,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       {/* ===== Row 2: Call Outcome + Original Enquiry ===== */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className={`rounded-2xl border border-border bg-white p-4 ${lead.originalProject ? "" : "sm:col-span-2"}`}>
+        <div className={`rounded-2xl border border-border bg-white p-4 scroll-mt-24 ${lead.originalProject ? "" : "sm:col-span-2"}`} id="call-outcome" data-section="true">
           <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
           <div className="flex flex-wrap gap-2">
             {[
@@ -1004,7 +1021,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       {/* ===== Property matches ===== */}
       {(showMatches || matches.length > 0) && (
-        <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+        <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-bold text-primary">Matching Properties</h3>
             {matches.length === 0 && !matchesLoaded && (
@@ -1086,7 +1103,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       {/* ===== Follow-up form ===== */}
       {showFollowUp && (
-        <form onSubmit={handleFollowUp} className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+        <form onSubmit={handleFollowUp} id="follow-up-form" className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 scroll-mt-24">
           <h3 className="text-sm font-bold text-primary">Schedule Follow-up</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -1121,7 +1138,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
       {/* ===== Visit form ===== */}
       {showVisit && (
-        <form onSubmit={handleVisit} className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+        <form onSubmit={handleVisit} id="visit-form" className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 scroll-mt-24">
           <h3 className="text-sm font-bold text-primary">Book Site Visit</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

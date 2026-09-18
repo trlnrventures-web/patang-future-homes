@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
@@ -155,6 +155,7 @@ export async function GET() {
 const myLeads = db
     .select()
     .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
     .orderBy(desc(schema.leads.createdAt))
     .all()
     .filter(isInCallerScope);

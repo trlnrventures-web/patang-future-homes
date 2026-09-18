@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { FINAL_STAGES } from "@/lib/crm/sales";
-import { resolveDefaultCallerId, buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
+import { resolveDefaultCallerId, buildEarliestFollowUpMap, isInCallerScope, nextActionLabel } from "@/lib/crm/leads";
 import { computeSlaStatus } from "@/lib/crm/sla-compute";
 
 const QUICK_FILTERS = ["overdue", "hot", "unassigned", "visit_today"] as const;
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   let rows = db
     .select()
     .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
     .orderBy(desc(schema.leads.createdAt))
     .all();
 
@@ -127,6 +128,7 @@ export async function GET(request: NextRequest) {
         : "";
     return {
       ...l,
+      nextAction: nextActionLabel(l.nextAction),
       assignedCallerName: l.assignedCallerId ? userMap.get(l.assignedCallerId) || "" : "",
       assignedSmName: l.assignedSmId ? userMap.get(l.assignedSmId) || "" : "",
       negotiationLastActive: l.status === "negotiation" ? (negotiationDaysMap.get(l.id) ?? null) : null,

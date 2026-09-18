@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 
 const ACTIVE_LEAD_STATUSES = new Set([
@@ -29,7 +29,11 @@ export async function GET() {
   const nowIso = now.toISOString();
   const today = nowIso.slice(0, 10);
 
-  const allLeads = db.select().from(schema.leads).all();
+  const allLeads = db
+    .select()
+    .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
+    .all();
   const allFollowUps = db.select().from(schema.followUps).all();
   const allVisits = db.select().from(schema.siteVisits).all();
 

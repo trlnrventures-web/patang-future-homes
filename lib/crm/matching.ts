@@ -180,10 +180,17 @@ function scoreMarketEntry(
   }
 
   const area = marketArea(e.location);
-  if (areaMatches(area, e.location, setter.location)) {
-    w += weights.location;
+  let locationTier: "exact" | "area" | "none" | "neutral" = "neutral";
+  if (setter.subLocation && e.location.toLowerCase().includes(setter.subLocation.toLowerCase())) {
+    locationTier = "exact";
+    w += weights.location + Math.round(weights.location / 2);
+    reasons.push({ label: `Sub-location: ${e.location}`, ok: true });
+  } else if (areaMatches(area, e.location, setter.location)) {
+    locationTier = "area";
+    w += Math.round((weights.location || 0) * 0.6);
     reasons.push({ label: e.location, ok: true });
-  } else {
+  } else if (setter.location || setter.subLocation) {
+    locationTier = "none";
     reasons.push({ label: e.location, ok: false });
   }
 
@@ -219,8 +226,12 @@ function scoreMarketEntry(
     }
   }
 
-  const score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
-  const level: MatchLevel = score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
+  let score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
+
+  if (locationTier === "none") score = Math.min(score, 49);
+  else if (locationTier === "area") score = Math.min(score, 74);
+
+  const level: MatchLevel = locationTier === "none" ? "low" : score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
 
   return {
     projectSlug: `partner-${e.project.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -262,10 +273,20 @@ export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeig
       }
     }
 
-    if (areaMatches(p.area, p.location, setter.location)) {
-      w += weights.location;
+    // Location weighting: an exact sub-location match is the strongest signal,
+    // a match on the broader area is a good-but-not-best signal, and any other
+    // location can never outrank them.
+    let locationTier: "exact" | "area" | "none" | "neutral" = "neutral";
+    if (setter.subLocation && subLocationMatches(p.subLocation, setter.subLocation)) {
+      locationTier = "exact";
+      w += weights.location + Math.round(weights.location / 2);
+      reasons.push({ label: `Sub-location: ${p.subLocation}`, ok: true });
+    } else if (areaMatches(p.area, p.location, setter.location)) {
+      locationTier = "area";
+      w += Math.round((weights.location || 0) * 0.6);
       reasons.push({ label: p.location, ok: true });
-    } else {
+    } else if (setter.location || setter.subLocation) {
+      locationTier = "none";
       reasons.push({ label: p.location, ok: false });
     }
 
@@ -277,11 +298,6 @@ export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeig
       } else {
         reasons.push({ label: `No ${setter.bhk} BHK`, ok: false });
       }
-    }
-
-    if (setter.subLocation && subLocationMatches(p.subLocation, setter.subLocation)) {
-      w += Math.round(weights.location / 2);
-      reasons.push({ label: `Sub-location: ${p.subLocation}`, ok: true });
     }
 
     if (setter.timeline && setter.timeline !== "exploring") {
@@ -320,8 +336,14 @@ export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeig
       }
     }
 
-    const score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
-    const level: MatchLevel = score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
+    let score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
+
+    // Location tier caps: different-location matches can never be BEST MATCH,
+    // and same-area (but not exact sub-location) matches cap below BEST MATCH.
+    if (locationTier === "none") score = Math.min(score, 49);
+    else if (locationTier === "area") score = Math.min(score, 74);
+
+    const level: MatchLevel = locationTier === "none" ? "low" : score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
 
     results.push({
       projectSlug: p.slug,

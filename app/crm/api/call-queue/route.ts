@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { formatLeadAge } from "@/lib/crm/sla";
 import { istToday, istDayRange } from "@/lib/crm/reports";
@@ -85,6 +85,7 @@ export async function GET() {
   const myLeads = db
     .select()
     .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
     .all()
     .filter(isInCallerScope);
 
