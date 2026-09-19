@@ -475,7 +475,7 @@ function seedSettings(sqlite: Database.Database) {
   const settings = {
     sla_first_response_min: "5",
     budget_ranges: '["under_25","25_40","40_60","60_85","85_plus"]',
-    matching_weights: '{"budget":30,"location":20,"bhk":15,"timeline":15,"purpose":10,"preferences":10}',
+    matching_weights: '{"subLocation":40,"location":20,"budget":25,"budgetPartial":10}',
     no_response_schedule: '{"1":0,"2":240,"3":1440,"4":4320,"5":10080}',
   };
   const insert = sqlite.prepare("INSERT INTO crm_settings (key, value, updated_at) VALUES (?, ?, ?)");

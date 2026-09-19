@@ -18,48 +18,7 @@ export type ShowFlatImage = {
   src: string;
 };
 
-export const SUB_LOCATIONS = [
-  "Sai Nagar",
-  "Navyug Nagar",
-  "Diwanman",
-  "Gokul Aagan",
-  "Krishna Township",
-  "Bhabola",
-  "Stella",
-  "Barampur",
-  "Shastri Nagar",
-  "Anand Nagar",
-  "Manickpur",
-  "Ambadi Road",
-  "Om Nagar",
-  "Navpada",
-  "Suncity",
-  "Navghar",
-  "Papdi",
-  "Koliwada",
-  "Chulna",
-  "Kaul Heritage City",
-  "Golani Naka",
-  "Suruchi Beach",
-  "Umela",
-  "Fatherwadi",
-] as const;
-
-export function subLocationTokens(value?: string | null): string[] {
-  if (!value) return [];
-  return value
-    .split(/[\/,&]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-export function subLocationMatches(projectValue?: string | null, leadValue?: string | null): boolean {
-  const pTokens = subLocationTokens(projectValue);
-  if (pTokens.length === 0 || !leadValue) return false;
-  const lTokens = subLocationTokens(leadValue);
-  const norm = (s: string) => s.toLowerCase().trim();
-  return pTokens.some((pt) => lTokens.some((lt) => norm(pt) === norm(lt)));
-}
+export { SUB_LOCATIONS, subLocationTokens, subLocationMatches } from "./sub-locations";
 
 export type PriceValidityInfo = {
   validUntil: string;

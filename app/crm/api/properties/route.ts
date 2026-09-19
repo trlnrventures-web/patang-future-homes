@@ -6,8 +6,26 @@ import {
   slugifyTitle,
   type ProjectRecord,
 } from "@/lib/crm/projects-store";
+import {
+  MARKET_LOCATION,
+  marketBhkOptions,
+  marketInventory,
+  marketPossessionLabel,
+  marketPriceLabel,
+  marketSlug,
+} from "@/lib/crm/market-inventory";
 
 export const dynamic = "force-dynamic";
+
+function projectBhkOptions(p: ProjectRecord): string[] {
+  const configs = Array.isArray(p.configurations) ? (p.configurations as { type?: string }[]) : [];
+  const out = new Set<string>();
+  for (const c of configs) {
+    const m = String(c?.type || "").match(/(\d+)\s*BHK/i);
+    if (m) out.add(m[1]);
+  }
+  return [...out];
+}
 
 export async function GET() {
   const user = await getAuthUser();
@@ -31,6 +49,26 @@ export async function GET() {
       possessionDate: p.possessionDate || "",
       shortDescription: p.shortDescription || "",
       isActive: p.isActive !== false,
+      bhkOptions: projectBhkOptions(p),
+      source: "primary" as const,
+    })),
+    partner: marketInventory.map((e) => ({
+      slug: marketSlug(e),
+      title: e.project,
+      location: `${MARKET_LOCATION} · Partner`,
+      area: "west",
+      type: "flat",
+      status: "",
+      tier: "",
+      subLocation: e.subLocation || "",
+      priceRange: marketPriceLabel(e),
+      pricePerSqft: "",
+      reraId: "",
+      possessionDate: marketPossessionLabel(e),
+      shortDescription: "",
+      isActive: true,
+      bhkOptions: marketBhkOptions(e),
+      source: "market" as const,
     })),
   });
 }

@@ -5,17 +5,15 @@ import { eq } from "drizzle-orm";
 const DEFAULTS: Record<string, string> = {
   sla_first_response_min: "5",
   budget_ranges: '["under_25","25_40","40_60","60_85","85_plus"]',
-  matching_weights: '{"budget":30,"location":20,"bhk":15,"timeline":15,"purpose":10,"preferences":10}',
+  matching_weights: '{"subLocation":40,"location":20,"budget":25,"budgetPartial":10}',
   no_response_schedule: '{"1":0,"2":240,"3":1440,"4":4320,"5":10080}',
 };
 
 export type MatchingWeights = {
-  budget: number;
+  subLocation: number;
   location: number;
-  bhk: number;
-  timeline: number;
-  purpose: number;
-  preferences: number;
+  budget: number;
+  budgetPartial: number;
 };
 
 export function getSetting(key: string): string {
@@ -32,12 +30,10 @@ export function getSlaFirstResponseMin(): number {
 export function getMatchingWeights(): MatchingWeights {
   const parsed = JSON.parse(getSetting("matching_weights") || "{}") as Partial<MatchingWeights>;
   return {
-    budget: typeof parsed.budget === "number" ? parsed.budget : 30,
+    subLocation: typeof parsed.subLocation === "number" ? parsed.subLocation : 40,
     location: typeof parsed.location === "number" ? parsed.location : 20,
-    bhk: typeof parsed.bhk === "number" ? parsed.bhk : 15,
-    timeline: typeof parsed.timeline === "number" ? parsed.timeline : 15,
-    purpose: typeof parsed.purpose === "number" ? parsed.purpose : 10,
-    preferences: typeof parsed.preferences === "number" ? parsed.preferences : 10,
+    budget: typeof parsed.budget === "number" ? parsed.budget : 25,
+    budgetPartial: typeof parsed.budgetPartial === "number" ? parsed.budgetPartial : 10,
   };
 }
 

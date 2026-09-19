@@ -1,29 +1,31 @@
 import { projects, subLocationMatches, type Project } from "@/lib/projects";
-import rawMarketInventory from "@/data/market-inventory.json";
+import {
+  MARKET_AREA,
+  MARKET_LOCATION,
+  marketBhkOptions,
+  marketInventory,
+  marketPossessionLabel,
+  marketPriceLabel,
+  marketPriceRange,
+  marketSlug,
+  type MarketInventoryEntry,
+} from "./market-inventory";
 import type { MatchingWeights } from "./settings";
 
 export type MatchLevel = "strong" | "medium" | "low";
 export type MatchSource = "primary" | "market";
+export type MatchTone = "good" | "warn" | "bad";
 
 const DEFAULT_WEIGHTS: MatchingWeights = {
-  budget: 30,
+  subLocation: 40,
   location: 20,
-  bhk: 15,
-  timeline: 15,
-  purpose: 10,
-  preferences: 10,
+  budget: 25,
+  budgetPartial: 10,
 };
 
-export type MarketInventoryEntry = {
-  project: string;
-  developer?: string;
-  location: string;
-  priceRangeLacs: [number, number];
-  carpetRangeSqft: [number, number];
-  possession: string;
-};
+export type { MarketInventoryEntry };
 
-const marketInventory = rawMarketInventory as MarketInventoryEntry[];
+export type MatchReason = { label: string; ok: boolean; tone?: MatchTone };
 
 export type PropertyMatch = {
   projectSlug: string;
@@ -38,7 +40,7 @@ export type PropertyMatch = {
   score: number;
   level: MatchLevel;
   bhkOptions: string[];
-  reasons: { label: string; ok: boolean }[];
+  reasons: MatchReason[];
   source: MatchSource;
   developer?: string;
   subLocation?: string;
@@ -58,6 +60,35 @@ type Setter = {
   otherPreferences?: string | null;
 };
 
+/**
+ * Internal, source-agnostic view of a candidate so website projects and
+ * partner-network inventory are scored by exactly the same code path.
+ */
+type Candidate = {
+  slug: string;
+  title: string;
+  location: string;
+  subLocation: string | null;
+  area: "west" | "east";
+  bhkOptions: string[];
+  priceRange: { min: number; max: number } | null;
+  priceLabel: string;
+  possessionLabel: string;
+  tier: string | null;
+  type: string;
+  reraId: string;
+  image?: string;
+  priceValidUntil?: string;
+  developer?: string;
+  source: MatchSource;
+};
+
+type LocationTier = "sub" | "area" | "none" | "neutral";
+type BudgetFit = "full" | "partial" | "none" | "unknown";
+
+const LEVEL_RANK: Record<MatchLevel, number> = { strong: 2, medium: 1, low: 0 };
+const BUDGET_RANK: Record<BudgetFit, number> = { full: 3, partial: 2, unknown: 1, none: 0 };
+
 function parseLakhs(value: string): number | null {
   const clean = value.replace(/[,₹]/g, "").trim();
   const m = clean.match(/([\d.]+)\s*(lakh|lac|lacs|cr|crore)/i);
@@ -68,7 +99,7 @@ function parseLakhs(value: string): number | null {
   return num;
 }
 
-function projectBudgetRange(p: Project): { min: number; max: number } {
+function projectBudgetRange(p: Project): { min: number; max: number } | null {
   let min = Infinity;
   let max = -Infinity;
   for (const c of p.configurations) {
@@ -84,8 +115,7 @@ function projectBudgetRange(p: Project): { min: number; max: number } {
       max = Math.max(max, start);
     }
   }
-  if (!Number.isFinite(min)) min = 0;
-  if (!Number.isFinite(max)) max = 0;
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
   return { min, max };
 }
 
@@ -98,282 +128,234 @@ function projectBhkOptions(p: Project): string[] {
   return [...out];
 }
 
-function areaMatches(projectArea: string, projectLocation: string, desired?: string | null): boolean {
-  if (!desired) return false;
-  const d = desired.toLowerCase().trim();
-  const loc = projectLocation.toLowerCase();
-  const area = projectArea === "west" ? "vasai west" : "vasai east";
-  return loc.includes(d) || d.includes("vasai") && area.includes(d) || d.includes(area);
+function desiredArea(desired?: string | null): "west" | "east" | null {
+  if (!desired) return null;
+  const d = desired.toLowerCase();
+  if (d.includes("west")) return "west";
+  if (d.includes("east")) return "east";
+  return null;
 }
 
-function possessionYear(p: Project): number | null {
-  const m = p.possessionDate.match(/(20\d{2})/);
-  return m ? parseInt(m[1], 10) : null;
+function areaLabel(area: "west" | "east"): string {
+  return area === "west" ? "Vasai West" : "Vasai East";
 }
 
-function timelineBudgetYear(timeline?: string | null): number {
-  const year = new Date().getFullYear();
-  switch (timeline) {
-    case "immediate":
-      return year;
-    case "1_3_months":
-      return year + 1;
-    case "3_6_months":
-      return year + 1;
-    case "6_plus_months":
-      return year + 2;
-    case "exploring":
-      return year + 3;
-    default:
-      return year + 3;
-  }
+function locationLabel(value?: string | null): string {
+  if (!value) return "";
+  const map: Record<string, string> = {
+    vasai_west: "Vasai West",
+    vasai_east: "Vasai East",
+    naigaon: "Naigaon",
+    nalasopara: "Nalasopara",
+    virar: "Virar",
+    other: "Other",
+  };
+  return map[value.toLowerCase()] || value;
 }
 
-function budgetFits(pMin: number, pMax: number, bMin?: number | null, bMax?: number | null): boolean {
-  if (bMin == null && bMax == null) return true;
+function budgetFit(
+  priceRange: { min: number; max: number } | null,
+  bMin?: number | null,
+  bMax?: number | null,
+): BudgetFit {
+  const hasAsk = bMin != null || bMax != null;
+  if (!hasAsk) return "unknown";
+  if (!priceRange) return "unknown";
   const leadMin = bMin ?? 0;
-  const leadMax = bMax ?? Infinity;
-  return pMin <= leadMax + 5 && pMax >= leadMin - 5;
+  const leadMax = bMax ?? Number.POSITIVE_INFINITY;
+  const { min: pMin, max: pMax } = priceRange;
+  if (pMin >= leadMin && pMax <= leadMax) return "full";
+  const span = Number.isFinite(leadMax) ? leadMax - leadMin : Number.POSITIVE_INFINITY;
+  const tol = Number.isFinite(span) ? span * 0.15 : Number.POSITIVE_INFINITY;
+  if (pMin <= leadMax + tol && pMax >= leadMin - tol) return "partial";
+  return "none";
 }
 
-function inferBhkFromCarpet(carpetMin: number, carpetMax: number): string[] {
-  const opts: string[] = [];
-  if (carpetMax >= 350) opts.push("1");
-  if (carpetMax >= 560) opts.push("2");
-  if (carpetMax >= 880) opts.push("3");
-  return opts.length ? opts : ["2"];
-}
-
-function marketArea(location: string): "west" | "east" {
-  return /east/i.test(location) ? "east" : "west";
-}
-
-function marketPossessionYear(possession: string): number {
-  const now = new Date().getFullYear();
-  const v = possession.toLowerCase();
-  if (/ready|rtmi|month/i.test(v)) return now;
-  const m = v.match(/(\d(?:\.\d)?)\s*years?/i);
-  if (m) return now + Math.max(0, Math.round(parseFloat(m[1]) - 1));
-  return now + 1;
-}
-
-function scoreMarketEntry(
-  e: MarketInventoryEntry,
-  setter: Setter,
-  weights: MatchingWeights,
-  maxWeight: number
-): PropertyMatch {
-  const reasons: { label: string; ok: boolean }[] = [];
-  let w = 0;
-  const [pMin, pMax] = e.priceRangeLacs;
-  const hasBudget = setter.budgetMin != null || setter.budgetMax != null;
-  const bMin = setter.budgetMin ?? 0;
-  const bMax = setter.budgetMax ?? Infinity;
-
-  if (hasBudget) {
-    if (budgetFits(pMin, pMax, bMin, bMax)) {
-      w += weights.budget;
-      reasons.push({ label: "Budget fits", ok: true });
-    } else {
-      reasons.push({ label: "Budget out of range", ok: false });
-    }
-  }
-
-  const area = marketArea(e.location);
-  let locationTier: "exact" | "area" | "none" | "neutral" = "neutral";
-  if (setter.subLocation && e.location.toLowerCase().includes(setter.subLocation.toLowerCase())) {
-    locationTier = "exact";
-    w += weights.location + Math.round(weights.location / 2);
-    reasons.push({ label: `Sub-location: ${e.location}`, ok: true });
-  } else if (areaMatches(area, e.location, setter.location)) {
-    locationTier = "area";
-    w += Math.round((weights.location || 0) * 0.6);
-    reasons.push({ label: e.location, ok: true });
-  } else if (setter.location || setter.subLocation) {
-    locationTier = "none";
-    reasons.push({ label: e.location, ok: false });
-  }
-
-  const bhkOpts = inferBhkFromCarpet(e.carpetRangeSqft[0], e.carpetRangeSqft[1]);
-  if (setter.bhk && setter.bhk !== "other") {
-    if (bhkOpts.includes(setter.bhk)) {
-      w += weights.bhk;
-      reasons.push({ label: `${setter.bhk} BHK available`, ok: true });
-    } else {
-      reasons.push({ label: `No ${setter.bhk} BHK`, ok: false });
-    }
-  }
-
-  if (setter.timeline && setter.timeline !== "exploring") {
-    const py = marketPossessionYear(e.possession);
-    if (py <= timelineBudgetYear(setter.timeline)) {
-      w += weights.timeline;
-      reasons.push({ label: "Suitable possession timeline", ok: true });
-    } else {
-      reasons.push({ label: `Possession ${e.possession}`, ok: false });
-    }
-  }
-
-  if (setter.purpose && setter.purpose !== "self_use") {
-    w += weights.purpose / 2;
-    reasons.push({ label: "Residential project", ok: true });
-  }
-
-  if (setter.preferredProject) {
-    if (e.project.toLowerCase().includes(setter.preferredProject.toLowerCase())) {
-      w += weights.preferences;
-      reasons.push({ label: "Preferred project", ok: true });
-    }
-  }
-
-  let score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
-
-  if (locationTier === "none") score = Math.min(score, 49);
-  else if (locationTier === "area") score = Math.min(score, 74);
-
-  const level: MatchLevel = locationTier === "none" ? "low" : score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
-
+function projectToCandidate(p: Project): Candidate {
   return {
-    projectSlug: `partner-${e.project.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    title: e.project,
-    location: `${e.location} · Partner`,
-    tier: null,
-    type: "flat",
-    priceRange: `₹${Math.round(pMin)}L – ₹${Math.round(pMax)}L`,
-    possessionDate: e.possession,
-    reraId: "",
-    score,
-    level,
-    bhkOptions: bhkOpts,
-    reasons: reasons.slice(0, 5),
-    source: "market",
-    developer: e.developer || undefined,
+    slug: p.slug,
+    title: p.title,
+    location: p.location,
+    subLocation: p.subLocation ?? null,
+    area: p.area === "east" ? "east" : "west",
+    bhkOptions: projectBhkOptions(p),
+    priceRange: projectBudgetRange(p),
+    priceLabel: p.priceRange,
+    possessionLabel: p.possessionDate,
+    tier: p.tier ?? null,
+    type: p.type,
+    reraId: p.reraId,
+    image: p.images?.[0],
+    priceValidUntil: p.priceValidUntil,
+    developer: p.developer?.name,
+    source: "primary",
   };
 }
 
-export function matchProperties(setter: Setter, limit = 5, weights: MatchingWeights = DEFAULT_WEIGHTS, includeMarket = true): PropertyMatch[] {
-  const maxWeight = weights.budget + weights.location + weights.bhk + weights.timeline + weights.purpose + weights.preferences;
+function marketToCandidate(e: MarketInventoryEntry): Candidate {
+  return {
+    slug: marketSlug(e),
+    title: e.project,
+    location: `${MARKET_LOCATION} · Partner`,
+    subLocation: e.subLocation ?? null,
+    area: MARKET_AREA,
+    bhkOptions: marketBhkOptions(e),
+    priceRange: marketPriceRange(e),
+    priceLabel: marketPriceLabel(e),
+    possessionLabel: marketPossessionLabel(e),
+    tier: null,
+    type: "flat",
+    reraId: "",
+    source: "market",
+  };
+}
+
+type Scored = {
+  score: number;
+  level: MatchLevel;
+  reasons: MatchReason[];
+  locationTier: LocationTier;
+  budget: BudgetFit;
+  bhkOk: boolean;
+};
+
+function scoreCandidate(c: Candidate, setter: Setter, weights: MatchingWeights): Scored {
+  const hasSub = !!setter.subLocation;
+  const hasLoc = !!setter.location;
   const hasBudget = setter.budgetMin != null || setter.budgetMax != null;
-  const bMin = setter.budgetMin ?? 0;
-  const bMax = setter.budgetMax ?? Infinity;
+  const hasBhk = !!setter.bhk && setter.bhk !== "other";
+  const wantArea = desiredArea(setter.location);
 
-  const results: PropertyMatch[] = [];
+  const subMatch = hasSub && subLocationMatches(c.subLocation, setter.subLocation);
+  const areaMatch = wantArea != null && c.area === wantArea;
 
-  for (const p of projects) {
-    const reasons: { label: string; ok: boolean }[] = [];
-    let w = 0;
+  let locationTier: LocationTier;
+  if (subMatch) locationTier = "sub";
+  else if (areaMatch) locationTier = "area";
+  else if (!hasSub && !hasLoc) locationTier = "neutral";
+  else if (wantArea == null) locationTier = "neutral";
+  else locationTier = "none";
 
-    const { min: pMin, max: pMax } = projectBudgetRange(p);
-    if (hasBudget) {
-      if (budgetFits(pMin, pMax, bMin, bMax)) {
-        w += weights.budget;
-        reasons.push({ label: "Budget fits", ok: true });
-      } else {
-        reasons.push({ label: "Budget out of range", ok: false });
-      }
-    }
+  const locationPoints =
+    locationTier === "sub"
+      ? weights.subLocation
+      : locationTier === "area"
+        ? weights.location
+        : 0;
 
-    // Location weighting: an exact sub-location match is the strongest signal,
-    // a match on the broader area is a good-but-not-best signal, and any other
-    // location can never outrank them.
-    let locationTier: "exact" | "area" | "none" | "neutral" = "neutral";
-    if (setter.subLocation && subLocationMatches(p.subLocation, setter.subLocation)) {
-      locationTier = "exact";
-      w += weights.location + Math.round(weights.location / 2);
-      reasons.push({ label: `Sub-location: ${p.subLocation}`, ok: true });
-    } else if (areaMatches(p.area, p.location, setter.location)) {
-      locationTier = "area";
-      w += Math.round((weights.location || 0) * 0.6);
-      reasons.push({ label: p.location, ok: true });
-    } else if (setter.location || setter.subLocation) {
-      locationTier = "none";
-      reasons.push({ label: p.location, ok: false });
-    }
+  const budget = budgetFit(c.priceRange, setter.budgetMin, setter.budgetMax);
+  const budgetPoints = budget === "full" ? weights.budget : budget === "partial" ? weights.budgetPartial : 0;
 
-    const bhkOpts = projectBhkOptions(p);
-    if (setter.bhk && setter.bhk !== "other") {
-      if (bhkOpts.includes(setter.bhk)) {
-        w += weights.bhk;
-        reasons.push({ label: `${setter.bhk} BHK available`, ok: true });
-      } else {
-        reasons.push({ label: `No ${setter.bhk} BHK`, ok: false });
-      }
-    }
+  const bhkOk = !hasBhk || c.bhkOptions.includes(setter.bhk!);
 
-    if (setter.timeline && setter.timeline !== "exploring") {
-      const py = possessionYear(p);
-      if (py != null && py <= timelineBudgetYear(setter.timeline)) {
-        w += weights.timeline;
-        reasons.push({ label: "Suitable possession timeline", ok: true });
-      } else if (py != null) {
-        reasons.push({ label: `Possession ${p.possessionDate}`, ok: false });
-      }
-    }
+  const locCap = hasSub ? weights.subLocation : hasLoc ? weights.location : 0;
+  const budgetCap = hasBudget ? weights.budget : 0;
+  const cap = locCap + budgetCap;
+  const raw = locationPoints + budgetPoints;
+  const score = cap > 0 ? Math.round((raw / cap) * 100) : 50;
 
-    if (setter.purpose && setter.purpose !== "self_use") {
-      if (p.type === "shop" || setter.purpose === "both") {
-        w += weights.purpose;
-        reasons.push({ label: "Good for investment", ok: true });
-      } else {
-        reasons.push({ label: "Residential project", ok: true });
-        w += weights.purpose / 2;
-      }
-    }
+  const budgetBlocks = budget === "none";
+  let level: MatchLevel;
+  if (bhkOk && !budgetBlocks && score >= 80) level = "strong";
+  else if (bhkOk && score >= 50) level = "medium";
+  else level = "low";
 
-    if (setter.preferredProject) {
-      if (p.slug === setter.preferredProject || p.title.toLowerCase().includes(setter.preferredProject.toLowerCase())) {
-        w += weights.preferences;
-        reasons.push({ label: "Preferred project", ok: true });
-      }
-    }
+  const reasons: MatchReason[] = [];
 
-    if (setter.otherPreferences || setter.familyRequirements) {
-      const pref = `${setter.otherPreferences || ""} ${setter.familyRequirements || ""}`.toLowerCase();
-      const amens = Object.values(p.amenities).flat().join(" ").toLowerCase();
-      if (pref && amens && pref.split(" ").some((word) => amens.includes(word))) {
-        w += weights.preferences;
-        reasons.push({ label: "Matches preferences", ok: true });
-      }
-    }
-
-    let score = maxWeight > 0 ? Math.round((w / maxWeight) * 100) : 60;
-
-    // Location tier caps: different-location matches can never be BEST MATCH,
-    // and same-area (but not exact sub-location) matches cap below BEST MATCH.
-    if (locationTier === "none") score = Math.min(score, 49);
-    else if (locationTier === "area") score = Math.min(score, 74);
-
-    const level: MatchLevel = locationTier === "none" ? "low" : score >= 75 ? "strong" : score >= 50 ? "medium" : "low";
-
-    results.push({
-      projectSlug: p.slug,
-      title: p.title,
-      location: p.location,
-      tier: p.tier ?? null,
-      type: p.type,
-      priceRange: p.priceRange,
-      possessionDate: p.possessionDate,
-      reraId: p.reraId,
-      image: p.images?.[0],
-      score,
-      level,
-      bhkOptions: bhkOpts,
-      reasons: reasons.slice(0, 5),
-      source: "primary",
-      subLocation: p.subLocation,
-      priceValidUntil: p.priceValidUntil,
-    });
+  if (hasSub) {
+    reasons.push(
+      subMatch
+        ? { label: `Sub-location: ${c.subLocation}`, ok: true, tone: "good" }
+        : { label: `Not in ${setter.subLocation}`, ok: false, tone: "bad" },
+    );
   }
 
-  if (includeMarket) {
-    for (const e of marketInventory) {
-      results.push(scoreMarketEntry(e, setter, weights, maxWeight));
+  if (hasLoc) {
+    if (wantArea == null) {
+      reasons.push({ label: locationLabel(setter.location), ok: true, tone: "warn" });
+    } else if (areaMatch) {
+      reasons.push({ label: areaLabel(wantArea), ok: true, tone: "good" });
+    } else {
+      reasons.push({ label: `Not ${areaLabel(wantArea)}`, ok: false, tone: "bad" });
     }
   }
 
-  return results
-    .sort((a, b) => b.score - a.score || (a.reasons.filter((r) => r.ok).length - b.reasons.filter((r) => r.ok).length))
-    .slice(0, limit);
+  if (hasBudget) {
+    if (budget === "full") reasons.push({ label: "Budget fits", ok: true, tone: "good" });
+    else if (budget === "partial") reasons.push({ label: "Budget near match", ok: true, tone: "warn" });
+    else if (budget === "unknown") reasons.push({ label: "Price on request", ok: false, tone: "warn" });
+    else reasons.push({ label: "Budget out of range", ok: false, tone: "bad" });
+  }
+
+  if (hasBhk) {
+    reasons.push(
+      bhkOk
+        ? { label: `${setter.bhk} BHK available`, ok: true, tone: "good" }
+        : { label: `No ${setter.bhk} BHK`, ok: false, tone: "bad" },
+    );
+  }
+
+  return { score, level, reasons, locationTier, budget, bhkOk };
+}
+
+function toPropertyMatch(c: Candidate, s: Scored): PropertyMatch {
+  return {
+    projectSlug: c.slug,
+    title: c.title,
+    location: c.location,
+    tier: c.tier,
+    type: c.type,
+    priceRange: c.priceLabel,
+    possessionDate: c.possessionLabel,
+    reraId: c.reraId,
+    image: c.image,
+    score: s.score,
+    level: s.level,
+    bhkOptions: c.bhkOptions,
+    reasons: s.reasons,
+    source: c.source,
+    developer: c.developer,
+    subLocation: c.subLocation ?? undefined,
+    priceValidUntil: c.priceValidUntil,
+  };
+}
+
+/**
+ * Deterministic property matching shared by the CRM lead detail, dashboard
+ * price-expiry alerts, reactivation scans and partner inventory.
+ *
+ * Location: an exact sub-location match is worth `subLocation`; failing that a
+ * same-area match is worth `location`; anything with no location relevance to
+ * the lead is dropped. Budget overlap is worth `budget` (full) or
+ * `budgetPartial` (within 15% of the lead's band). BHK is a hard filter – a
+ * configuration mismatch can never score above ALTERNATIVE. The raw score is
+ * normalised against only the criteria the lead actually specified, so a lead
+ * that only gave a location is not penalised for not having a budget.
+ */
+export function matchProperties(
+  setter: Setter,
+  limit = 5,
+  weights: MatchingWeights = DEFAULT_WEIGHTS,
+  includeMarket = true,
+): PropertyMatch[] {
+  const candidates: Candidate[] = projects.map(projectToCandidate);
+  if (includeMarket) for (const e of marketInventory) candidates.push(marketToCandidate(e));
+
+  const scored = candidates
+    .map((c) => ({ c, s: scoreCandidate(c, setter, weights) }))
+    .filter(({ s }) => s.locationTier !== "none");
+
+  scored.sort((a, b) => {
+    const byLevel = LEVEL_RANK[b.s.level] - LEVEL_RANK[a.s.level];
+    if (byLevel !== 0) return byLevel;
+    if (b.s.score !== a.s.score) return b.s.score - a.s.score;
+    const byBudget = BUDGET_RANK[b.s.budget] - BUDGET_RANK[a.s.budget];
+    if (byBudget !== 0) return byBudget;
+    if (b.s.bhkOk !== a.s.bhkOk) return b.s.bhkOk ? 1 : -1;
+    return a.c.title.localeCompare(b.c.title);
+  });
+
+  return scored.slice(0, limit).map(({ c, s }) => toPropertyMatch(c, s));
 }
 
 export function matchLevelMeta(level: MatchLevel) {

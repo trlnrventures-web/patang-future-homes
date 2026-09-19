@@ -1211,16 +1211,24 @@ export default function LeadDetail({ data, currentUser }: Props) {
                     ) : null;
                   })()}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.reasons.map((r, i) => (
-                      <span
-                        key={i}
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          r.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-                        }`}
-                      >
-                        {r.ok ? "✓" : "✗"} {r.label}
-                      </span>
-                    ))}
+                    {m.reasons.map((r, i) => {
+                      const tone = r.tone ?? (r.ok ? "good" : "bad");
+                      const cls =
+                        tone === "good"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : tone === "warn"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-red-50 text-red-600";
+                      const mark = tone === "good" ? "✓" : tone === "bad" ? "✗" : "!";
+                      return (
+                        <span
+                          key={i}
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}
+                        >
+                          {mark} {r.label}
+                        </span>
+                      );
+                    })}
                   </div>
                   {m.source === "primary" ? (
                     <a
