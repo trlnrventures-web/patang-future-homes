@@ -5,7 +5,9 @@ export type Configuration = {
   carpetArea: string;
   saleableArea?: string;
   price: string;
-  allInclusive?: string;
+  allInclusive?: boolean;
+  parkingIncluded?: boolean;
+  amenities?: string[];
   floorBreakup?: { floors: string; price: string }[];
   floorPlanImage: string;
 };

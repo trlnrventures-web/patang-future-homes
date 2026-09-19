@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 import { SUB_LOCATIONS } from "@/lib/projects";
+import { amenityLabel } from "@/lib/amenities";
 
 type PropSource = "primary" | "market";
 
@@ -13,7 +14,10 @@ type ConfigRow = {
   carpetArea: string;
   saleableArea: string;
   price: string;
-  allInclusive: string;
+  allInclusive: boolean;
+  parkingIncluded: boolean;
+  amenities: string[];
+  floorPlanImage: string;
 };
 
 type PropRow = {
@@ -238,13 +242,23 @@ export default function PropertiesManager() {
                       {c.type || "Configuration"}
                       {c.carpetArea ? ` · ${c.carpetArea}` : ""}
                       {c.price ? ` · ${c.price}` : ""}
-                      {c.allInclusive ? ` (${c.allInclusive})` : ""}
+                      {c.allInclusive ? " · All-inclusive" : ""}
+                      {c.parkingIncluded ? " · Parking" : ""}
                     </span>
                   ))
                 ) : (
                   <span className="text-[11px] text-soft">No configurations listed</span>
                 )}
               </div>
+              {p.configurations.some((c) => c.amenities.length > 0) && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {[...new Set(p.configurations.flatMap((c) => c.amenities))].map((a) => (
+                    <span key={a} className="rounded-full bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      {amenityLabel(a)}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-lg bg-background/50 px-2 py-1.5">

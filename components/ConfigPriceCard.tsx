@@ -1,5 +1,6 @@
 import type { Configuration, Project } from "@/lib/projects";
 import { priceValidityInfo } from "@/lib/projects";
+import { amenityLabel } from "@/lib/amenities";
 
 const WHATSAPP_NUMBER = "917249138197";
 
@@ -104,7 +105,7 @@ function displayArea(items: Configuration[]): string {
 
 function displayPrice(items: Configuration[]): string {
   const prices = items
-    .map((c) => priceInLacs(c.price ?? c.allInclusive ?? ""))
+    .map((c) => priceInLacs(c.price ?? ""))
     .filter((p): p is number => p !== null);
   if (prices.length === 0) return "On Request";
   return `${formatLacs(Math.min(...prices))}*`;
@@ -171,6 +172,31 @@ export default function ConfigPriceCard({ project }: { project: Project }) {
                 </dd>
               </div>
             </dl>
+
+            {(group.items.some((c) => c.allInclusive) ||
+              group.items.some((c) => c.parkingIncluded) ||
+              group.items.some((c) => c.amenities?.length)) && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {group.items.some((c) => c.allInclusive) && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    All-inclusive
+                  </span>
+                )}
+                {group.items.some((c) => c.parkingIncluded) && (
+                  <span className="rounded-full bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    Parking included
+                  </span>
+                )}
+                {[...new Set(group.items.flatMap((c) => c.amenities ?? []))].map((a) => (
+                  <span
+                    key={a}
+                    className="rounded-full bg-ink/[0.04] px-2 py-0.5 text-[10px] font-semibold text-muted"
+                  >
+                    {amenityLabel(a)}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {group.items[0]?.floorBreakup &&
               group.items[0].floorBreakup.length > 0 && (

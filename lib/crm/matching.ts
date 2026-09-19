@@ -1,4 +1,5 @@
 import { projects, subLocationMatches, type Project } from "@/lib/projects";
+import { amenityLabel } from "@/lib/amenities";
 import {
   MARKET_AREA,
   MARKET_LOCATION,
@@ -72,6 +73,7 @@ type Candidate = {
   area: "west" | "east";
   bhkOptions: string[];
   priceRange: { min: number; max: number } | null;
+  priceByBhk: Record<string, { min: number; max: number }>;
   priceLabel: string;
   possessionLabel: string;
   tier: string | null;
@@ -81,6 +83,7 @@ type Candidate = {
   priceValidUntil?: string;
   developer?: string;
   source: MatchSource;
+  extras: { allInclusive: boolean; parkingIncluded: boolean; amenities: string[] };
 };
 
 type LocationTier = "sub" | "area" | "none" | "neutral";
@@ -103,20 +106,21 @@ function projectBudgetRange(p: Project): { min: number; max: number } | null {
   let min = Infinity;
   let max = -Infinity;
   for (const c of p.configurations) {
-    const nums = (c.price.match(/₹?([\d,.]+)\s*(Lacs?|Cr|Lakh|Lakhs?)/gi) || []).map(parseLakhs);
-    for (const n of nums) {
-      if (n == null) continue;
-      min = Math.min(min, n);
-      max = Math.max(max, n);
-    }
-    const start = parseLakhs(c.price);
-    if (start != null) {
-      min = Math.min(min, start);
-      max = Math.max(max, start);
-    }
+    const range = configBudgetRange(c.price);
+    if (!range) continue;
+    min = Math.min(min, range.min);
+    max = Math.max(max, range.max);
   }
   if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
   return { min, max };
+}
+
+function configBudgetRange(price: string): { min: number; max: number } | null {
+  const nums = (price.match(/₹?([\d,.]+)\s*(Lacs?|Cr|Lakh|Lakhs?)/gi) || [])
+    .map(parseLakhs)
+    .filter((n): n is number => n != null);
+  if (nums.length === 0) return null;
+  return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
 function projectBhkOptions(p: Project): string[] {
@@ -172,6 +176,19 @@ function budgetFit(
 }
 
 function projectToCandidate(p: Project): Candidate {
+  const configs = p.configurations ?? [];
+  const priceByBhk: Record<string, { min: number; max: number }> = {};
+  for (const cfg of configs) {
+    const m = cfg.type.match(/(\d+)\s*BHK/i);
+    if (!m) continue;
+    const range = configBudgetRange(cfg.price);
+    if (!range) continue;
+    const key = m[1];
+    const existing = priceByBhk[key];
+    priceByBhk[key] = existing
+      ? { min: Math.min(existing.min, range.min), max: Math.max(existing.max, range.max) }
+      : range;
+  }
   return {
     slug: p.slug,
     title: p.title,
@@ -180,6 +197,7 @@ function projectToCandidate(p: Project): Candidate {
     area: p.area === "east" ? "east" : "west",
     bhkOptions: projectBhkOptions(p),
     priceRange: projectBudgetRange(p),
+    priceByBhk,
     priceLabel: p.priceRange,
     possessionLabel: p.possessionDate,
     tier: p.tier ?? null,
@@ -189,10 +207,20 @@ function projectToCandidate(p: Project): Candidate {
     priceValidUntil: p.priceValidUntil,
     developer: p.developer?.name,
     source: "primary",
+    extras: {
+      allInclusive: configs.some((c) => c.allInclusive === true),
+      parkingIncluded: configs.some((c) => c.parkingIncluded === true),
+      amenities: [...new Set(configs.flatMap((c) => c.amenities ?? []))],
+    },
   };
 }
 
 function marketToCandidate(e: MarketInventoryEntry): Candidate {
+  const priceRange = marketPriceRange(e);
+  const priceByBhk: Record<string, { min: number; max: number }> = {};
+  if (priceRange) {
+    for (const b of marketBhkOptions(e)) priceByBhk[b] = priceRange;
+  }
   return {
     slug: marketSlug(e),
     title: e.project,
@@ -200,13 +228,15 @@ function marketToCandidate(e: MarketInventoryEntry): Candidate {
     subLocation: e.subLocation ?? null,
     area: MARKET_AREA,
     bhkOptions: marketBhkOptions(e),
-    priceRange: marketPriceRange(e),
+    priceRange,
+    priceByBhk,
     priceLabel: marketPriceLabel(e),
     possessionLabel: marketPossessionLabel(e),
     tier: null,
     type: "flat",
     reraId: "",
     source: "market",
+    extras: { allInclusive: false, parkingIncluded: false, amenities: [] },
   };
 }
 
@@ -243,7 +273,9 @@ function scoreCandidate(c: Candidate, setter: Setter, weights: MatchingWeights):
         ? weights.location
         : 0;
 
-  const budget = budgetFit(c.priceRange, setter.budgetMin, setter.budgetMax);
+  const effectiveRange =
+    hasBhk && c.priceByBhk[setter.bhk!] ? c.priceByBhk[setter.bhk!] : c.priceRange;
+  const budget = budgetFit(effectiveRange, setter.budgetMin, setter.budgetMax);
   const budgetPoints = budget === "full" ? weights.budget : budget === "partial" ? weights.budgetPartial : 0;
 
   const bhkOk = !hasBhk || c.bhkOptions.includes(setter.bhk!);
@@ -252,13 +284,25 @@ function scoreCandidate(c: Candidate, setter: Setter, weights: MatchingWeights):
   const budgetCap = hasBudget ? weights.budget : 0;
   const cap = locCap + budgetCap;
   const raw = locationPoints + budgetPoints;
-  const score = cap > 0 ? Math.round((raw / cap) * 100) : 50;
+  const baseScore = cap > 0 ? Math.round((raw / cap) * 100) : 50;
+
+  // Better-equipped units (parking, all-inclusive pricing, ticked amenities)
+  // get a bounded boost so they rank above comparable bare-shell options.
+  const extrasPoints =
+    (c.extras.parkingIncluded ? 5 : 0) +
+    (c.extras.allInclusive ? 3 : 0) +
+    Math.min(c.extras.amenities.length, 7);
+  const score = Math.min(100, baseScore + extrasPoints);
 
   const budgetBlocks = budget === "none";
   let level: MatchLevel;
   if (bhkOk && !budgetBlocks && score >= 80) level = "strong";
   else if (bhkOk && score >= 50) level = "medium";
   else level = "low";
+
+  // When the lead asked for a specific sub-location, only an exact
+  // sub-location match can be BEST — area matches stay at GOOD or below.
+  if (hasSub && locationTier !== "sub" && level === "strong") level = "medium";
 
   const reasons: MatchReason[] = [];
 
@@ -293,6 +337,20 @@ function scoreCandidate(c: Candidate, setter: Setter, weights: MatchingWeights):
         ? { label: `${setter.bhk} BHK available`, ok: true, tone: "good" }
         : { label: `No ${setter.bhk} BHK`, ok: false, tone: "bad" },
     );
+  }
+
+  if (c.extras.parkingIncluded) {
+    reasons.push({ label: "Parking included", ok: true, tone: "good" });
+  }
+  if (c.extras.allInclusive) {
+    reasons.push({ label: "All-inclusive price", ok: true, tone: "good" });
+  }
+  const amenityNames = c.extras.amenities.map(amenityLabel);
+  for (const name of amenityNames.slice(0, 4)) {
+    reasons.push({ label: name, ok: true, tone: "good" });
+  }
+  if (amenityNames.length > 4) {
+    reasons.push({ label: `+${amenityNames.length - 4} more amenities`, ok: true, tone: "good" });
   }
 
   return { score, level, reasons, locationTier, budget, bhkOk };

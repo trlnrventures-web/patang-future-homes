@@ -4,6 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 import { SUB_LOCATIONS } from "@/lib/projects";
+import { AMENITY_OPTIONS } from "@/lib/amenities";
+
+type ConfigRecord = {
+  type: string;
+  carpetArea: string;
+  saleableArea: string;
+  price: string;
+  allInclusive: boolean;
+  parkingIncluded: boolean;
+  amenities: string[];
+  floorPlanImage: string;
+};
 
 type ProjectShape = {
   slug?: string;
@@ -29,6 +41,7 @@ type ProjectShape = {
   usps?: { title: string; description: string }[];
   images?: string[];
   nearbyLandmarks?: { name: string; distance: string }[];
+  configurations?: ConfigRecord[];
   [k: string]: unknown;
 };
 
@@ -39,6 +52,34 @@ const LIST_TIERS = ["affordable", "luxury"];
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background/50 px-3 py-2.5 text-sm text-navy outline-none focus:border-primary";
+
+const blankConfig = (): ConfigRecord => ({
+  type: "",
+  carpetArea: "",
+  saleableArea: "",
+  price: "",
+  allInclusive: false,
+  parkingIncluded: false,
+  amenities: [],
+  floorPlanImage: "",
+});
+
+function normalizeConfigurations(raw: unknown): ConfigRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const c = (item || {}) as Record<string, unknown>;
+    return {
+      type: String(c.type ?? ""),
+      carpetArea: String(c.carpetArea ?? ""),
+      saleableArea: String(c.saleableArea ?? ""),
+      price: String(c.price ?? ""),
+      allInclusive: c.allInclusive === true,
+      parkingIncluded: c.parkingIncluded === true,
+      amenities: Array.isArray(c.amenities) ? c.amenities.filter((a): a is string => typeof a === "string") : [],
+      floorPlanImage: String(c.floorPlanImage ?? ""),
+    };
+  });
+}
 
 export default function PropertyForm({
   mode,
@@ -74,6 +115,7 @@ export default function PropertyForm({
     usps: initial?.usps || [],
     images: initial?.images || [],
     nearbyLandmarks: initial?.nearbyLandmarks || [],
+    configurations: normalizeConfigurations(initial?.configurations),
   });
 
   const set = <K extends keyof ProjectShape>(key: K, value: ProjectShape[K]) =>
@@ -131,6 +173,40 @@ export default function PropertyForm({
       const arr = (f.images || []) as string[];
       return { ...f, images: arr.filter((_, i) => i !== idx) } as ProjectShape;
     });
+  };
+
+  const addConfig = () => {
+    setForm((f) => ({ ...f, configurations: [...(f.configurations || []), blankConfig()] }));
+  };
+
+  const removeConfig = (idx: number) => {
+    setForm((f) => ({
+      ...f,
+      configurations: (f.configurations || []).filter((_, i) => i !== idx),
+    }));
+  };
+
+  const setConfig = (idx: number, patch: Partial<ConfigRecord>) => {
+    setForm((f) => ({
+      ...f,
+      configurations: (f.configurations || []).map((c, i) => (i === idx ? { ...c, ...patch } : c)),
+    }));
+  };
+
+  const toggleConfigAmenity = (idx: number, key: string) => {
+    setForm((f) => ({
+      ...f,
+      configurations: (f.configurations || []).map((c, i) =>
+        i === idx
+          ? {
+              ...c,
+              amenities: c.amenities.includes(key)
+                ? c.amenities.filter((a) => a !== key)
+                : [...c.amenities, key],
+            }
+          : c,
+      ),
+    }));
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -254,6 +330,68 @@ export default function PropertyForm({
             <input type="date" className={inputCls} value={String(form.priceValidUntil || "")} onChange={(e) => set("priceValidUntil", e.target.value)} />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Configurations (BHK, area, price, amenities)">
+        {(form.configurations || []).map((c, i) => (
+          <div key={i} className="rounded-xl border border-border p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-bold text-primary">Configuration {i + 1}</span>
+              <button
+                type="button"
+                onClick={() => removeConfig(i)}
+                className="rounded-lg border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Type (e.g. 1 BHK)">
+                <input className={inputCls} value={c.type} onChange={(e) => setConfig(i, { type: e.target.value })} placeholder="1 BHK" />
+              </Field>
+              <Field label="Carpet area">
+                <input className={inputCls} value={c.carpetArea} onChange={(e) => setConfig(i, { carpetArea: e.target.value })} placeholder="e.g. 320 sq ft" />
+              </Field>
+              <Field label="Saleable area">
+                <input className={inputCls} value={c.saleableArea} onChange={(e) => setConfig(i, { saleableArea: e.target.value })} placeholder="e.g. 610 sq ft" />
+              </Field>
+              <Field label="Price">
+                <input className={inputCls} value={c.price} onChange={(e) => setConfig(i, { price: e.target.value })} placeholder="e.g. ₹54 Lacs" />
+              </Field>
+              <Field label="Floor plan image URL">
+                <input className={inputCls} value={c.floorPlanImage} onChange={(e) => setConfig(i, { floorPlanImage: e.target.value })} placeholder="/projects/... or https://..." />
+              </Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-xs font-semibold text-navy">
+                <input type="checkbox" checked={c.allInclusive} onChange={(e) => setConfig(i, { allInclusive: e.target.checked })} />
+                All-inclusive price
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-navy">
+                <input type="checkbox" checked={c.parkingIncluded} onChange={(e) => setConfig(i, { parkingIncluded: e.target.checked })} />
+                Parking included
+              </label>
+            </div>
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs font-semibold text-muted">Amenities</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {AMENITY_OPTIONS.map((a) => (
+                  <label key={a.key} className="flex items-center gap-1.5 text-xs text-navy">
+                    <input type="checkbox" checked={c.amenities.includes(a.key)} onChange={() => toggleConfigAmenity(i, a.key)} />
+                    {a.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addConfig}
+          className="rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5"
+        >
+          + Add configuration
+        </button>
       </Section>
 
       <Section title="Copy">

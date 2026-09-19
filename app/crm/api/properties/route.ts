@@ -17,7 +17,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type ConfigRecord = { type?: string; carpetArea?: string; saleableArea?: string; price?: string; allInclusive?: string };
+type ConfigRecord = {
+  type?: string;
+  carpetArea?: string;
+  saleableArea?: string;
+  price?: string;
+  allInclusive?: boolean;
+  parkingIncluded?: boolean;
+  amenities?: string[];
+  floorPlanImage?: string;
+};
 
 function projectConfigurations(p: ProjectRecord): ConfigRecord[] {
   return Array.isArray(p.configurations) ? (p.configurations as ConfigRecord[]) : [];
@@ -39,7 +48,10 @@ function mapConfigurations(p: ProjectRecord) {
       carpetArea: String(c?.carpetArea || "").trim(),
       saleableArea: String(c?.saleableArea || "").trim(),
       price: String(c?.price || "").trim(),
-      allInclusive: String(c?.allInclusive || "").trim(),
+      allInclusive: c?.allInclusive === true,
+      parkingIncluded: c?.parkingIncluded === true,
+      amenities: Array.isArray(c?.amenities) ? c.amenities.filter((a) => typeof a === "string") : [],
+      floorPlanImage: String(c?.floorPlanImage || "").trim(),
     }))
     .filter((c) => c.type || c.price);
 }
@@ -94,7 +106,10 @@ export async function GET() {
           carpetArea: `${e.carpetRangeSqft[0]}–${e.carpetRangeSqft[1]} sq.ft`,
           saleableArea: "",
           price: marketPriceLabel(e),
-          allInclusive: "",
+          allInclusive: false,
+          parkingIncluded: false,
+          amenities: [],
+          floorPlanImage: "",
         },
       ],
       source: "market" as const,
