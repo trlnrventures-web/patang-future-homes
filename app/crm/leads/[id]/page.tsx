@@ -144,7 +144,7 @@ activities,
           ← Back to Leads
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-bold text-primary">{lead.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">{lead.name}</h1>
           <Badge
             color={LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700"}
           >
@@ -162,7 +162,7 @@ activities,
 
       <div className="mt-8 scroll-mt-24" id="message-center">
         <h2 className="mb-3 text-base font-bold text-primary">
-          Hinglish Message Center
+          Message Center
         </h2>
         <MessageCenter
           lead={lead as unknown as MCLead}

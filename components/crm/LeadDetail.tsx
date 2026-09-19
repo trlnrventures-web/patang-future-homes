@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import {
   LEAD_STATUS_LABELS,
+  LEAD_STATUS_COLORS,
   ACTIVITY_LABELS,
   LEAD_LOST_REASONS,
-  LEAD_STATUS_GROUPS,
   lostReasonLabel,
   getLeadLostReason,
   setLeadLostReasonInNotes,
@@ -29,6 +29,32 @@ export type LeadDetailData = {
   latestFeedback: Record<string, any> | null;
   duplicates: { id: number; name: string; phone: string; reason: string }[];
 };
+
+const FUNNEL_STAGES: { key: string; label: string; status: string; matches: string[] }[] = [
+  { key: "new", label: "New", status: "new", matches: ["new", "calling", "connected", "no_response"] },
+  { key: "qualified", label: "Qualified", status: "qualified", matches: ["qualified"] },
+  { key: "follow_up", label: "Follow-up", status: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
+  { key: "visit", label: "Site Visit", status: "visit_booked", matches: ["visit_proposed", "visit_booked", "visit_confirmed", "visit_done"] },
+  { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation"] },
+  { key: "booked", label: "Booked", status: "booked", matches: ["booked"] },
+];
+
+const EXIT_STATUSES: { value: string; label: string }[] = [
+  { value: "lost", label: "Mark as Lost" },
+  { value: "invalid", label: "Mark as Invalid" },
+  { value: "dnc", label: "Mark as DNC" },
+];
+
+const OVERFLOW_STATUSES = [
+  "calling",
+  "connected",
+  "no_response",
+  "assigned",
+  "visit_proposed",
+  "visit_confirmed",
+  "visit_done",
+  "nurture",
+];
 
 type Props = {
   data: LeadDetailData;
@@ -64,6 +90,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const [showLostPicker, setShowLostPicker] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [lostNote, setLostNote] = useState("");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [visitDefaults, setVisitDefaults] = useState({
     date: "",
     time: "11:00",
@@ -345,6 +372,13 @@ export default function LeadDetail({ data, currentUser }: Props) {
 
   const requiredFieldsFilled = Boolean(lead.bhk && (lead.budget || (lead.budgetMin && lead.budgetMax)) && lead.location);
 
+  const stageIndex = FUNNEL_STAGES.findIndex((s) => s.matches.includes(lead.status));
+  const hasProgressed =
+    activities.length > 1 ||
+    followUps.length > 0 ||
+    visits.length > 0 ||
+    !["new", "calling", "connected", "no_response"].includes(lead.status);
+
   const scrollToSection = useCallback((id: string) => {
     setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -392,28 +426,29 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Phone / contact ===== */}
+      {/* ===== Contact row (2 primary actions) ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-white p-4">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-soft">Phone Number</div>
-          <div className="mt-0.5 truncate text-lg font-bold text-navy">
+          <a
+            href={`tel:+${phone}`}
+            className="block truncate text-sm font-semibold text-muted transition-colors hover:text-primary"
+          >
             {phone || lead.phone || "—"}
+          </a>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-soft">
+            {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
+              <span>WhatsApp: <span className="font-medium text-muted">{lead.whatsappNumber}</span></span>
+            )}
+            {lead.email && (
+              <span>Email: <span className="font-medium text-muted">{lead.email}</span></span>
+            )}
           </div>
-          {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
-            <div className="mt-0.5 text-xs text-muted">
-              WhatsApp: <span className="font-semibold text-navy">{lead.whatsappNumber}</span>
-            </div>
-          )}
-          {lead.email && (
-            <div className="mt-0.5 text-xs text-muted">
-              Email: <span className="font-semibold text-navy">{lead.email}</span>
-            </div>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <a
             href={`tel:+${phone}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white"
+            onClick={() => scrollToSection("call-outcome")}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-secondary"
           >
             <PhoneIcon />
             CALL
@@ -422,7 +457,8 @@ export default function LeadDetail({ data, currentUser }: Props) {
             href={`https://wa.me/${waNumber}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white"
+            onClick={() => scrollToSection("message-center")}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-[#25D366]/30 transition-colors hover:bg-[#1DA851]"
           >
             <WhatsAppIcon />
             WhatsApp
@@ -430,107 +466,81 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
       </div>
 
-      {/* ===== Admin controls ===== */}
-      {isAdmin && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-white p-3">
-          <div className="text-xs font-semibold text-muted">Admin controls</div>
-          <div className="flex gap-2">
+      {/* ===== Secondary actions (More Actions dropdown) ===== */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMoreActionsOpen((s) => !s)}
+          aria-expanded={moreActionsOpen}
+          className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold text-navy transition-colors hover:bg-primary/5"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="19" r="1" />
+          </svg>
+          More Actions
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`h-3.5 w-3.5 transition-transform ${moreActionsOpen ? "rotate-180" : ""}`}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        {moreActionsOpen && (
+          <>
             <button
-              onClick={() => setShowEdit(true)}
-              className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
-            >
-              ✎ Edit Lead
-            </button>
-            <button
-              onClick={() => setShowDelete(true)}
-              className="rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-100"
-            >
-              Delete Lead
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Quick actions ===== */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <a
-          href={`tel:+${phone}`}
-          onClick={() => scrollToSection("call-outcome")}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-primary px-3 py-3 text-white"
-        >
-          <PhoneIcon />
-          <span className="text-xs font-bold">CALL</span>
-        </a>
-        <a
-          href={`https://wa.me/${waNumber}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => scrollToSection("message-center")}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-3 text-white"
-        >
-          <WhatsAppIcon />
-          <span className="text-xs font-bold">WHATSAPP</span>
-        </a>
-        <a
-          href="#message-center"
-          onClick={(e) => { e.preventDefault(); scrollToSection("message-center"); }}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-secondary px-3 py-3 text-white"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10ZM8 10h8" />
-          </svg>
-          <span className="text-xs font-bold">MESSAGE</span>
-        </a>
-        <button
-          onClick={() => {
-            const willShow = !showFollowUp;
-            setShowFollowUp(willShow);
-            if (willShow) scrollToSection("follow-up-form");
-          }}
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-amber-700"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-          <span className="text-xs font-bold">FOLLOW-UP</span>
-        </button>
-        <button
-          onClick={() => {
-            openVisit();
-            scrollToSection("visit-form");
-          }}
-          className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-3 text-emerald-700"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          <span className="text-xs font-bold">VISIT</span>
-        </button>
-        <button
-          onClick={() => {
-            setShowMatches(true);
-            loadMatches();
-            scrollToSection("matching-properties");
-          }}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-accent px-3 py-3 text-primary"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <span className="text-xs font-bold">FIND PROPERTY</span>
-        </button>
-        {!isCaller && (
-          <a
-            href={`/crm/leads/${lead.id}/negotiation`}
-            className="flex flex-col items-center gap-1.5 rounded-xl border border-fuchsia-300 bg-fuchsia-50 px-3 py-3 text-fuchsia-700"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M9 3H4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1ZM20 3h-5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1ZM9 15H4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1ZM20 15h-5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1Z" />
-            </svg>
-            <span className="text-xs font-bold">NEGOTIATION</span>
-          </a>
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setMoreActionsOpen(false)}
+              className="fixed inset-0 z-30 cursor-default"
+            />
+            <div className="absolute left-0 top-full z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-white p-1.5 shadow-xl">
+              <MoreAction
+                label="Message Center"
+                hint="Templates and WhatsApp"
+                color="bg-blue-50 text-blue-700"
+                onClick={() => { setMoreActionsOpen(false); scrollToSection("message-center"); }}
+                icon={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10ZM8 10h8" />}
+              />
+              <MoreAction
+                label="Schedule Follow-up"
+                hint="Set next action"
+                color="bg-amber-50 text-amber-700"
+                onClick={() => { setMoreActionsOpen(false); const willShow = !showFollowUp; setShowFollowUp(willShow); if (willShow) scrollToSection("follow-up-form"); }}
+                icon={<path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+              />
+              <MoreAction
+                label="Book Site Visit"
+                hint="Schedule a project visit"
+                color="bg-emerald-50 text-emerald-700"
+                onClick={() => { setMoreActionsOpen(false); openVisit(); scrollToSection("visit-form"); }}
+                icon={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>}
+              />
+              <MoreAction
+                label="Find Property"
+                hint="Run the matching engine"
+                color="bg-accent text-primary"
+                onClick={() => { setMoreActionsOpen(false); setShowMatches(true); loadMatches(); scrollToSection("matching-properties"); }}
+                icon={<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /></>}
+              />
+              {!isCaller && hasProgressed && (
+                <a
+                  href={`/crm/leads/${lead.id}/negotiation`}
+                  onClick={() => setMoreActionsOpen(false)}
+                  className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-background"
+                >
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-fuchsia-50 text-fuchsia-700">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M9 3H4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1ZM20 3h-5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1ZM9 15H4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1ZM20 15h-5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1Z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold text-navy">Negotiation</span>
+                    <span className="block text-[10px] text-soft">Open the negotiation workspace</span>
+                  </span>
+                </a>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -673,42 +683,100 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Status change ===== */}
+      {/* ===== Status / funnel stepper ===== */}
       <div className="rounded-2xl border border-border bg-white p-4">
-        <h3 className="mb-3 text-sm font-bold text-primary">Lead Status</h3>
-        {LEAD_STATUS_GROUPS.map((g) => (
-          <div key={g.label} className="mb-3 last:mb-0">
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-soft">
-              {g.label}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {g.values.map((s) => {
-                const label = LEAD_STATUS_LABELS[s] || s;
-                return (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-primary">Lead Progress</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value=""
+              disabled={busy}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                handleStatusChange(v);
+              }}
+              className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-muted focus:border-primary focus:outline-none"
+            >
+              <option value="">More statuses…</option>
+              {OVERFLOW_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {LEAD_STATUS_LABELS[s] || s}
+                </option>
+              ))}
+            </select>
+            <select
+              value=""
+              disabled={busy}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                if (v === "lost") {
+                  setLostReason(getLeadLostReason(lead.notes) || "");
+                  setLostNote("");
+                  setShowLostPicker(true);
+                } else {
+                  handleStatusChange(v);
+                }
+              }}
+              className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 focus:border-red-400 focus:outline-none"
+            >
+              <option value="">Close lead…</option>
+              {EXIT_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-start">
+          {FUNNEL_STAGES.map((stage, i) => {
+            const done = stageIndex > i;
+            const current = stageIndex === i;
+            const reached = stageIndex >= i && stageIndex !== -1;
+            return (
+              <div key={stage.key} className="flex flex-1 flex-col items-center">
+                <div className="flex w-full items-center">
+                  <div className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : reached ? "bg-primary" : "bg-border"}`} />
                   <button
-                    key={s}
+                    type="button"
+                    disabled={busy}
                     onClick={() => {
-                      if (s === "lost") {
-                        setLostReason(getLeadLostReason(lead.notes) || "");
-                        setLostNote("");
-                        setShowLostPicker(true);
-                      } else {
-                        handleStatusChange(s);
-                      }
+                      if (current) return;
+                      handleStatusChange(stage.status);
                     }}
-                    className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                      lead.status === s
-                        ? "border-primary bg-primary text-white"
-                        : "border-border bg-white text-muted hover:bg-primary/5"
+                    title={`Move to ${stage.label}`}
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                      current
+                        ? "bg-primary text-white ring-4 ring-primary/15"
+                        : done
+                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                          : "border border-border bg-white text-soft hover:border-primary hover:text-primary"
                     }`}
                   >
-                    {label}
+                    {done ? "✓" : i + 1}
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                  <div className={`h-0.5 flex-1 ${i === FUNNEL_STAGES.length - 1 ? "bg-transparent" : done ? "bg-primary" : "bg-border"}`} />
+                </div>
+                <span
+                  className={`mt-1.5 text-center text-[10px] font-semibold leading-tight ${
+                    current ? "text-primary" : done ? "text-emerald-600" : "text-soft"
+                  }`}
+                >
+                  {stage.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]">
+          <span className="text-soft">Current:</span>
+          <Badge color={LEAD_STATUS_COLORS[lead.status] || "bg-primary/10 text-primary"}>{LEAD_STATUS_LABELS[lead.status] || lead.status}</Badge>
+          {lead.status === "lost" && (
+            <span className="text-red-600">· {getLeadLostReason(lead.notes) || "No reason"}</span>
+          )}
+        </div>
       </div>
 
       {/* ===== Lead lost / reason ===== */}
@@ -783,9 +851,16 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
 
         {!requiredFieldsFilled && (
-          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Requirement is not complete yet. Call and qualify the lead.
-          </p>
+          <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <p className="text-sm font-semibold leading-snug text-amber-800">
+              Requirement is not complete yet — call and qualify the lead.
+            </p>
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
@@ -826,9 +901,8 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
-      {/* ===== Lead Tag + Assignment ===== */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className={`rounded-2xl border border-primary/15 bg-white p-4 ${canAssign ? "" : "sm:col-span-2"}`}>
+      {/* ===== Lead Tag ===== */}
+      <div className="rounded-2xl border border-primary/15 bg-white p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
             {!tagShown && (
@@ -864,12 +938,13 @@ export default function LeadDetail({ data, currentUser }: Props) {
           )}
         </div>
 
-        {/* ===== Lead Assignment (all options) ===== */}
+        {/* ===== Admin Zone: lead assignment + admin controls ===== */}
         {canAssign && (
-          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-primary">Lead Assignment</h3>
-              <div className="flex flex-wrap gap-1.5">
+          <section className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 className="text-sm font-bold text-amber-800">Admin Zone</h3>
+                <Badge color="bg-amber-100 text-amber-800">Lead Assignment</Badge>
                 {lead.assignedCallerName && (
                   <Badge color="bg-sky-100 text-sky-800">Caller: {lead.assignedCallerName}</Badge>
                 )}
@@ -880,6 +955,22 @@ export default function LeadDetail({ data, currentUser }: Props) {
                   <Badge color="bg-gray-100 text-gray-600">Unassigned</Badge>
                 )}
               </div>
+              {isAdmin && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowEdit(true)}
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-100"
+                  >
+                    ✎ Edit Lead
+                  </button>
+                  <button
+                    onClick={() => setShowDelete(true)}
+                    className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100"
+                  >
+                    Delete Lead
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Caller */}
@@ -981,9 +1072,8 @@ export default function LeadDetail({ data, currentUser }: Props) {
               </div>
               {selectedSm && <WorkloadTiles w={sms[selectedSm]} />}
             </div>
-          </div>
+          </section>
         )}
-      </div>
 
       {/* ===== SM Handoff ===== */}
       {lead.assignedSmName && (
@@ -1563,6 +1653,38 @@ function WorkloadTiles({ w }: { w: any }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function MoreAction({
+  label,
+  hint,
+  color,
+  icon,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  color: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-background"
+    >
+      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${color}`}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+          {icon}
+        </svg>
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-bold text-navy">{label}</span>
+        <span className="block text-[10px] text-soft">{hint}</span>
+      </span>
+    </button>
   );
 }
 
