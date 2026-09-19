@@ -426,6 +426,11 @@ export default function LeadDetail({ data, currentUser }: Props) {
         )}
       </div>
 
+      {/* ===== Two-column layout ===== */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      {/* ===== LEFT COLUMN ===== */}
+      <div className="space-y-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+
       {/* ===== Contact row (2 primary actions) ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-white p-4">
         <div className="min-w-0">
@@ -589,8 +594,8 @@ export default function LeadDetail({ data, currentUser }: Props) {
       )}
 
       {/* ===== Row 2: Call Outcome + Original Enquiry ===== */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className={`rounded-2xl border border-border bg-white p-4 scroll-mt-24 ${lead.originalProject ? "" : "sm:col-span-2"}`} id="call-outcome" data-section="true">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-border bg-white p-4 scroll-mt-24" id="call-outcome" data-section="true">
           <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
           <div className="flex flex-wrap gap-2">
             {[
@@ -682,6 +687,106 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         )}
       </div>
+
+      {/* ===== Requirement card ===== */}
+      <div className="rounded-2xl border border-border bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-primary">Requirement</h3>
+          {(isCaller || isAdmin) && (
+            <button
+              onClick={() => setEditingReq((s) => !s)}
+              className="text-xs font-semibold text-accent-ink hover:underline"
+            >
+              {editingReq ? "Cancel ✕" : "✎ Edit"}
+            </button>
+          )}
+        </div>
+
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="font-semibold text-navy">Qualification Progress</span>
+            <span className="font-bold text-primary">
+              {qualificationDone}/8 captured
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${(qualificationDone / 8) * 100}%` }}
+            />
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {qualificationFields.map((f) => (
+              <span
+                key={f.key}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  f.filled
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-gray-100 text-soft"
+                }`}
+              >
+                {f.filled ? "✓ " : "○ "}{f.key}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {!requiredFieldsFilled && (
+          <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <p className="text-sm font-semibold leading-snug text-amber-800">
+              Requirement is not complete yet — call and qualify the lead.
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
+          <ReqItem label="Location" value={lead.location || ""} />
+          <ReqItem label="Sub-location" value={lead.sublocation || ""} />
+          <ReqItem label="Budget" value={budgetLabel(lead)} />
+          <ReqItem label="BHK" value={bhkLabel(lead.bhk)} />
+          <ReqItem label="Purpose" value={purposeLabel(lead.purpose)} />
+          <ReqItem label="Timeline" value={timelineLabel(lead.timeline)} />
+          <ReqItem label="Loan Required" value={loanLabel(lead.loanRequired)} />
+        </div>
+
+        {lead.preferredProject && (
+          <div className="mt-3 text-sm">
+            <span className="text-soft">Preferred project: </span>
+            <span className="font-semibold text-navy">{lead.preferredProject}</span>
+          </div>
+        )}
+        {lead.familyRequirements && (
+          <div className="mt-1 text-sm">
+            <span className="text-soft">Family: </span>
+            <span className="text-navy">{lead.familyRequirements}</span>
+          </div>
+        )}
+        {lead.notes && (
+          <div className="mt-1 text-sm">
+            <span className="text-soft">Notes: </span>
+            <span className="text-navy">{lead.notes}</span>
+          </div>
+        )}
+
+        {editingReq && (
+          <RequirementEditor
+            lead={lead}
+            onSave={handleSaveRequirement}
+            onCancel={() => setEditingReq(false)}
+          />
+        )}
+      </div>
+
+      </div>
+      {/* ===== END LEFT COLUMN ===== */}
+
+      {/* ===== RIGHT COLUMN ===== */}
+      <div className="space-y-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
 
       {/* ===== Status / funnel stepper ===== */}
       <div className="rounded-2xl border border-border bg-white p-4">
@@ -806,100 +911,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </p>
         </div>
       )}
-
-      {/* ===== Requirement card ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-primary">Requirement</h3>
-          {(isCaller || isAdmin) && (
-            <button
-              onClick={() => setEditingReq((s) => !s)}
-              className="text-xs font-semibold text-accent-ink hover:underline"
-            >
-              {editingReq ? "Cancel ✕" : "✎ Edit"}
-            </button>
-          )}
-        </div>
-
-        <div className="mb-3">
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="font-semibold text-navy">Qualification Progress</span>
-            <span className="font-bold text-primary">
-              {qualificationDone}/8 captured
-            </span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${(qualificationDone / 8) * 100}%` }}
-            />
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {qualificationFields.map((f) => (
-              <span
-                key={f.key}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                  f.filled
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-gray-100 text-soft"
-                }`}
-              >
-                {f.filled ? "✓ " : "○ "}{f.key}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {!requiredFieldsFilled && (
-          <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
-              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <p className="text-sm font-semibold leading-snug text-amber-800">
-              Requirement is not complete yet — call and qualify the lead.
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
-          <ReqItem label="Location" value={lead.location || ""} />
-          <ReqItem label="Sub-location" value={lead.sublocation || ""} />
-          <ReqItem label="Budget" value={budgetLabel(lead)} />
-          <ReqItem label="BHK" value={bhkLabel(lead.bhk)} />
-          <ReqItem label="Purpose" value={purposeLabel(lead.purpose)} />
-          <ReqItem label="Timeline" value={timelineLabel(lead.timeline)} />
-          <ReqItem label="Loan Required" value={loanLabel(lead.loanRequired)} />
-        </div>
-
-        {lead.preferredProject && (
-          <div className="mt-3 text-sm">
-            <span className="text-soft">Preferred project: </span>
-            <span className="font-semibold text-navy">{lead.preferredProject}</span>
-          </div>
-        )}
-        {lead.familyRequirements && (
-          <div className="mt-1 text-sm">
-            <span className="text-soft">Family: </span>
-            <span className="text-navy">{lead.familyRequirements}</span>
-          </div>
-        )}
-        {lead.notes && (
-          <div className="mt-1 text-sm">
-            <span className="text-soft">Notes: </span>
-            <span className="text-navy">{lead.notes}</span>
-          </div>
-        )}
-
-        {editingReq && (
-          <RequirementEditor
-            lead={lead}
-            onSave={handleSaveRequirement}
-            onCancel={() => setEditingReq(false)}
-          />
-        )}
-      </div>
 
       {/* ===== Lead Tag ===== */}
       <div className="rounded-2xl border border-primary/15 bg-white p-4">
@@ -1110,6 +1121,46 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
       )}
 
+      {/* ===== Notes ===== */}
+      <div className="rounded-2xl border border-border bg-white p-4">
+        <h3 className="mb-1 text-sm font-bold text-primary">Notes</h3>
+        <p className="mb-3 text-[10px] text-soft">
+          Call updates, customer preferences, and reminders all in one place.
+        </p>
+        {notesList.length === 0 ? (
+          <p className="rounded-xl bg-background px-3 py-2 text-xs text-muted">No notes yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {notesList.map((a) => (
+              <div key={a.id} className="rounded-xl bg-background px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
+                  <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
+                </div>
+                <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAddNote();
+            }}
+            placeholder="Add a note..."
+            className="flex-1 rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
+          />
+          <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
+        </div>
+      </div>
+
+      </div>
+      {/* ===== END RIGHT COLUMN ===== */}
+      </div>
+      {/* ===== END TWO-COLUMN LAYOUT ===== */}
+
       {/* ===== Property matches ===== */}
       {(showMatches || matches.length > 0) && (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
@@ -1256,42 +1307,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </form>
       )}
 
-      {/* ===== Row: Notes + Call History ===== */}
-      <div className="grid gap-4 sm:grid-cols-2">
-      <div className={`rounded-2xl border border-border bg-white p-4 ${activities.some((a) => String(a.type).startsWith("call")) ? "" : "sm:col-span-2"}`}>
-        <h3 className="mb-1 text-sm font-bold text-primary">Notes</h3>
-        <p className="mb-3 text-[10px] text-soft">
-          Call updates, customer preferences, and reminders all in one place.
-        </p>
-        {notesList.length === 0 ? (
-          <p className="rounded-xl bg-background px-3 py-2 text-xs text-muted">No notes yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {notesList.map((a) => (
-              <div key={a.id} className="rounded-xl bg-background px-3 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
-                  <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
-                </div>
-                <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddNote();
-            }}
-            placeholder="Add a note..."
-            className="flex-1 rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
-          />
-          <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
-        </div>
-      </div>
-
       {/* ===== Call history ===== */}
       {activities.some((a) => String(a.type).startsWith("call")) && (
         <div className="rounded-2xl border border-border bg-white p-4">
@@ -1312,7 +1327,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
         </div>
       )}
-      </div>
 
       {/* ===== Row: Site Visits + Follow-ups ===== */}
       {(visits.length > 0 || followUps.length > 0) && (
