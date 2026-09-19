@@ -427,3 +427,27 @@ export const reactivationAlerts = sqliteTable("reactivation_alerts", {
   dismissed: integer("dismissed", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(""),
 });
+
+export const auditLog = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  category: text("category").notNull(),
+  action: text("action").notNull(),
+  actorUserId: integer("actor_user_id").references(() => users.id),
+  targetUserId: integer("target_user_id").references(() => users.id),
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  summary: text("summary").notNull().default(""),
+  details: text("details").notNull().default(""),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const companyHolidays = sqliteTable("company_holidays", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull(),
+  name: text("name").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: text("created_at").notNull().default(""),
+  removedBy: integer("removed_by").references(() => users.id),
+  removedAt: text("removed_at"),
+});

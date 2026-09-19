@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
+import { writeAuditLog, getUserName } from "./audit";
 
 export const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
@@ -322,6 +323,9 @@ export function markIncentivePaid(userId: number, month: string, role: string, b
     .from(schema.incentivePayments)
     .where(and(eq(schema.incentivePayments.userId, userId), eq(schema.incentivePayments.month, month)))
     .get();
+  const previous = existing
+    ? { amount: existing.amount, paidAt: existing.paidAt, paidBy: existing.paidBy, role: existing.role }
+    : null;
   if (existing) {
     db.update(schema.incentivePayments)
       .set({ amount, paidAt, paidBy: byUserId, role })
@@ -332,5 +336,57 @@ export function markIncentivePaid(userId: number, month: string, role: string, b
       .values({ userId, month, role, amount, paidBy: byUserId, paidAt })
       .run();
   }
+  writeAuditLog({
+    category: "incentive",
+    action: previous ? "incentive_paid_updated" : "incentive_marked_paid",
+    actorUserId: byUserId,
+    targetUserId: userId,
+    entityType: "incentive_payment",
+    entityId: existing?.id ?? `${userId}:${month}`,
+    summary: `${previous ? "Updated" : "Marked"} ${getUserName(userId) ?? `User #${userId}`}'s ${month} incentive as paid (₹${amount.toLocaleString("en-IN")}).`,
+    details: { month, role, amount, previous },
+  });
   return { amount, paidAt };
+}
+
+/**
+ * Reverse a paid incentive back to pending (admin only).
+ * Deletes the payment row so the month reads as outstanding again, and records
+ * who reversed it, when, and the previous status in the audit log.
+ */
+export function markIncentiveUnpaid(
+  userId: number,
+  month: string,
+  byUserId: number
+): { ok: boolean; previous: { amount: number; paidAt: string | null; paidBy: number | null; role: string } | null } {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(schema.incentivePayments)
+    .where(and(eq(schema.incentivePayments.userId, userId), eq(schema.incentivePayments.month, month)))
+    .get();
+
+  if (!existing) return { ok: false, previous: null };
+
+  const previous = {
+    amount: existing.amount,
+    paidAt: existing.paidAt || null,
+    paidBy: existing.paidBy ?? null,
+    role: existing.role,
+  };
+
+  db.delete(schema.incentivePayments).where(eq(schema.incentivePayments.id, existing.id)).run();
+
+  writeAuditLog({
+    category: "incentive",
+    action: "incentive_marked_unpaid",
+    actorUserId: byUserId,
+    targetUserId: userId,
+    entityType: "incentive_payment",
+    entityId: existing.id,
+    summary: `Reversed ${getUserName(userId) ?? `User #${userId}`}'s ${month} incentive back to pending (was ₹${previous.amount.toLocaleString("en-IN")}).`,
+    details: { month, previous },
+  });
+
+  return { ok: true, previous };
 }

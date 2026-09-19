@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/crm/data";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, and, desc } from "drizzle-orm";
+import Link from "next/link";
 import AttendancePanel from "@/components/crm/AttendancePanel";
 import {
   istToday,
@@ -158,6 +159,14 @@ export default async function AttendancePage() {
           Daily check-in/check-out (office geofence), office location: {OFFICE_LOCATION.lat.toFixed(4)},{" "}
           {OFFICE_LOCATION.lng.toFixed(4)} within 100m.
         </p>
+        {isAdmin && (
+          <Link
+            href="/crm/attendance/audit"
+            className="mt-2 inline-flex items-center gap-1 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:border-primary/30"
+          >
+            View Attendance Audit Log →
+          </Link>
+        )}
       </div>
 
       <AttendancePanel

@@ -343,6 +343,38 @@ function createTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_reactivation_alerts_user ON reactivation_alerts(user_id);
     CREATE INDEX IF NOT EXISTS idx_reactivation_alerts_project ON reactivation_alerts(project_slug);
 
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      action TEXT NOT NULL,
+      actor_user_id INTEGER,
+      target_user_id INTEGER,
+      entity_type TEXT,
+      entity_id TEXT,
+      summary TEXT NOT NULL DEFAULT '',
+      details TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (actor_user_id) REFERENCES users(id),
+      FOREIGN KEY (target_user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_category ON audit_log(category);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_user_id);
+
+    CREATE TABLE IF NOT EXISTS company_holidays (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT '',
+      removed_by INTEGER,
+      removed_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id),
+      FOREIGN KEY (removed_by) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_company_holidays_date ON company_holidays(date);
+
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
     CREATE INDEX IF NOT EXISTS idx_leads_caller ON leads(assigned_caller_id);
     CREATE INDEX IF NOT EXISTS idx_leads_sm ON leads(assigned_sm_id);

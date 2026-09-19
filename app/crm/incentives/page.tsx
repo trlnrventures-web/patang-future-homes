@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/crm/data";
 import { getMonthlyIncentives, getUserIncentiveForMonth, currentMonthKey, INCENTIVE_LADDERS, type IncentiveEntry } from "@/lib/crm/incentives";
+import { queryAuditLog } from "@/lib/crm/audit";
 import { Card } from "@/components/crm/ui";
 import MarkPaidButton from "@/components/crm/MarkPaidButton";
 
@@ -15,6 +16,19 @@ function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1, 12));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatWhen(iso: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 export default async function IncentivesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
@@ -94,6 +108,7 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
           No bookings this month yet. Close the first booking and your incentive unlocks!
         </Card>
       ) : isAdmin ? (
+        <>
         <Card className="p-4">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -130,10 +145,42 @@ export default async function IncentivesPage({ searchParams }: { searchParams: P
             </table>
           </div>
         </Card>
+        {(() => {
+          const incentiveAudit = queryAuditLog({ categories: ["incentive"], limit: 12 });
+          if (incentiveAudit.length === 0) return null;
+          return (
+            <Card className="mt-3 p-4">
+              <h2 className="text-sm font-bold text-primary">Payment audit trail</h2>
+              <p className="mt-0.5 text-[11px] text-soft">
+                Recent incentive paid / reversed events, with who changed it and when.
+              </p>
+              <div className="mt-3 space-y-1.5">
+                {incentiveAudit.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-background px-3 py-2 text-xs"
+                  >
+                    <span className="min-w-0 text-navy">
+                      {a.action === "incentive_marked_unpaid" ? (
+                        <span className="mr-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">REVERSED</span>
+                      ) : (
+                        <span className="mr-1.5 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">PAID</span>
+                      )}
+                      {a.summary}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-soft">
+                      by {a.actorName || "System"} · {formatWhen(a.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })()}
+        </>
       ) : (
         (() => {
-          const e = entries[0];
-          return (
+          const e = entries[0];          return (
             <div className="space-y-3">
               <Card className="p-4">
                 <div className="flex flex-wrap items-end justify-between gap-2">

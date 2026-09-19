@@ -42,22 +42,33 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
 
   return (
     <div
-      onClick={onToggleSelect ? (e) => { e.stopPropagation(); onToggleSelect(); } : open}
-      className={`relative flex min-h-[9.5rem] cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-3 transition-colors ${
+      onClick={open}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+      className={`group relative flex min-h-[8.5rem] cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-3 transition-colors ${
         selected
           ? "border-primary ring-2 ring-primary/30"
           : "border-border hover:border-primary/30"
       }`}
     >
-      {accentCls && <span className={`absolute left-0 top-0 h-full w-1 ${accentCls}`} />}
-      <div className="flex min-w-0 items-center gap-1.5">
+      {accentCls && <span className={`absolute inset-y-0 left-0 w-1 ${accentCls}`} />}
+      <div className="flex min-w-0 items-center gap-2">
         {onToggleSelect && (
           <button
             type="button"
             aria-label="Select lead"
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect();
+            }}
             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-              selected ? "border-primary bg-primary" : "border-muted/50 bg-white"
+              selected ? "border-primary bg-primary" : "border-muted/50 bg-white hover:border-primary"
             }`}
           >
             {selected && (
@@ -67,14 +78,16 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
             )}
           </button>
         )}
-        <span
-          onClick={open}
-          className="truncate text-sm font-bold text-navy transition-colors hover:text-primary"
-        >
+        <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy transition-colors group-hover:text-primary">
           {lead.name}
         </span>
         {lead.statusLabel && (
-          <Badge color={lead.statusCls || "bg-background text-muted"}>{lead.statusLabel}</Badge>
+          <Badge
+            color={lead.statusCls || "bg-background text-muted"}
+            className="shrink-0"
+          >
+            {lead.statusLabel}
+          </Badge>
         )}
       </div>
       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
@@ -83,10 +96,9 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
         )}
         {badges}
       </div>
-      <div className="mt-1.5 truncate text-[10px] text-soft">{lead.phone}</div>
-      {pills && <div className="mt-1.5 flex flex-wrap gap-1">{pills}</div>}
-      <div className="mt-auto flex items-end justify-between gap-2 pt-2">
-        <div className="min-w-0 flex-1 text-[10px]">
+      {pills && <div className="mt-1 flex flex-wrap gap-1">{pills}</div>}
+      <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
+        <div className="min-w-0 flex-1 text-[10px] leading-tight">
           {lead.nextFollowUpDisplay ? (
             <>
               {lead.nextAction && (
@@ -100,7 +112,10 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
               </div>
             </>
           ) : null}
-          {footerNote && <div className={lead.nextFollowUpDisplay ? "mt-0.5" : ""}>{footerNote}</div>}
+          <div className="flex min-w-0 items-center gap-1 text-soft">
+            {footerNote}
+            {lead.phone && <span className="truncate">· {lead.phone}</span>}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1" onClick={stop}>
           <a

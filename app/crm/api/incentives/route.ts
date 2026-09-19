@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
-import { getMonthlyIncentives, getUserIncentiveForMonth, currentMonthKey } from "@/lib/crm/incentives";
+import {
+  getMonthlyIncentives,
+  getUserIncentiveForMonth,
+  currentMonthKey,
+  markIncentivePaid,
+  markIncentiveUnpaid,
+} from "@/lib/crm/incentives";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +51,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const userId = Number(body.userId);
   const month = String(body.month || "").slice(0, 7);
+  const action = body.action === "unpaid" ? "unpaid" : "paid";
   if (!userId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
@@ -55,26 +62,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const entry = getUserIncentiveForMonth(userId, month);
-  const amount = entry ? entry.total : 0;
-  const paidAt = new Date().toISOString();
-
-  const existing = db
-    .select()
-    .from(schema.incentivePayments)
-    .where(and(eq(schema.incentivePayments.userId, userId), eq(schema.incentivePayments.month, month)))
-    .get();
-
-  if (existing) {
-    db.update(schema.incentivePayments)
-      .set({ amount, paidAt, paidBy: user.id, role: target.role })
-      .where(eq(schema.incentivePayments.id, existing.id))
-      .run();
-  } else {
-    db.insert(schema.incentivePayments)
-      .values({ userId, month, role: target.role, amount, paidBy: user.id, paidAt })
-      .run();
+  if (action === "unpaid") {
+    const result = markIncentiveUnpaid(userId, month, user.id);
+    if (!result.ok) {
+      return NextResponse.json({ error: "Nothing to reverse — this month is not marked paid" }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true, action, previous: result.previous });
   }
 
-  return NextResponse.json({ ok: true, amount, paidAt });
+  const { amount, paidAt } = markIncentivePaid(userId, month, target.role, user.id);
+  return NextResponse.json({ ok: true, action, amount, paidAt });
 }
