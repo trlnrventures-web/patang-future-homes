@@ -197,59 +197,73 @@ export default function PropertiesManager() {
       ) : visible.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">No properties found.</p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-white">
-          <div className="hidden grid-cols-12 gap-2 border-b border-border bg-background/50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-soft md:grid">
-            <div className="col-span-5">Property</div>
-            <div className="col-span-2">Status</div>
-            <div className="col-span-2">Tier</div>
-            <div className="col-span-3">Actions</div>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((p) => (
             <div
               key={`${p.source}-${p.slug}`}
-              className={`grid grid-cols-1 gap-2 border-b border-border/60 px-4 py-3 text-sm md:grid-cols-12 md:items-center ${
-                p.source === "primary" && !p.isActive ? "opacity-60" : ""
-              } ${p.source === "market" ? "bg-blue-50/40" : ""}`}
+              className={`flex flex-col rounded-2xl border bg-white p-4 shadow-sm ${
+                p.source === "market" ? "border-blue-100 bg-blue-50/30" : "border-border"
+              } ${p.source === "primary" && !p.isActive ? "opacity-60" : ""}`}
             >
-              <div className="col-span-5">
-                <p className="font-semibold text-navy">
-                  {p.title}
-                  {p.source === "market" && (
-                    <span className="ml-2 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-blue-700">
-                      Partner Network
-                    </span>
-                  )}
-                  {p.source === "primary" && !p.isActive && (
-                    <span className="ml-2 rounded bg-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted">
-                      Archived
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-muted">
-                  {areaLabel(p.area)} · {p.type}
-                  {p.subLocation ? ` · ${p.subLocation}` : ""}
-                </p>
-                {p.configurations.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {p.configurations.map((c, i) => (
-                      <span key={i} className="rounded-md border border-border/70 bg-background/60 px-1.5 py-0.5 text-[11px] text-navy">
-                        {c.type || "Configuration"}
-                        {c.carpetArea ? ` · ${c.carpetArea}` : ""}
-                        {c.price ? ` · ${c.price}` : ""}
-                        {c.allInclusive ? ` (${c.allInclusive})` : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-navy">{p.title}</p>
+                  <p className="text-xs text-muted">
+                    {areaLabel(p.area)}
+                    {p.subLocation ? ` · ${p.subLocation}` : ""} · {p.type}
+                  </p>
+                </div>
                 {p.source === "market" ? (
-                  <p className="mt-1 text-[11px] text-soft">Possession {p.possessionDate}</p>
-                ) : p.shortDescription ? (
-                  <p className="mt-1 truncate text-xs text-soft">{p.shortDescription}</p>
-                ) : null}
+                  <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">
+                    Partner Network
+                  </span>
+                ) : !p.isActive ? (
+                  <span className="shrink-0 rounded-full bg-soft px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
+                    Archived
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
+                    Live
+                  </span>
+                )}
               </div>
-              <div className="col-span-2 text-xs text-soft md:text-sm">{p.status || "—"}</div>
-              <div className="col-span-2 text-xs text-soft md:text-sm">{p.tier || "—"}</div>
-              <div className="col-span-3 flex flex-wrap gap-1.5 md:justify-end">
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {p.configurations.length > 0 ? (
+                  p.configurations.map((c, i) => (
+                    <span
+                      key={i}
+                      className="rounded-lg border border-border/70 bg-background/60 px-2 py-1 text-[11px] font-medium text-navy"
+                    >
+                      {c.type || "Configuration"}
+                      {c.carpetArea ? ` · ${c.carpetArea}` : ""}
+                      {c.price ? ` · ${c.price}` : ""}
+                      {c.allInclusive ? ` (${c.allInclusive})` : ""}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[11px] text-soft">No configurations listed</span>
+                )}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-background/50 px-2 py-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-soft">Status</p>
+                  <p className="text-navy">{p.status || "—"}</p>
+                </div>
+                <div className="rounded-lg bg-background/50 px-2 py-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-soft">Tier</p>
+                  <p className="text-navy">{p.tier || "—"}</p>
+                </div>
+              </div>
+
+              {p.source === "market" ? (
+                <p className="mt-2 text-[11px] text-soft">Possession {p.possessionDate}</p>
+              ) : p.shortDescription ? (
+                <p className="mt-2 line-clamp-2 text-xs text-soft">{p.shortDescription}</p>
+              ) : null}
+
+              <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
                 {p.source === "primary" ? (
                   <>
                     <Link href={`/crm/properties/${p.slug}/edit`}>
@@ -267,7 +281,7 @@ export default function PropertiesManager() {
                     </Button>
                   </>
                 ) : (
-                  <span className="text-[11px] font-semibold text-blue-600">Via partner network</span>
+                  <span className="text-[11px] font-semibold text-blue-600">Available via partner network</span>
                 )}
               </div>
             </div>
