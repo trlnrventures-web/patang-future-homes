@@ -72,3 +72,29 @@ export function nextNoResponseAttempt(attemptCount: number): string | null {
   if (mins == null) return null;
   return new Date(Date.now() + mins * 60000).toISOString();
 }
+
+export const TERMINAL_STATUSES = new Set(["invalid", "lost", "dnc", "booked"]);
+
+/**
+ * Single, consistent "overdue" definition shared by the inbox, the leads list,
+ * the quick "Overdue" filter and the snapshot tiles:
+ * - Terminal statuses are never overdue.
+ * - New/calling leads are overdue when their first-call SLA window has passed
+ *   (elapsed >= 1.5x the response SLA, matching computeSlaStatus).
+ * - Every other status is overdue when its scheduled action time has passed.
+ */
+export function isLeadActionOverdue(
+  lead: {
+    status: string;
+    createdAt: string;
+    firstCallAt: string | null;
+    nextActionAt: string | null;
+  },
+  now = Date.now()
+): boolean {
+  if (TERMINAL_STATUSES.has(lead.status)) return false;
+  if (lead.status === "new" || lead.status === "calling") {
+    if (computeSlaStatus(lead.createdAt, lead.firstCallAt) === "overdue") return true;
+  }
+  return !!lead.nextActionAt && new Date(lead.nextActionAt).getTime() < now;
+}

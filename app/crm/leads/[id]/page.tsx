@@ -6,7 +6,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
-import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/crm/leads";
+import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, findLikelyDuplicates } from "@/lib/crm/leads";
 import { Badge } from "@/components/crm/ui";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
@@ -129,6 +129,9 @@ activities,
     visits,
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     latestFeedback,
+    duplicates: user.role === "admin" || user.role === "sales_head"
+      ? findLikelyDuplicates(db, lead)
+      : [],
   };
 
   return (

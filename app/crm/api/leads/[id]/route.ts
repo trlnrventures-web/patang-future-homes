@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import {
   isInCallerScope,
   resolveDefaultCallerId,
   resolveDefaultSmId,
+  findLikelyDuplicates,
 } from "@/lib/crm/leads";
 
 export async function GET(
@@ -93,6 +94,7 @@ export async function GET(
     visits: enrichVisits,
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     latestFeedback,
+    duplicates: isAdmin(user) ? findLikelyDuplicates(db, lead) : [],
   });
 }
 

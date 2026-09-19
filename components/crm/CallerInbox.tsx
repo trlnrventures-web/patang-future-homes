@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Badge } from "./ui";
 import LeadCard from "./LeadCard";
 import InboxSnapshot from "./InboxSnapshot";
+import AccentLegend from "./AccentLegend";
 import CallQueue from "./CallQueue";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
-import { slaStatusMeta, type SlaStatus } from "@/lib/crm/sla";
+import { slaStatusMeta, type SlaStatus, leadAccentCls } from "@/lib/crm/sla";
 type InboxLead = {
   id: number;
   name: string;
@@ -48,16 +49,29 @@ const TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
-const PRIORITY_BAR: Record<string, string> = {
-  p1_new: "bg-red-500",
-  p2_approaching_sla: "bg-amber-500",
-  p3_overdue_call: "bg-red-600",
-  p4_callback: "bg-blue-500",
-  p5_ready_to_assign: "bg-violet-500",
-  p6_follow_up: "bg-sky-500",
-  p7_no_response: "bg-slate-400",
-  p8_idle: "bg-gray-300",
-};
+const SORT_OPTIONS = [
+  { key: "newest", label: "Newest First" },
+  { key: "oldest", label: "Oldest First" },
+  { key: "overdue", label: "Most Overdue First" },
+];
+
+function sortInboxLeads(list: InboxLead[], sort: string): InboxLead[] {
+  const arr = [...list];
+  const actionMs = (x: InboxLead) =>
+    x.nextFollowUpIso ? new Date(x.nextFollowUpIso).getTime() : Infinity;
+  if (sort === "oldest") {
+    return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+  if (sort === "overdue") {
+    return arr.sort((a, b) => {
+      if (!!a.hasOverdueFollowUp !== !!b.hasOverdueFollowUp) {
+        return a.hasOverdueFollowUp ? -1 : 1;
+      }
+      return actionMs(a) - actionMs(b);
+    });
+  }
+  return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
 
 const SOURCE_LABELS: Record<string, string> = {
   meta: "Meta Lead",
@@ -71,12 +85,14 @@ export default function CallerInbox() {
   const [leads, setLeads] = useState<InboxLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("new");
+  const [sort, setSort] = useState("newest");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [queueOpen, setQueueOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState("");
+  const loadSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -148,6 +164,7 @@ export default function CallerInbox() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    const seq = ++loadSeq.current;
     try {
       const params = new URLSearchParams();
       params.set("tab", tab);
@@ -155,11 +172,15 @@ export default function CallerInbox() {
       const res = await fetch(`/crm/api/inbox?${params.toString()}`);
       if (!res.ok) throw new Error("failed");
       const data = await res.json();
-      setLeads(data.leads);
+      if (seq !== loadSeq.current) return;
+      const seen = new Set<number>();
+      setLeads(
+        (data.leads as InboxLead[]).filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)))
+      );
     } catch {
-      setError("Could not load the inbox. Please try again.");
+      if (seq === loadSeq.current) setError("Could not load the inbox. Please try again.");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [tab, query]);
 
@@ -172,6 +193,8 @@ export default function CallerInbox() {
     setQueueOpen(false);
     load();
   };
+
+  const sortedLeads = useMemo(() => sortInboxLeads(leads, sort), [leads, sort]);
 
   return (
     <div className="space-y-3 pb-24">
@@ -219,6 +242,21 @@ export default function CallerInbox() {
           </button>
         ))}
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <AccentLegend />
+        <div className="ml-auto">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="cursor-pointer rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy outline-none transition-colors hover:bg-primary/5"
+            aria-label="Sort inbox leads"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -241,7 +279,7 @@ export default function CallerInbox() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {leads.map((lead) => (
+          {sortedLeads.map((lead) => (
             <LeadCard
               key={lead.id}
               lead={{
@@ -259,7 +297,11 @@ export default function CallerInbox() {
               }}
               selected={selected.has(lead.id)}
               onToggleSelect={() => toggleSelect(lead.id)}
-              accentCls={PRIORITY_BAR[lead.priority] || "bg-gray-200"}
+              accentCls={leadAccentCls({
+                status: lead.status,
+                slaStatus: lead.slaStatus,
+                hasOverdueFollowUp: lead.hasOverdueFollowUp,
+              })}
               badges={
                 lead.assignedSmName ? (
                   <Badge color="bg-violet-50 text-violet-700">SM: {lead.assignedSmName}</Badge>

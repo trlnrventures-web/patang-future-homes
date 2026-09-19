@@ -34,8 +34,8 @@ export default function InboxSnapshot({ leads, onStartQueue }: Props) {
 
   const stats = [
     { label: "Leads in View", value: leads.length, cls: "" },
-    { label: "Overdue", value: overdue, cls: overdue > 0 ? "text-red-600" : "" },
-    { label: "SLA Breach", value: slaLate, cls: slaLate > 0 ? "text-red-600" : "" },
+    { label: "Overdue Follow-up", value: overdue, cls: overdue > 0 ? "text-red-600" : "" },
+    { label: "SLA Breach (First-Call)", value: slaLate, cls: slaLate > 0 ? "text-red-600" : "" },
     { label: "Due Today", value: dueToday, cls: dueToday > 0 ? "text-primary" : "" },
   ];
 

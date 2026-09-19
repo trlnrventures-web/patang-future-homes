@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Badge } from "./ui";
 import LeadCard from "./LeadCard";
 import InboxSnapshot from "./InboxSnapshot";
+import AccentLegend from "./AccentLegend";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, bhkLabel } from "@/lib/crm/leads";
 import { dealHealthFor } from "@/lib/crm/sales";
+import { leadAccentCls } from "@/lib/crm/sla";
 
 type Lead = {
   id: number;
@@ -41,11 +43,18 @@ const QUICK_FILTERS = [
   { key: "visit_today", label: "Visit Today" },
 ];
 
+const SORT_OPTIONS = [
+  { key: "newest", label: "Newest First" },
+  { key: "oldest", label: "Oldest First" },
+  { key: "overdue", label: "Most Overdue First" },
+];
+
 export default function LeadsList() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("all");
   const [quick, setQuick] = useState("");
+  const [sort, setSort] = useState("newest");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -61,29 +70,36 @@ export default function LeadsList() {
   const [bulkAction, setBulkAction] = useState<"" | "assign_sm" | "status" | "delete">("");
   const [bulkSmId, setBulkSmId] = useState<number | "">("");
   const [bulkStatus, setBulkStatus] = useState("");
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    const seq = ++loadSeq.current;
     try {
       const params = new URLSearchParams();
       if (status !== "all") params.set("status", status);
       if (quick) params.set("quick", quick);
+      if (sort !== "newest") params.set("sort", sort);
       if (query.trim()) params.set("q", query.trim());
       params.set("page", String(page));
       params.set("pageSize", "20");
       const res = await fetch(`/crm/api/leads?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
-      setLeads(data.leads);
+      if (seq !== loadSeq.current) return;
+      const seen = new Set<number>();
+      setLeads(
+        (data.leads as Lead[]).filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)))
+      );
       setTotal(data.total || 0);
       setTotalPages(data.totalPages || 1);
     } catch {
-      setError("Could not load leads. Please try again.");
+      if (seq === loadSeq.current) setError("Could not load leads. Please try again.");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
-  }, [status, quick, query, page]);
+  }, [status, quick, query, sort, page]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -265,6 +281,21 @@ export default function LeadsList() {
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AccentLegend />
+          <div className="ml-auto">
+            <select
+              value={sort}
+              onChange={(e) => { setSort(e.target.value); setPage(1); }}
+              className="cursor-pointer rounded-full border border-border bg-white px-3 py-1 text-xs font-semibold text-navy outline-none transition-colors hover:bg-primary/5"
+              aria-label="Sort leads"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -338,7 +369,11 @@ export default function LeadsList() {
                 }}
                 selected={selected.has(lead.id)}
                 onToggleSelect={() => toggleSelect(lead.id)}
-                accentCls={accentFor(lead.status)}
+                accentCls={leadAccentCls({
+                  status: lead.status,
+                  slaStatus: lead.slaStatus,
+                  hasOverdueFollowUp: lead.hasOverdueFollowUp,
+                })}
                 badges={
                   lead.status === "negotiation" && lead.negotiationLastActive ? (() => {
                     const h = dealHealthFor(lead.negotiationLastActive);
@@ -516,30 +551,6 @@ export default function LeadsList() {
       )}
     </div>
   );
-}
-
-function accentFor(status: string): string {
-  switch (status) {
-    case "new":
-      return "bg-red-500";
-    case "calling":
-    case "connected":
-    case "follow_up":
-      return "bg-amber-500";
-    case "qualified":
-    case "assigned":
-      return "bg-violet-500";
-    case "negotiation":
-      return "bg-fuchsia-500";
-    case "booked":
-      return "bg-emerald-500";
-    case "no_response":
-      return "bg-slate-400";
-    case "nurture":
-      return "bg-indigo-500";
-    default:
-      return "bg-gray-300";
-  }
 }
 
 function timeAgo(iso: string): string {

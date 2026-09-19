@@ -5,7 +5,7 @@ import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { FINAL_STAGES } from "@/lib/crm/sales";
 import { resolveDefaultCallerId, buildEarliestFollowUpMap, isInCallerScope, nextActionLabel } from "@/lib/crm/leads";
-import { computeSlaStatus } from "@/lib/crm/sla-compute";
+import { computeSlaStatus, isLeadActionOverdue } from "@/lib/crm/sla-compute";
 
 const QUICK_FILTERS = ["overdue", "hot", "unassigned", "visit_today"] as const;
 
@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") || undefined;
   const quick = searchParams.get("quick") || undefined;
   const q = (searchParams.get("q") || "").toLowerCase();
+  const sort = searchParams.get("sort") || "newest";
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
   const pageSize = Math.min(100, Math.max(10, parseInt(searchParams.get("pageSize") || "20", 10) || 20));
 
@@ -45,7 +46,6 @@ export async function GET(request: NextRequest) {
   }
 
   if (QUICK_FILTERS.includes(quick as (typeof QUICK_FILTERS)[number]) && quick) {
-    const now = Date.now();
     let visitTodayIds: Set<number> | null = null;
     if (quick === "visit_today") {
       const today = istToday();
@@ -61,12 +61,12 @@ export async function GET(request: NextRequest) {
     rows = rows.filter((l) => {
       switch (quick) {
         case "overdue":
-          return (
-            Boolean(l.nextFollowUp) &&
-            new Date(l.nextFollowUp as string).getTime() < now &&
-            l.status !== "booked" &&
-            l.status !== "lost"
-          );
+          return isLeadActionOverdue({
+            status: l.status,
+            createdAt: l.createdAt,
+            firstCallAt: l.firstCallAt,
+            nextActionAt: l.nextFollowUp || l.nextAttemptAt,
+          });
         case "hot":
           return l.leadScore != null && l.leadScore >= 75 && l.status !== "lost";
         case "unassigned":
@@ -92,6 +92,31 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const actionAtMs = (l: (typeof rows)[number]) => {
+    const t = l.nextFollowUp || l.nextAttemptAt;
+    return t ? new Date(t).getTime() : Infinity;
+  };
+  if (sort === "oldest") {
+    rows.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } else if (sort === "overdue") {
+    rows.sort((a, b) => {
+      const ao = isLeadActionOverdue({
+        status: a.status,
+        createdAt: a.createdAt,
+        firstCallAt: a.firstCallAt,
+        nextActionAt: a.nextFollowUp || a.nextAttemptAt,
+      });
+      const bo = isLeadActionOverdue({
+        status: b.status,
+        createdAt: b.createdAt,
+        firstCallAt: b.firstCallAt,
+        nextActionAt: b.nextFollowUp || b.nextAttemptAt,
+      });
+      if (ao !== bo) return ao ? -1 : 1;
+      return actionAtMs(a) - actionAtMs(b);
+    });
+  }
+
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u.name]));
   const earliestFollowUp = buildEarliestFollowUpMap(db);
@@ -113,8 +138,12 @@ export async function GET(request: NextRequest) {
 
   const result = rows.map((l) => {
     const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt || earliestFollowUp.get(l.id) || null;
-    const hasOverdueFollowUp =
-      nextFollowUpIso != null && !["invalid", "lost", "dnc", "booked"].includes(l.status) && new Date(nextFollowUpIso).getTime() < Date.now();
+    const hasOverdueFollowUp = isLeadActionOverdue({
+      status: l.status,
+      createdAt: l.createdAt,
+      firstCallAt: l.firstCallAt,
+      nextActionAt: nextFollowUpIso,
+    });
     const checkHours = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec((nextFollowUpIso || "").replace(" ", "T"));
     const nextFollowUpDisplay = checkHours
       ? `${checkHours[1].slice(5).split("-").reverse().join("/")} ${checkHours[2]}`

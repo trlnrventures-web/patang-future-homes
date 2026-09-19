@@ -3,9 +3,9 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { desc, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
-import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
+import { computeSlaStatus, getPriority, isLeadActionOverdue } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
-import { buildEarliestFollowUpMap, isInCallerScope, nextActionLabel } from "@/lib/crm/leads";
+import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
 
 export type InboxTab =
   | "new"
@@ -119,18 +119,16 @@ export async function GET(request: NextRequest) {
     case "today_calls":
       filtered = rows.filter((l) => l.lastAttemptAt?.slice(0, 10) === today);
       break;
-    case "overdue": {
-      const slaInMin = 5;
-      filtered = rows.filter((l) => {
-        if (terminal.has(l.status)) return false;
-        if (l.status === "new" || l.status === "calling") {
-          return (now.getTime() - new Date(l.createdAt).getTime()) / 60000 >= slaInMin;
-        }
-        const nxt = l.nextFollowUp || l.nextAttemptAt;
-        return !!nxt && new Date(nxt).getTime() < now.getTime();
-      });
+    case "overdue":
+      filtered = rows.filter((l) =>
+        isLeadActionOverdue({
+          status: l.status,
+          createdAt: l.createdAt,
+          firstCallAt: l.firstCallAt,
+          nextActionAt: l.nextFollowUp || l.nextAttemptAt,
+        })
+      );
       break;
-    }
     case "no_response":
       filtered = rows.filter((l) => l.status === "no_response");
       break;
@@ -167,7 +165,12 @@ export async function GET(request: NextRequest) {
     const slaStatus = computeSlaStatus(l.createdAt, l.firstCallAt);
     const priority = getPriority(l);
     const nextFollowUpIso = l.nextFollowUp || l.nextAttemptAt || earliestFollowUp.get(l.id) || null;
-    const hasOverdueFollowUp = nextFollowUpIso != null && new Date(nextFollowUpIso).getTime() < now.getTime() && !terminal.has(l.status);
+    const hasOverdueFollowUp = isLeadActionOverdue({
+      status: l.status,
+      createdAt: l.createdAt,
+      firstCallAt: l.firstCallAt,
+      nextActionAt: nextFollowUpIso,
+    });
 
     const checkHours = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(
       (nextFollowUpIso || "").replace(" ", "T")

@@ -37,3 +37,18 @@ export function slaStatusMeta(s: SlaStatus) {
       return { label: "No SLA", cls: "bg-slate-100 text-slate-500" };
   }
 }
+
+/**
+ * Left-border accent color used on lead cards. One consistent 4-color system:
+ * red = Overdue, amber = Hot/SLA Breach, gray = Routine, green = Resolved/Booked.
+ */
+export function leadAccentCls(lead: {
+  status?: string;
+  slaStatus?: SlaStatus | string | null;
+  hasOverdueFollowUp?: boolean;
+}): string {
+  if (lead.status === "booked") return "bg-emerald-500";
+  if (lead.hasOverdueFollowUp || lead.slaStatus === "overdue") return "bg-red-500";
+  if (lead.slaStatus === "approaching_sla") return "bg-amber-500";
+  return "bg-gray-300";
+}

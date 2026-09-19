@@ -27,6 +27,7 @@ export type LeadDetailData = {
   visits: any[];
   users: { id: number; name: string; role: string }[];
   latestFeedback: Record<string, any> | null;
+  duplicates: { id: number; name: string; phone: string; reason: string }[];
 };
 
 type Props = {

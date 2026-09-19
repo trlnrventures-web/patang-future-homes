@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
 
@@ -58,6 +58,45 @@ export function buildEarliestFollowUpMap(db: CrmDb): Map<number, string> {
     }
   }
   return map;
+}
+
+export type DuplicateMatch = {
+  id: number;
+  name: string;
+  phone: string;
+  reason: string;
+};
+
+/**
+ * Lightweight duplicate detection: a lead is a candidate duplicate when it has
+ * the exact same phone digits, or the same normalised name (a different phone
+ * alone is not enough to merge — it may be a family member or a second enquiry).
+ */
+export function findLikelyDuplicates(
+  db: CrmDb,
+  lead: { id: number; name: string; phone: string }
+): DuplicateMatch[] {
+  const selfDigits = (lead.phone || "").replace(/\D/g, "");
+  const selfName = (lead.name || "").trim().toLowerCase();
+  const others = db
+    .select()
+    .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
+    .all()
+    .filter((l) => l.id !== lead.id);
+
+  const out: DuplicateMatch[] = [];
+  for (const other of others) {
+    const digits = (other.phone || "").replace(/\D/g, "");
+    if (selfDigits && digits === selfDigits) {
+      out.push({ id: other.id, name: other.name, phone: other.phone, reason: "Same phone number" });
+      continue;
+    }
+    if (selfName && (other.name || "").trim().toLowerCase() === selfName) {
+      out.push({ id: other.id, name: other.name, phone: other.phone, reason: "Same name, different number" });
+    }
+  }
+  return out;
 }
 
 export function resolveDefaultCallerId(

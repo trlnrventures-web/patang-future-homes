@@ -83,22 +83,24 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
         )}
         {badges}
       </div>
-      <div className="mt-1.5 truncate text-[11px] font-semibold text-primary">{lead.phone}</div>
+      <div className="mt-1.5 truncate text-[10px] text-soft">{lead.phone}</div>
       {pills && <div className="mt-1.5 flex flex-wrap gap-1">{pills}</div>}
       <div className="mt-auto flex items-end justify-between gap-2 pt-2">
         <div className="min-w-0 flex-1 text-[10px]">
-          {lead.nextAction && (
-            <div className="truncate font-semibold text-navy">
-              Next:{" "}
-              <span className={overdue ? "text-red-600" : "text-primary"}>{lead.nextAction}</span>
-            </div>
-          )}
-          <div className={overdue ? "truncate font-semibold text-red-600" : "truncate text-soft"}>
-            {lead.nextFollowUpDisplay
-              ? `${overdue ? "Overdue: " : "Due: "}${lead.nextFollowUpDisplay}`
-              : "Not scheduled"}
-          </div>
-          {footerNote && <div className="mt-0.5">{footerNote}</div>}
+          {lead.nextFollowUpDisplay ? (
+            <>
+              {lead.nextAction && (
+                <div className="truncate font-semibold text-navy">
+                  Next:{" "}
+                  <span className={overdue ? "text-red-600" : "text-primary"}>{lead.nextAction}</span>
+                </div>
+              )}
+              <div className={overdue ? "truncate font-semibold text-red-600" : "truncate text-soft"}>
+                {overdue ? "Overdue: " : "Due: "}{lead.nextFollowUpDisplay}
+              </div>
+            </>
+          ) : null}
+          {footerNote && <div className={lead.nextFollowUpDisplay ? "mt-0.5" : ""}>{footerNote}</div>}
         </div>
         <div className="flex shrink-0 items-center gap-1" onClick={stop}>
           <a
