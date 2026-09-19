@@ -17,14 +17,31 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type ConfigRecord = { type?: string; carpetArea?: string; saleableArea?: string; price?: string; allInclusive?: string };
+
+function projectConfigurations(p: ProjectRecord): ConfigRecord[] {
+  return Array.isArray(p.configurations) ? (p.configurations as ConfigRecord[]) : [];
+}
+
 function projectBhkOptions(p: ProjectRecord): string[] {
-  const configs = Array.isArray(p.configurations) ? (p.configurations as { type?: string }[]) : [];
   const out = new Set<string>();
-  for (const c of configs) {
+  for (const c of projectConfigurations(p)) {
     const m = String(c?.type || "").match(/(\d+)\s*BHK/i);
     if (m) out.add(m[1]);
   }
   return [...out];
+}
+
+function mapConfigurations(p: ProjectRecord) {
+  return projectConfigurations(p)
+    .map((c) => ({
+      type: String(c?.type || "").trim(),
+      carpetArea: String(c?.carpetArea || "").trim(),
+      saleableArea: String(c?.saleableArea || "").trim(),
+      price: String(c?.price || "").trim(),
+      allInclusive: String(c?.allInclusive || "").trim(),
+    }))
+    .filter((c) => c.type || c.price);
 }
 
 export async function GET() {
@@ -50,6 +67,7 @@ export async function GET() {
       shortDescription: p.shortDescription || "",
       isActive: p.isActive !== false,
       bhkOptions: projectBhkOptions(p),
+      configurations: mapConfigurations(p),
       source: "primary" as const,
     })),
     partner: marketInventory.map((e) => ({
@@ -68,6 +86,17 @@ export async function GET() {
       shortDescription: "",
       isActive: true,
       bhkOptions: marketBhkOptions(e),
+      configurations: [
+        {
+          type: marketBhkOptions(e)
+            .map((b) => `${b} BHK`)
+            .join(" / "),
+          carpetArea: `${e.carpetRangeSqft[0]}–${e.carpetRangeSqft[1]} sq.ft`,
+          saleableArea: "",
+          price: marketPriceLabel(e),
+          allInclusive: "",
+        },
+      ],
       source: "market" as const,
     })),
   });

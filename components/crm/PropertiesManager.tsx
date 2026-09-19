@@ -8,6 +8,14 @@ import { SUB_LOCATIONS } from "@/lib/projects";
 
 type PropSource = "primary" | "market";
 
+type ConfigRow = {
+  type: string;
+  carpetArea: string;
+  saleableArea: string;
+  price: string;
+  allInclusive: string;
+};
+
 type PropRow = {
   slug: string;
   title: string;
@@ -24,6 +32,7 @@ type PropRow = {
   shortDescription: string;
   isActive: boolean;
   bhkOptions: string[];
+  configurations: ConfigRow[];
   source: PropSource;
 };
 
@@ -219,11 +228,24 @@ export default function PropertiesManager() {
                 <p className="text-xs text-muted">
                   {areaLabel(p.area)} · {p.type}
                   {p.subLocation ? ` · ${p.subLocation}` : ""}
-                  {p.bhkOptions.length ? ` · ${p.bhkOptions.map((b) => `${b} BHK`).join(", ")}` : ""}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-soft">
-                  {p.source === "market" ? `${p.priceRange} · Possession ${p.possessionDate}` : p.shortDescription}
-                </p>
+                {p.configurations.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {p.configurations.map((c, i) => (
+                      <span key={i} className="rounded-md border border-border/70 bg-background/60 px-1.5 py-0.5 text-[11px] text-navy">
+                        {c.type || "Configuration"}
+                        {c.carpetArea ? ` · ${c.carpetArea}` : ""}
+                        {c.price ? ` · ${c.price}` : ""}
+                        {c.allInclusive ? ` (${c.allInclusive})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {p.source === "market" ? (
+                  <p className="mt-1 text-[11px] text-soft">Possession {p.possessionDate}</p>
+                ) : p.shortDescription ? (
+                  <p className="mt-1 truncate text-xs text-soft">{p.shortDescription}</p>
+                ) : null}
               </div>
               <div className="col-span-2 text-xs text-soft md:text-sm">{p.status || "—"}</div>
               <div className="col-span-2 text-xs text-soft md:text-sm">{p.tier || "—"}</div>
