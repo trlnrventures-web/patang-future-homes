@@ -287,6 +287,7 @@ export default function CallerInbox() {
                 name: lead.name,
                 phone: lead.phone,
                 whatsappNumber: lead.whatsappNumber,
+                status: lead.status,
                 statusLabel: LEAD_STATUS_LABELS[lead.status] || lead.status,
                 statusCls: statusColor(lead.status),
                 slaLabel: slaStatusMeta(lead.slaStatus as SlaStatus).label,
@@ -307,26 +308,26 @@ export default function CallerInbox() {
                   <Badge color="bg-violet-50 text-violet-700">SM: {lead.assignedSmName}</Badge>
                 ) : undefined
               }
-              pills={
-                <>
-                  <span className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    {SOURCE_LABELS[lead.source] || lead.source}
-                  </span>
-                  {lead.originalProject && (
-                    <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
-                      {lead.originalProject}
+                pills={
+                  <>
+                    <span className="rounded-full bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      {SOURCE_LABELS[lead.source] || lead.source}
                     </span>
-                  )}
-                  {lead.campaignName && (
-                    <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
-                      {lead.campaignName}
-                    </span>
-                  )}
-                  {lead.concern && (
-                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                      {lead.concern}
-                    </span>
-                  )}
+                    {lead.originalProject && (
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted">
+                        {lead.originalProject}
+                      </span>
+                    )}
+                    {lead.campaignName && (
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted">
+                        {lead.campaignName}
+                      </span>
+                    )}
+                    {lead.concern && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        {lead.concern}
+                      </span>
+                    )}
                   <span className="text-[10px] text-soft">{lead.leadAge}</span>
                   {lead.attemptCount > 0 && (
                     <span className="text-[10px] text-soft">Attempts: {lead.attemptCount}</span>

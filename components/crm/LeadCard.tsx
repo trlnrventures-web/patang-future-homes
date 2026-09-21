@@ -11,6 +11,7 @@ export type LeadCardLead = {
   name: string;
   phone: string;
   whatsappNumber?: string | null;
+  status?: string;
   statusLabel?: string;
   statusCls?: string;
   slaLabel?: string;
@@ -82,21 +83,21 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
           {lead.name}
         </span>
         {lead.statusLabel && (
-          <Badge
-            color={lead.statusCls || "bg-background text-muted"}
-            className="shrink-0"
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${lead.statusCls || "bg-background text-muted"}`}
           >
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotCls(lead.status)}`} />
             {lead.statusLabel}
-          </Badge>
+          </span>
         )}
       </div>
-      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
         {lead.slaLabel && (
           <Badge color={lead.slaCls || "bg-background text-muted"}>{lead.slaLabel}</Badge>
         )}
         {badges}
       </div>
-      {pills && <div className="mt-1 flex flex-wrap gap-1">{pills}</div>}
+      {pills && <div className="mt-1.5 flex flex-wrap gap-1.5">{pills}</div>}
       <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
         <div className="min-w-0 flex-1 text-[10px] leading-tight">
           {lead.nextFollowUpDisplay ? (
@@ -148,4 +149,42 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
       </div>
     </div>
   );
+}
+
+function statusDotCls(status?: string): string {
+  switch (status) {
+    case "new":
+      return "bg-red-500";
+    case "calling":
+    case "connected":
+      return "bg-amber-500";
+    case "qualified":
+      return "bg-emerald-500";
+    case "assigned":
+      return "bg-violet-500";
+    case "follow_up":
+      return "bg-yellow-500";
+    case "visit_proposed":
+      return "bg-cyan-500";
+    case "visit_booked":
+      return "bg-teal-500";
+    case "visit_confirmed":
+      return "bg-teal-600";
+    case "visit_done":
+      return "bg-sky-500";
+    case "negotiation":
+      return "bg-fuchsia-500";
+    case "booked":
+      return "bg-green-500";
+    case "nurture":
+      return "bg-indigo-500";
+    case "no_response":
+      return "bg-slate-400";
+    case "lost":
+    case "invalid":
+    case "dnc":
+      return "bg-red-400";
+    default:
+      return "bg-slate-300";
+  }
 }

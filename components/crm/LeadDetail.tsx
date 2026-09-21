@@ -14,6 +14,7 @@ import {
   getLeadLostReason,
   setLeadLostReasonInNotes,
   bhkLabel,
+  isInCallerScope,
 } from "@/lib/crm/leads";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import { slaStatusMeta, formatLeadAge } from "@/lib/crm/sla";
@@ -34,7 +35,9 @@ const FUNNEL_STAGES: { key: string; label: string; status: string; matches: stri
   { key: "new", label: "New", status: "new", matches: ["new", "calling", "connected", "no_response"] },
   { key: "qualified", label: "Qualified", status: "qualified", matches: ["qualified"] },
   { key: "follow_up", label: "Follow-up", status: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
-  { key: "visit", label: "Site Visit", status: "visit_booked", matches: ["visit_proposed", "visit_booked", "visit_confirmed", "visit_done"] },
+  { key: "visit_booked", label: "Visit Booked", status: "visit_booked", matches: ["visit_proposed", "visit_booked"] },
+  { key: "visit_confirmed", label: "Visit Confirmed", status: "visit_confirmed", matches: ["visit_confirmed"] },
+  { key: "visit_done", label: "Visit Done", status: "visit_done", matches: ["visit_done"] },
   { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation"] },
   { key: "booked", label: "Booked", status: "booked", matches: ["booked"] },
 ];
@@ -104,6 +107,14 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
   const canAssign = isCaller || isAdmin;
   const canAssignCaller = isAdmin;
+  // Callers keep visibility of a lead after it is handed off to an SM, but the
+  // sales team owns it from then on — so the view becomes read-only for them.
+  const readOnly =
+    isCaller &&
+    !isInCallerScope({
+      status: String(lead.status),
+      assignedSmId: (lead.assignedSmId as number | null) ?? null,
+    });
   const router = useRouter();
 
   const showToast = useCallback((msg: string) => {
@@ -167,9 +178,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
     }
   }, [canAssign]);
 
-  const loadMatches = useCallback(async () => {
-    if (matchesLoaded) return;
-    setMatchesLoaded(true);
+  const refreshMatches = useCallback(async () => {
     try {
       const res = await fetch(`/crm/api/leads/${lead.id}/matches`);
       if (res.ok) {
@@ -177,9 +186,17 @@ export default function LeadDetail({ data, currentUser }: Props) {
         setMatches(d.matches);
       }
     } catch {
+      // keep the existing matches if the refresh fails
+    } finally {
       setMatchesLoaded(true);
     }
-  }, [lead.id, matchesLoaded]);
+  }, [lead.id]);
+
+  const loadMatches = useCallback(async () => {
+    if (matchesLoaded) return;
+    setMatchesLoaded(true);
+    await refreshMatches();
+  }, [matchesLoaded, refreshMatches]);
 
   const handleCallOutcome = async (type: string, extra?: any) => {
     setBusy(true);
@@ -358,9 +375,27 @@ export default function LeadDetail({ data, currentUser }: Props) {
     }
   };
 
+  const handleVisitStatus = async (type: string, visitId?: number) => {
+    setBusy(true);
+    try {
+      await postActivity({ type, visitId });
+      showToast(ACTIVITY_LABELS[type] || "Visit updated");
+      reload();
+    } catch {
+      showToast("Could not update visit");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const phone = (lead.whatsappNumber || lead.phone || "").replace(/\D/g, "");
   const waNumber = formatPhoneForWhatsApp(phone);
   const notesList = activities.filter((a) => a.type === "note");
+  const latestVisit =
+    visits
+      .slice()
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || b.id - a.id)[0] ||
+    null;
 
   const SECOND_VISIT_MESSAGE =
     "Great to see your interest! Would you like to bring your family for a second look this weekend? I can arrange a convenient time.";
@@ -425,6 +460,20 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <Badge color="bg-violet-100 text-violet-800">SM: {lead.assignedSmName}</Badge>
         )}
       </div>
+
+      {/* ===== Post-handoff read-only notice (caller) ===== */}
+      {readOnly && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-sky-600">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <p className="text-xs font-semibold leading-snug text-sky-800">
+            Handed off to {lead.assignedSmName || "the sales team"} — this lead is now managed by
+            the sales team. You can still view the full history here, but editing is disabled.
+          </p>
+        </div>
+      )}
 
       {/* ===== Two-column layout ===== */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
@@ -506,20 +555,24 @@ export default function LeadDetail({ data, currentUser }: Props) {
                 onClick={() => { setMoreActionsOpen(false); scrollToSection("message-center"); }}
                 icon={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10ZM8 10h8" />}
               />
-              <MoreAction
-                label="Schedule Follow-up"
-                hint="Set next action"
-                color="bg-amber-50 text-amber-700"
-                onClick={() => { setMoreActionsOpen(false); const willShow = !showFollowUp; setShowFollowUp(willShow); if (willShow) scrollToSection("follow-up-form"); }}
-                icon={<path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
-              />
-              <MoreAction
-                label="Book Site Visit"
-                hint="Schedule a project visit"
-                color="bg-emerald-50 text-emerald-700"
-                onClick={() => { setMoreActionsOpen(false); openVisit(); scrollToSection("visit-form"); }}
-                icon={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>}
-              />
+              {!readOnly && (
+                <>
+                  <MoreAction
+                    label="Schedule Follow-up"
+                    hint="Set next action"
+                    color="bg-amber-50 text-amber-700"
+                    onClick={() => { setMoreActionsOpen(false); const willShow = !showFollowUp; setShowFollowUp(willShow); if (willShow) scrollToSection("follow-up-form"); }}
+                    icon={<path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+                  />
+                  <MoreAction
+                    label="Book Site Visit"
+                    hint="Schedule a project visit"
+                    color="bg-emerald-50 text-emerald-700"
+                    onClick={() => { setMoreActionsOpen(false); openVisit(); scrollToSection("visit-form"); }}
+                    icon={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>}
+                  />
+                </>
+              )}
               <MoreAction
                 label="Find Property"
                 hint="Run the matching engine"
@@ -548,6 +601,98 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </>
         )}
       </div>
+
+      {/* ===== Site Visit action (stage-synced) ===== */}
+      {!readOnly && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-primary">Site Visit</h3>
+            {latestVisit && (
+              <Badge color={visitStatusMeta(String(latestVisit.status)).cls}>
+                {visitStatusMeta(String(latestVisit.status)).label}
+              </Badge>
+            )}
+          </div>
+          {latestVisit ? (
+            <>
+              <div className="rounded-xl bg-white px-3 py-2.5 text-sm">
+                <div className="font-semibold text-navy">
+                  {latestVisit.projectId || "Project TBD"} · {latestVisit.date || "Date TBD"}{" "}
+                  {latestVisit.time || ""}
+                </div>
+                <div className="mt-0.5 text-xs text-muted">
+                  SM: {latestVisit.smName || lead.assignedSmName || ""}
+                  {latestVisit.meetingPoint ? ` · ${latestVisit.meetingPoint}` : ""}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["proposed", "booked"].includes(String(latestVisit.status)) && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleVisitStatus("visit_confirmed", latestVisit.id)}
+                    className="rounded-xl bg-teal-600 px-3.5 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    ✓ Confirm Visit
+                  </button>
+                )}
+                {!["visit_done", "cancelled"].includes(String(latestVisit.status)) && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleVisitStatus("visit_done", latestVisit.id)}
+                      className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      Mark Visit Done
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleVisitStatus("visit_no_show", latestVisit.id)}
+                      className="rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      No Show
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleVisitStatus("visit_cancelled", latestVisit.id)}
+                      className="rounded-xl border border-border bg-white px-3.5 py-2 text-xs font-bold text-muted transition-colors hover:bg-background disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+                {["visit_done", "cancelled", "no_show"].includes(String(latestVisit.status)) && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={openVisit}
+                    className="rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                  >
+                    + Book Another Visit
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                No site visit yet. Book one to move this lead forward.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={openVisit}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                Book Site Visit
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ===== 2nd visit suggestion (post-visit feedback) ===== */}
       {shouldSuggestSecondVisit && (
@@ -609,7 +754,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
             ].map((b) => (
               <button
                 key={b.t}
-                disabled={busy}
+                disabled={busy || readOnly}
                 onClick={() => {
                   if (b.t === "call_back") {
                     setShowCallback((s) => !s);
@@ -672,7 +817,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
               ].map((c) => (
                 <button
                   key={c.v}
-                  disabled={busy}
+                  disabled={busy || readOnly}
                   onClick={() => handleRecordConcern(c.v)}
                   className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                     lead.concern === c.v
@@ -692,7 +837,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       <div className="rounded-2xl border border-border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-primary">Requirement</h3>
-          {(isCaller || isAdmin) && (
+          {(isCaller || isAdmin) && !readOnly && (
             <button
               onClick={() => setEditingReq((s) => !s)}
               className="text-xs font-semibold text-accent-ink hover:underline"
@@ -788,6 +933,51 @@ export default function LeadDetail({ data, currentUser }: Props) {
       {/* ===== RIGHT COLUMN ===== */}
       <div className="space-y-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
 
+      {/* ===== Notes (highlighted) ===== */}
+      <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </span>
+          <h3 className="text-sm font-bold text-primary">Notes</h3>
+          {notesList.length > 0 && (
+            <Badge color="bg-amber-100 text-amber-800">{notesList.length}</Badge>
+          )}
+          <span className="ml-auto text-[10px] text-soft">Call updates & reminders</span>
+        </div>
+        {notesList.length === 0 ? (
+          <p className="rounded-xl bg-white/70 px-3 py-2 text-xs text-muted">No notes yet.</p>
+        ) : (
+          <div className="max-h-64 space-y-2 overflow-y-auto pr-0.5">
+            {notesList.map((a) => (
+              <div key={a.id} className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
+                  <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
+                </div>
+                <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {!readOnly && (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddNote();
+              }}
+              placeholder="Add a note..."
+              className="flex-1 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
+            />
+            <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
+          </div>
+        )}
+      </div>
+
       {/* ===== Status / funnel stepper ===== */}
       <div className="rounded-2xl border border-border bg-white p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -795,7 +985,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value=""
-              disabled={busy}
+              disabled={busy || readOnly}
               onChange={(e) => {
                 const v = e.target.value;
                 if (!v) return;
@@ -812,7 +1002,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
             </select>
             <select
               value=""
-              disabled={busy}
+              disabled={busy || readOnly}
               onChange={(e) => {
                 const v = e.target.value;
                 if (!v) return;
@@ -846,7 +1036,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
                   <div className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : reached ? "bg-primary" : "bg-border"}`} />
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || readOnly}
                     onClick={() => {
                       if (current) return;
                       handleStatusChange(stage.status);
@@ -950,7 +1140,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
 
         {/* ===== Admin Zone: lead assignment + admin controls ===== */}
-        {canAssign && (
+        {canAssign && !readOnly && (
           <section className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -1121,41 +1311,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </div>
       )}
 
-      {/* ===== Notes ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <h3 className="mb-1 text-sm font-bold text-primary">Notes</h3>
-        <p className="mb-3 text-[10px] text-soft">
-          Call updates, customer preferences, and reminders all in one place.
-        </p>
-        {notesList.length === 0 ? (
-          <p className="rounded-xl bg-background px-3 py-2 text-xs text-muted">No notes yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {notesList.map((a) => (
-              <div key={a.id} className="rounded-xl bg-background px-3 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
-                  <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
-                </div>
-                <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddNote();
-            }}
-            placeholder="Add a note..."
-            className="flex-1 rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
-          />
-          <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
-        </div>
-      </div>
-
       </div>
       {/* ===== END RIGHT COLUMN ===== */}
       </div>
@@ -1164,17 +1319,27 @@ export default function LeadDetail({ data, currentUser }: Props) {
       {/* ===== Property matches ===== */}
       {(showMatches || matches.length > 0) && (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-primary">Matching Properties</h3>
-            {matches.length === 0 && !matchesLoaded && (
-              <button onClick={loadMatches} className="text-xs font-semibold text-accent-ink">
-                Load matches
+            {!readOnly && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { setShowMatches(true); refreshMatches(); }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+                Recommend Property
               </button>
             )}
           </div>
           {matches.length === 0 ? (
             <p className="text-xs text-muted">
-              Complete the requirement (budget, location, BHK) and matching properties will appear.
+              Complete the requirement (budget, location, BHK) then tap Recommend Property to see
+              the best matches.
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -1315,115 +1480,106 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </form>
       )}
 
-      {/* ===== Call history ===== */}
-      {activities.some((a) => String(a.type).startsWith("call")) && (
-        <div className="rounded-2xl border border-border bg-white p-4">
-          <h3 className="mb-3 text-sm font-bold text-primary">Call History</h3>
-          <div className="space-y-2">
-            {activities
-              .filter((a) => String(a.type).startsWith("call"))
-              .slice(0, 10)
-              .map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
-                  <div className="min-w-0 text-sm">
-                    <span className="font-semibold text-navy">{ACTIVITY_LABELS[a.type] || a.type}</span>
-                    {a.notes && <span className="ml-2 text-xs text-muted">{a.notes}</span>}
-                  </div>
-                  <span className="shrink-0 text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* ===== Row: Site Visits + Follow-ups ===== */}
-      {(visits.length > 0 || followUps.length > 0) && (
+      {/* ===== Lower detail grid (2 columns) ===== */}
       <div className="grid gap-4 sm:grid-cols-2">
-      {visits.length > 0 && (
-        <div className={`rounded-2xl border border-border bg-white p-4 ${visits.length > 0 && followUps.length > 0 ? "" : "sm:col-span-2"}`}>
-          <h3 className="mb-3 text-sm font-bold text-primary">Site Visits</h3>
-          <div className="space-y-2">
-            {visits.map((v) => (
-              <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
-                <div className="text-sm">
-                  <div className="font-semibold text-navy">
-                    {v.projectId || ""} · {v.date || "TBD"} {v.time}
+        {/* Call history */}
+        {activities.some((a) => String(a.type).startsWith("call")) && (
+          <div className="rounded-2xl border border-border bg-white p-4">
+            <h3 className="mb-3 text-sm font-bold text-primary">Call History</h3>
+            <div className="space-y-2">
+              {activities
+                .filter((a) => String(a.type).startsWith("call"))
+                .slice(0, 10)
+                .map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
+                    <div className="min-w-0 text-sm">
+                      <span className="font-semibold text-navy">{ACTIVITY_LABELS[a.type] || a.type}</span>
+                      {a.notes && <span className="ml-2 text-xs text-muted">{a.notes}</span>}
+                    </div>
+                    <span className="shrink-0 text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
                   </div>
-                  <div className="text-xs text-muted">SM: {v.smName || ""}</div>
-                </div>
-                <Badge
-                  color={
-                    v.status === "no_show"
-                      ? "bg-red-100 text-red-700"
-                      : v.status === "visit_done"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-blue-100 text-blue-800"
-                  }
-                >
-                  {String(v.status).toUpperCase()}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Follow-ups */}
-      {followUps.length > 0 && (
-        <div className={`rounded-2xl border border-border bg-white p-4 ${visits.length > 0 && followUps.length > 0 ? "" : "sm:col-span-2"}`}>
-          <h3 className="mb-3 text-sm font-bold text-primary">Follow-ups</h3>
-          <div className="space-y-2">
-            {followUps.map((f) => (
-              <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
-                <div className="text-sm">
-                  <div className="font-semibold text-navy">{f.purpose || "Follow-up"}</div>
-                  <div className="text-xs text-muted">{formatDateTime(f.scheduledFor)}</div>
-                  {f.notes && <div className="mt-1 text-xs text-soft">{f.notes}</div>}
-                </div>
-                <Badge
-                  color={
-                    f.status === "completed"
-                      ? "bg-green-100 text-green-800"
-                      : isPast(f.scheduledFor)
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-800"
-                  }
-                >
-                  {f.status === "completed" ? "Done" : isPast(f.scheduledFor) ? "Overdue" : "Pending"}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      </div>
-      )}
-
-      {/* ===== Activity timeline ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <h3 className="mb-3 text-sm font-bold text-primary">Activity</h3>
-        {activities.length === 0 ? (
-          <p className="text-center text-xs text-muted">No activity yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {activities.slice(0, 12).map((a) => (
-              <div key={a.id} className="flex gap-3">
-                <div className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-primary/40" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold text-navy">
-                      {ACTIVITY_LABELS[a.type] || a.type}
-                    </span>
-                    <span className="text-[10px] text-soft">
-                      {a.userName} · {formatDateTime(a.createdAt)}
-                    </span>
-                  </div>
-                  {a.notes && <div className="mt-0.5 text-xs text-muted">{a.notes}</div>}
-                </div>
-              </div>
-            ))}
+                ))}
+            </div>
           </div>
         )}
+
+        {/* Site Visits */}
+        {visits.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-4">
+            <h3 className="mb-3 text-sm font-bold text-primary">Site Visits</h3>
+            <div className="space-y-2">
+              {visits.map((v) => (
+                <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
+                  <div className="text-sm">
+                    <div className="font-semibold text-navy">
+                      {v.projectId || ""} · {v.date || "TBD"} {v.time}
+                    </div>
+                    <div className="text-xs text-muted">SM: {v.smName || ""}</div>
+                  </div>
+                  <Badge color={visitStatusMeta(String(v.status)).cls}>
+                    {visitStatusMeta(String(v.status)).label}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Follow-ups */}
+        {followUps.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-4">
+            <h3 className="mb-3 text-sm font-bold text-primary">Follow-ups</h3>
+            <div className="space-y-2">
+              {followUps.map((f) => (
+                <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
+                  <div className="text-sm">
+                    <div className="font-semibold text-navy">{f.purpose || "Follow-up"}</div>
+                    <div className="text-xs text-muted">{formatDateTime(f.scheduledFor)}</div>
+                    {f.notes && <div className="mt-1 text-xs text-soft">{f.notes}</div>}
+                  </div>
+                  <Badge
+                    color={
+                      f.status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : isPast(f.scheduledFor)
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-800"
+                    }
+                  >
+                    {f.status === "completed" ? "Done" : isPast(f.scheduledFor) ? "Overdue" : "Pending"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Activity timeline */}
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <h3 className="mb-3 text-sm font-bold text-primary">Activity</h3>
+          {activities.length === 0 ? (
+            <p className="text-center text-xs text-muted">No activity yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {activities.slice(0, 12).map((a) => (
+                <div key={a.id} className="flex gap-3">
+                  <div className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-primary/40" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-semibold text-navy">
+                        {ACTIVITY_LABELS[a.type] || a.type}
+                      </span>
+                      <span className="text-[10px] text-soft">
+                        {a.userName} · {formatDateTime(a.createdAt)}
+                      </span>
+                    </div>
+                    {a.notes && <div className="mt-0.5 text-xs text-muted">{a.notes}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     {/* ===== Lost reason picker ===== */}
       {showLostPicker && (
@@ -1553,6 +1709,10 @@ export default function LeadDetail({ data, currentUser }: Props) {
       await postActivity({ type: "requirement_changed", notes: changes.join("; ") });
       showToast("Requirement updated");
       setEditingReq(false);
+      if (showMatches || matchesLoaded) {
+        setShowMatches(true);
+        await refreshMatches();
+      }
       reload();
     } catch {
       showToast("Could not save");
@@ -1822,6 +1982,14 @@ function LeadEditor({
   );
 }
 
+const BUDGET_PRESETS: { label: string; min: number | null; max: number | null }[] = [
+  { label: "Under ₹25L", min: null, max: 25 },
+  { label: "₹25–40L", min: 25, max: 40 },
+  { label: "₹40–60L", min: 40, max: 60 },
+  { label: "₹60–85L", min: 60, max: 85 },
+  { label: "₹85L+", min: 85, max: null },
+];
+
 function RequirementEditor({
   lead,
   onSave,
@@ -1889,14 +2057,43 @@ function RequirementEditor({
           </select>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-muted">Budget Min (L)</label>
-          <input type="number" min={0} value={form.budgetMin} onChange={(e) => setForm({ ...form, budgetMin: e.target.value })} className={input} />
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-muted">Budget Range</label>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {BUDGET_PRESETS.map((p) => {
+            const active =
+              String(p.min ?? "") === form.budgetMin && String(p.max ?? "") === form.budgetMax;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    budgetMin: p.min == null ? "" : String(p.min),
+                    budgetMax: p.max == null ? "" : String(p.max),
+                  })
+                }
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  active
+                    ? "border-primary bg-primary text-white"
+                    : "border-border bg-white text-muted hover:border-primary hover:text-primary"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-muted">Budget Max (L)</label>
-          <input type="number" min={0} value={form.budgetMax} onChange={(e) => setForm({ ...form, budgetMax: e.target.value })} className={input} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Budget Min (L)</label>
+            <input type="number" min={0} value={form.budgetMin} onChange={(e) => setForm({ ...form, budgetMin: e.target.value })} className={input} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Budget Max (L)</label>
+            <input type="number" min={0} value={form.budgetMax} onChange={(e) => setForm({ ...form, budgetMax: e.target.value })} className={input} />
+          </div>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -2055,6 +2252,27 @@ function loanLabel(v: boolean | number | null): string {
   if (v === true || v === 1) return "Yes";
   if (v === false || v === 0) return "No";
   return "";
+}
+
+function visitStatusMeta(status: string): { label: string; cls: string } {
+  switch (status) {
+    case "proposed":
+      return { label: "Proposed", cls: "bg-cyan-100 text-cyan-800" };
+    case "booked":
+      return { label: "Booked", cls: "bg-teal-100 text-teal-800" };
+    case "confirmed":
+      return { label: "Confirmed", cls: "bg-teal-200 text-teal-900" };
+    case "arrived":
+      return { label: "Arrived", cls: "bg-sky-100 text-sky-800" };
+    case "visit_done":
+      return { label: "Visit Done", cls: "bg-green-100 text-green-800" };
+    case "no_show":
+      return { label: "No Show", cls: "bg-red-100 text-red-700" };
+    case "cancelled":
+      return { label: "Cancelled", cls: "bg-slate-100 text-slate-600" };
+    default:
+      return { label: status || "—", cls: "bg-background text-muted" };
+  }
 }
 
 function formatDateTime(iso: string): string {

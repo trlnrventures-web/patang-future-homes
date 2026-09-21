@@ -256,7 +256,7 @@ export async function POST(
       if (body.status) newStatus = body.status;
     }
 
-    if (body.type === "visit_proposed" || body.type === "visit_booked" || body.type === "visit_confirmed") {
+    if (body.type === "visit_proposed" || body.type === "visit_booked") {
       const visitDate = body.visitDate;
       const visitTime = body.visitTime;
       db.insert(schema.siteVisits).values({
@@ -320,6 +320,7 @@ export async function POST(
     }
 
     if (
+      body.type === "visit_confirmed" ||
       body.type === "visit_arrived" ||
       body.type === "visit_done" ||
       body.type === "visit_no_show" ||
@@ -330,13 +331,15 @@ export async function POST(
         visits.find((v) => body.visitId && v.id === Number(body.visitId)) ||
         visits[visits.length - 1];
       const nextVisitStatus =
-        body.type === "visit_arrived"
-          ? "arrived"
-          : body.type === "visit_no_show"
-            ? "no_show"
-            : body.type === "visit_cancelled"
-              ? "cancelled"
-              : "visit_done";
+        body.type === "visit_confirmed"
+          ? "confirmed"
+          : body.type === "visit_arrived"
+            ? "arrived"
+            : body.type === "visit_no_show"
+              ? "no_show"
+              : body.type === "visit_cancelled"
+                ? "cancelled"
+                : "visit_done";
       if (target) {
         db.update(schema.siteVisits)
           .set({
@@ -345,6 +348,10 @@ export async function POST(
           })
           .where(eq(schema.siteVisits.id, target.id))
           .run();
+        if (body.type === "visit_confirmed") {
+          leadUpdates.nextAction = "site_visit";
+          if (lead.status !== "negotiation" && lead.status !== "booked") newStatus = "visit_confirmed";
+        }
         if (body.type === "visit_done") {
           leadUpdates.nextAction = "post_visit_feedback";
           if (lead.status !== "negotiation" && lead.status !== "booked") newStatus = "visit_done";

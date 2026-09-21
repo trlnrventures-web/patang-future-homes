@@ -361,6 +361,7 @@ export default function LeadsList() {
                   name: lead.name,
                   phone: lead.phone,
                   whatsappNumber: lead.whatsappNumber,
+                  status: lead.status,
                   statusLabel: LEAD_STATUS_LABELS[lead.status] || lead.status,
                   statusCls: LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700",
                   nextAction: lead.nextAction || undefined,
@@ -387,22 +388,22 @@ export default function LeadsList() {
                 pills={
                   <>
                     {lead.originalProject && (
-                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted">
                         {lead.originalProject}
                       </span>
                     )}
                     {lead.bhk && (
-                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted">
                         {bhkLabel(lead.bhk)}
                       </span>
                     )}
                     {lead.budget && (
-                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] text-muted">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted">
                         {lead.budget}
                       </span>
                     )}
                     {lead.assignedSmName && (
-                      <span className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      <span className="rounded-full bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
                         SM: {lead.assignedSmName}
                       </span>
                     )}

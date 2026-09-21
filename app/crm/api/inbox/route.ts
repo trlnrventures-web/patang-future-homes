@@ -91,7 +91,13 @@ export async function GET(request: NextRequest) {
     .all();
 
   if (user.role === "caller") {
-    rows = q || tab === "lost" ? rows : rows.filter(isInCallerScope);
+    // Callers keep visibility of leads they handled even after they are handed
+    // off to a sales manager (read-only), alongside their active qualification
+    // pipeline.
+    rows =
+      q || tab === "lost"
+        ? rows
+        : rows.filter((l) => isInCallerScope(l) || l.assignedCallerId === user.id);
   } else if (user.role === "sales_manager") {
     rows = rows.filter((l) => l.assignedSmId === user.id);
   }
@@ -139,10 +145,7 @@ export async function GET(request: NextRequest) {
       filtered = rows.filter((l) => l.status === "qualified" && !l.assignedSmId);
       break;
     case "recently_assigned":
-      filtered = rows.filter((l) => {
-        if (!l.assignedSmId || !l.assignedAt) return false;
-        return now.getTime() - new Date(l.assignedAt).getTime() <= 24 * 60 * 60 * 1000;
-      });
+      filtered = rows.filter((l) => l.assignedSmId != null && l.status !== "lost");
       break;
     case "follow_up":
       filtered = rows.filter((l) =>
