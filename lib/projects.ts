@@ -53,6 +53,7 @@ export function priceValidityInfo(project: { priceValidUntil?: string }): PriceV
 export type Project = {
   slug: string;
   title: string;
+  category?: "primary" | "resale";
   location: string;
   subLocation?: string;
   priceValidUntil?: string;

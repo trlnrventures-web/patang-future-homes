@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getDashboardData } from "@/lib/crm/data";
-import { getDailyMetricsForEmployee, istToday } from "@/lib/crm/reports";
+import { getDailyMetricsForEmployee, istToday, istNow } from "@/lib/crm/reports";
 import { Card, Badge } from "@/components/crm/ui";
 import CallerDashboard from "@/components/crm/CallerDashboard";
 import { getDb } from "@/lib/crm/db";
@@ -74,6 +74,15 @@ const smMetrics =
     customerName: string;
     link: string;
   }[] = [];
+  const taggingPending: {
+    visitId: number;
+    leadId: number;
+    projectName: string;
+    customerName: string;
+    status: string;
+    overdue: boolean;
+    link: string;
+  }[] = [];
   // ---- Admin dashboards ----
   let adminNegotiationsNeedingAttention: {
     leadId: number;
@@ -90,6 +99,31 @@ const smMetrics =
     smName: string;
     link: string;
   }[] = [];
+  const adminTaggingPending: {
+    visitId: number;
+    leadId: number;
+    projectName: string;
+    customerName: string;
+    smName: string;
+    status: string;
+    overdue: boolean;
+    link: string;
+  }[] = [];
+
+  // A visit needs property tagging when its scheduled time has passed but it
+  // is still open, or it was closed without any properties tagged.
+  const nowIst = istNow();
+  const needsTagging = (v: {
+    date: string;
+    time: string;
+    status: string;
+    propertyShown: string | null;
+    propertiesShown: string | null;
+  }) => {
+    if (v.status === "cancelled" || v.status === "no_show") return false;
+    if (v.status === "visit_done") return !v.propertiesShown && !v.propertyShown;
+    return Boolean(v.date) && `${v.date}T${v.time || "23:59"}` < nowIst;
+  };
 
   if (isSm) {
     const dayVisits = db
@@ -161,6 +195,24 @@ const smMetrics =
         });
       }
     }
+
+    const smVisits = db
+      .select()
+      .from(schema.siteVisits)
+      .where(eq(schema.siteVisits.smId, user.id))
+      .all();
+    for (const v of smVisits) {
+      if (!needsTagging(v)) continue;
+      taggingPending.push({
+        visitId: v.id,
+        leadId: v.leadId,
+        customerName: leadsMap.get(v.leadId)?.name || "",
+        projectName: (v.projectId && (projectToTitle[v.projectId] || v.projectId)) || "",
+        status: v.status,
+        overdue: v.status !== "visit_done",
+        link: `/crm/leads/${v.leadId}?visit=1`,
+      });
+    }
   }
 
   if (isAdmin) {
@@ -210,6 +262,20 @@ const smMetrics =
           link: `/crm/leads/${v.leadId}/negotiation?feedback=${v.id}`,
         });
       }
+    }
+
+    for (const v of db.select().from(schema.siteVisits).all()) {
+      if (!needsTagging(v)) continue;
+      adminTaggingPending.push({
+        visitId: v.id,
+        leadId: v.leadId,
+        customerName: leadsMap.get(v.leadId)?.name || "",
+        projectName: (v.projectId && (projectToTitle[v.projectId] || v.projectId)) || "",
+        smName: usersMap.get(v.smId) || "",
+        status: v.status,
+        overdue: v.status !== "visit_done",
+        link: `/crm/leads/${v.leadId}?visit=1`,
+      });
     }
   }
 
@@ -367,6 +433,39 @@ return (
         </Card>
       )}
 
+      {/* Property tagging pending - SM view */}
+      {isSm && taggingPending.length > 0 && (
+        <Card className="border-amber-200 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-base font-bold text-amber-800">⚠ Property Tagging Pending</h2>
+            <Badge color="bg-amber-100 text-amber-800">{taggingPending.length}</Badge>
+          </div>
+          <p className="mb-3 text-xs text-muted">
+            Close these visits and tag which properties were shown.
+          </p>
+          <div className="space-y-2">
+            {taggingPending.map((t) => (
+              <Link
+                key={t.visitId}
+                href={t.link}
+                className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 transition-colors hover:bg-amber-100/60"
+              >
+                <div className="min-w-0 text-sm">
+                  <div className="truncate font-semibold text-navy">{t.customerName}&apos;s visit</div>
+                  <div className="truncate text-xs text-muted">
+                    {t.projectName || "Project TBD"}
+                    {t.overdue ? " · visit date passed" : " · tagging incomplete"}
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-bold text-white">
+                  TAG
+                </span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Deal health - SM view */}
       {isSm && dealHealthList.length > 0 && (
         <Card className="p-4">
@@ -405,7 +504,9 @@ return (
       {isAdmin && (
         <section>
           <h2 className="mb-3 text-base font-bold text-primary">Needs Attention</h2>
-          {adminNegotiationsNeedingAttention.length === 0 && adminFeedbackPending.length === 0 ? (
+          {adminNegotiationsNeedingAttention.length === 0 &&
+          adminFeedbackPending.length === 0 &&
+          adminTaggingPending.length === 0 ? (
             <p className="text-xs text-muted">Everything is on track. No pending deals or feedback.</p>
           ) : (
             <>
@@ -452,6 +553,35 @@ return (
                         </div>
                         <span className="shrink-0 rounded-xl bg-primary px-3 py-1 text-[11px] font-bold text-white">
                           SUBMIT
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {adminTaggingPending.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-amber-800">
+                      ⚠ Property Tagging Pending ({adminTaggingPending.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {adminTaggingPending.slice(0, 5).map((t) => (
+                      <Link
+                        key={t.visitId}
+                        href={t.link}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-white p-3"
+                      >
+                        <div className="min-w-0 text-sm">
+                          <div className="truncate font-semibold text-navy">{t.customerName}</div>
+                          <div className="truncate text-xs text-muted">
+                            {t.projectName || "Project TBD"} – SM: {t.smName}
+                            {t.overdue ? " · visit date passed" : " · tagging incomplete"}
+                          </div>
+                        </div>
+                        <span className="shrink-0 rounded-xl bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                          TAG
                         </span>
                       </Link>
                     ))}

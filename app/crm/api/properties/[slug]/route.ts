@@ -51,7 +51,7 @@ export async function PATCH(
 
     const merged: Record<string, unknown> = { ...current };
     const textFields = [
-      "title", "tier", "location", "area", "type", "status",
+      "title", "category", "tier", "location", "area", "type", "status",
       "priceRange", "pricePerSqft", "shortDescription", "description",
       "fullDescription", "reraId", "possessionDate", "landParcel",
       "subLocation", "metaTitle", "metaDescription", "showFlatVideoUrl",

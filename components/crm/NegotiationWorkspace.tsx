@@ -25,6 +25,7 @@ export type NegotiationData = {
   visits: any[];
   bookings: any[];
   projectMap: Record<string, string>;
+  propertyOptions: string[];
 };
 
 type Props = {
@@ -61,6 +62,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
   const [feedbackFormFor, setFeedbackFormFor] = useState<number | null>(openFeedbackVisitId ?? null);
   const [fb, setFb] = useState({
     interest: "",
+    propertyShown: "",
     likedProperty: "",
     mainObjection: "",
     expectedBudget: "",
@@ -431,6 +433,10 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
       showToast("Select an interest level");
       return;
     }
+    if (!fb.propertyShown.trim()) {
+      showToast("Pick the property that was shown");
+      return;
+    }
     const nextFollowUp = fb.nextFollowUp
       ? new Date(`${fb.nextFollowUp}:00+05:30`).toISOString()
       : undefined;
@@ -440,6 +446,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
         type: "post_visit_feedback",
         visitId: feedbackFormFor,
         interest: fb.interest,
+        propertyShown: fb.propertyShown.trim(),
         likedProperty: fb.likedProperty || undefined,
         mainObjection: fb.mainObjection || undefined,
         expectedBudget: fb.expectedBudget || undefined,
@@ -461,7 +468,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
         )
       );
       setFeedbackFormFor(null);
-      setFb({ interest: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
+      setFb({ interest: "", propertyShown: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
       showToast("Feedback saved");
       refreshLead();
     } catch {
@@ -962,6 +969,12 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
               <span className="text-muted">Project: </span>
               {data.projectMap[latestVisitFull.projectId] || latestVisitFull.projectId || ""}
             </p>
+            {latestVisitFull.propertyShown && (
+              <p>
+                <span className="text-muted">Property shown: </span>
+                <span className="font-semibold">{latestVisitFull.propertyShown}</span>
+              </p>
+            )}
             {latestVisitFull.feedback && (
               <>
                 <p>
@@ -997,7 +1010,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
                   size="sm"
                   disabled={busy}
                   onClick={() => {
-                    setFb({ interest: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
+                    setFb({ interest: "", propertyShown: "", likedProperty: "", mainObjection: "", expectedBudget: "", otherProjects: "", nextAction: "", nextFollowUp: "", notes: "" });
                     setFeedbackFormFor(latestVisitFull.id);
                   }}
                 >
@@ -1016,6 +1029,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
               <div key={v.id} className="flex items-center gap-2 text-xs text-muted">
                 <span className="font-semibold">#{i + 1}</span>
                 <span>{data.projectMap[v.projectId] || v.projectId || "Project"}</span>
+                {v.propertyShown && <span className="font-medium text-navy">· {v.propertyShown}</span>}
                 <span>{v.date}</span>
                 <Badge color={v.status === "visit_done" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}>
                   {v.status}
@@ -1045,6 +1059,20 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
             </button>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input
+              type="text"
+              list="property-shown-options"
+              required
+              placeholder="Property actually shown * (search & pick)"
+              value={fb.propertyShown}
+              onChange={(e) => setFb({ ...fb, propertyShown: e.target.value })}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm sm:col-span-3"
+            />
+            <datalist id="property-shown-options">
+              {data.propertyOptions.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
             <select
               required
               value={fb.interest}

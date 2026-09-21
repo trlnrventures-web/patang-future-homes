@@ -136,6 +136,9 @@ function createTables(sqlite: Database.Database) {
       transport_requirement TEXT,
       status TEXT NOT NULL DEFAULT 'proposed',
       notes TEXT,
+      property_shown TEXT,
+      recommended_properties TEXT,
+      properties_shown TEXT,
       done_at TEXT,
       created_at TEXT NOT NULL DEFAULT ''
     );
@@ -505,6 +508,15 @@ function migrateSiteVisits(sqlite: Database.Database) {
   const have = new Set(cols.map((c) => c.name));
   if (!have.has("done_at")) {
     sqlite.exec("ALTER TABLE site_visits ADD COLUMN done_at TEXT");
+  }
+  if (!have.has("property_shown")) {
+    sqlite.exec("ALTER TABLE site_visits ADD COLUMN property_shown TEXT");
+  }
+  if (!have.has("recommended_properties")) {
+    sqlite.exec("ALTER TABLE site_visits ADD COLUMN recommended_properties TEXT");
+  }
+  if (!have.has("properties_shown")) {
+    sqlite.exec("ALTER TABLE site_visits ADD COLUMN properties_shown TEXT");
   }
 }
 

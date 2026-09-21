@@ -7,6 +7,8 @@ import * as schema from "@/lib/crm/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, findLikelyDuplicates } from "@/lib/crm/leads";
+import { projects } from "@/lib/projects";
+import { marketInventory } from "@/lib/crm/market-inventory";
 import { Badge } from "@/components/crm/ui";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
@@ -18,12 +20,16 @@ export const metadata: Metadata = {
 
 export default async function LeadDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/crm/login");
 
+  const query = await searchParams;
+  const initialVisitOpen = query.visit === "1";
   const { id } = await params;
   const leadId = Number(id);
   if (Number.isNaN(leadId)) notFound();
@@ -132,6 +138,10 @@ activities,
     duplicates: user.role === "admin" || user.role === "sales_head"
       ? findLikelyDuplicates(db, lead)
       : [],
+    propertyOptions: [
+      ...projects.map((p) => p.title),
+      ...marketInventory.map((m) => m.project),
+    ].sort((a, b) => a.localeCompare(b)),
   };
 
   return (
@@ -158,7 +168,11 @@ activities,
         </div>
       </div>
 
-      <LeadDetail data={leadData} currentUser={user} />
+      <LeadDetail
+        data={leadData}
+        currentUser={user}
+        initialVisitOpen={initialVisitOpen}
+      />
 
       <div className="mt-8 scroll-mt-24" id="message-center">
         <h2 className="mb-3 text-base font-bold text-primary">

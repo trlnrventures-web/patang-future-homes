@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import {
@@ -20,6 +20,13 @@ import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import { slaStatusMeta, formatLeadAge } from "@/lib/crm/sla";
 import { matchLevelMeta, type PropertyMatch } from "@/lib/crm/matching";
 import { SUB_LOCATIONS, priceValidityInfo } from "@/lib/projects";
+import SiteVisitModal, {
+  parseShown,
+  shownSummary,
+  type RecommendedProperty,
+  type ShownProperty,
+  type VisitRecord,
+} from "./SiteVisitModal";
 
 export type LeadDetailData = {
   lead: Record<string, any>;
@@ -29,6 +36,7 @@ export type LeadDetailData = {
   users: { id: number; name: string; role: string }[];
   latestFeedback: Record<string, any> | null;
   duplicates: { id: number; name: string; phone: string; reason: string }[];
+  propertyOptions: string[];
 };
 
 const FUNNEL_STAGES: { key: string; label: string; status: string; matches: string[] }[] = [
@@ -62,9 +70,10 @@ const OVERFLOW_STATUSES = [
 type Props = {
   data: LeadDetailData;
   currentUser: { id: number; role: string; name: string };
+  initialVisitOpen?: boolean;
 };
 
-export default function LeadDetail({ data, currentUser }: Props) {
+export default function LeadDetail({ data, currentUser, initialVisitOpen }: Props) {
   const [lead, setLead] = useState(data.lead);
   const [activities, setActivities] = useState(data.activities);
   const [followUps, setFollowUps] = useState(data.followUps);
@@ -77,7 +86,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
   const [tagText, setTagText] = useState("");
   const [tagLogged, setTagLogged] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
-  const [showVisit, setShowVisit] = useState(false);
+  const [showVisit, setShowVisit] = useState(Boolean(initialVisitOpen));
   const [showCallback, setShowCallback] = useState(false);
   const [selectedSm, setSelectedSm] = useState<number | "">("");
   const [selectedCaller, setSelectedCaller] = useState<number | "">("");
@@ -100,6 +109,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
     project: "",
     meetingPoint: "",
   });
+  const [visitStartView, setVisitStartView] = useState<"book" | "manage" | null>(null);
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
   const callerUsers = data.users.filter((u) => u.role === "caller");
@@ -351,25 +361,45 @@ export default function LeadDetail({ data, currentUser }: Props) {
     }
   };
 
-  const handleVisit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
+  const handleBookVisit = async (payload: {
+    visitDate: string;
+    visitTime: string;
+    projectId: string;
+    meetingPoint: string;
+    notes: string;
+    recommendedProperties: RecommendedProperty[];
+  }) => {
     setBusy(true);
     try {
       await postActivity({
         type: "visit_booked",
-        visitDate: formData.get("visitDate"),
-        visitTime: formData.get("visitTime"),
-        meetingPoint: formData.get("meetingPoint"),
-        projectId: formData.get("visitProject"),
+        visitDate: payload.visitDate,
+        visitTime: payload.visitTime,
+        meetingPoint: payload.meetingPoint,
+        projectId: payload.projectId,
+        recommendedProperties: payload.recommendedProperties,
         smId: lead.assignedSmId || currentUser.id,
-        notes: formData.get("visitNote"),
+        notes: payload.notes,
       });
       showToast("Site visit booked");
       setShowVisit(false);
       reload();
     } catch {
       showToast("Could not book visit");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVisitDone = async (visitId: number, propertiesShown: ShownProperty[]) => {
+    setBusy(true);
+    try {
+      await postActivity({ type: "visit_done", visitId, propertiesShown });
+      showToast("Visit marked done");
+      setShowVisit(false);
+      reload();
+    } catch {
+      showToast("Could not update visit");
     } finally {
       setBusy(false);
     }
@@ -397,6 +427,12 @@ export default function LeadDetail({ data, currentUser }: Props) {
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || b.id - a.id)[0] ||
     null;
 
+  const recommendedProperties: RecommendedProperty[] = matches.map((m) => ({
+    slug: m.projectSlug,
+    title: m.title,
+    source: m.source,
+  }));
+
   const SECOND_VISIT_MESSAGE =
     "Great to see your interest! Would you like to bring your family for a second look this weekend? I can arrange a convenient time.";
   const shouldSuggestSecondVisit =
@@ -406,6 +442,16 @@ export default function LeadDetail({ data, currentUser }: Props) {
       latestFeedback.likedProperty === true);
 
   const requiredFieldsFilled = Boolean(lead.bhk && (lead.budget || (lead.budgetMin && lead.budgetMax)) && lead.location);
+
+  // Recommendations are visible by default — fetch matches as soon as the
+  // requirement is complete, no need to tap "Recommend Property".
+  const autoMatchedRef = useRef(false);
+  useEffect(() => {
+    if (requiredFieldsFilled && !readOnly && !autoMatchedRef.current) {
+      autoMatchedRef.current = true;
+      refreshMatches();
+    }
+  }, [requiredFieldsFilled, readOnly, refreshMatches]);
 
   const stageIndex = FUNNEL_STAGES.findIndex((s) => s.matches.includes(lead.status));
   const hasProgressed =
@@ -517,6 +563,20 @@ export default function LeadDetail({ data, currentUser }: Props) {
             <WhatsAppIcon />
             WhatsApp
           </a>
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={openVisit}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-colors hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              Site Visit
+            </button>
+          )}
         </div>
       </div>
 
@@ -568,7 +628,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
                     label="Book Site Visit"
                     hint="Schedule a project visit"
                     color="bg-emerald-50 text-emerald-700"
-                    onClick={() => { setMoreActionsOpen(false); openVisit(); scrollToSection("visit-form"); }}
+                    onClick={() => { setMoreActionsOpen(false); openVisit(); }}
                     icon={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>}
                   />
                 </>
@@ -601,98 +661,6 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </>
         )}
       </div>
-
-      {/* ===== Site Visit action (stage-synced) ===== */}
-      {!readOnly && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-primary">Site Visit</h3>
-            {latestVisit && (
-              <Badge color={visitStatusMeta(String(latestVisit.status)).cls}>
-                {visitStatusMeta(String(latestVisit.status)).label}
-              </Badge>
-            )}
-          </div>
-          {latestVisit ? (
-            <>
-              <div className="rounded-xl bg-white px-3 py-2.5 text-sm">
-                <div className="font-semibold text-navy">
-                  {latestVisit.projectId || "Project TBD"} · {latestVisit.date || "Date TBD"}{" "}
-                  {latestVisit.time || ""}
-                </div>
-                <div className="mt-0.5 text-xs text-muted">
-                  SM: {latestVisit.smName || lead.assignedSmName || ""}
-                  {latestVisit.meetingPoint ? ` · ${latestVisit.meetingPoint}` : ""}
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["proposed", "booked"].includes(String(latestVisit.status)) && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => handleVisitStatus("visit_confirmed", latestVisit.id)}
-                    className="rounded-xl bg-teal-600 px-3.5 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                  >
-                    ✓ Confirm Visit
-                  </button>
-                )}
-                {!["visit_done", "cancelled"].includes(String(latestVisit.status)) && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleVisitStatus("visit_done", latestVisit.id)}
-                      className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                    >
-                      Mark Visit Done
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleVisitStatus("visit_no_show", latestVisit.id)}
-                      className="rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50"
-                    >
-                      No Show
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleVisitStatus("visit_cancelled", latestVisit.id)}
-                      className="rounded-xl border border-border bg-white px-3.5 py-2 text-xs font-bold text-muted transition-colors hover:bg-background disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                )}
-                {["visit_done", "cancelled", "no_show"].includes(String(latestVisit.status)) && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={openVisit}
-                    className="rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50"
-                  >
-                    + Book Another Visit
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted">
-                No site visit yet. Book one to move this lead forward.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={openVisit}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                Book Site Visit
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ===== 2nd visit suggestion (post-visit feedback) ===== */}
       {shouldSuggestSecondVisit && (
@@ -750,6 +718,10 @@ export default function LeadDetail({ data, currentUser }: Props) {
               { t: "call_wrong_number", label: "Wrong Number", color: "bg-red-100 text-red-700" },
               { t: "call_back", label: "Call Back", color: "bg-blue-100 text-blue-800" },
               { t: "call_not_interested", label: "Not Interested", color: "bg-slate-200 text-slate-700" },
+              { t: "call_switched_off", label: "Switched Off", color: "bg-amber-100 text-amber-800" },
+              { t: "call_number_invalid", label: "Number Invalid", color: "bg-red-100 text-red-700" },
+              { t: "call_whatsapp_only", label: "Requested WhatsApp Only", color: "bg-emerald-100 text-emerald-800" },
+              { t: "call_language_barrier", label: "Language Barrier", color: "bg-purple-100 text-purple-800" },
               { t: "call_other", label: "Other", color: "bg-gray-100 text-gray-700" },
             ].map((b) => (
               <button
@@ -1317,7 +1289,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       {/* ===== END TWO-COLUMN LAYOUT ===== */}
 
       {/* ===== Property matches ===== */}
-      {(showMatches || matches.length > 0) && (
+      {(showMatches || matches.length > 0 || requiredFieldsFilled) && (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-primary">Matching Properties</h3>
@@ -1338,8 +1310,9 @@ export default function LeadDetail({ data, currentUser }: Props) {
           </div>
           {matches.length === 0 ? (
             <p className="text-xs text-muted">
-              Complete the requirement (budget, location, BHK) then tap Recommend Property to see
-              the best matches.
+              {requiredFieldsFilled
+                ? "No matching properties yet — tap Recommend Property to refresh."
+                : "Complete the requirement (budget, location, BHK) to see the best matches automatically."}
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -1451,33 +1424,21 @@ export default function LeadDetail({ data, currentUser }: Props) {
         </form>
       )}
 
-      {/* ===== Visit form ===== */}
-      {showVisit && (
-        <form onSubmit={handleVisit} id="visit-form" className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 scroll-mt-24">
-          <h3 className="text-sm font-bold text-primary">Book Site Visit</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted">Date</label>
-              <input type="date" name="visitDate" required defaultValue={visitDefaults.date} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted">Time</label>
-              <input type="time" name="visitTime" required defaultValue={visitDefaults.time || "11:00"} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-muted">Project</label>
-            <input type="text" name="visitProject" defaultValue={visitDefaults.project || lead.preferredProject || lead.originalProject || ""} className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-muted">Meeting Point</label>
-            <input type="text" name="meetingPoint" defaultValue={visitDefaults.meetingPoint} placeholder="e.g. Project gate, Vasai West station..." className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" disabled={busy}>Book Visit</Button>
-            <Button variant="ghost" onClick={() => setShowVisit(false)}>Cancel</Button>
-          </div>
-        </form>
+      {/* ===== Site visit popup (book / manage / mandatory tagging) ===== */}
+      {showVisit && !readOnly && (
+        <SiteVisitModal
+          key={latestVisit ? `visit-${latestVisit.id}` : "new-visit"}
+          visit={latestVisit as VisitRecord | null}
+          recommendations={recommendedProperties}
+          propertyOptions={data.propertyOptions}
+          defaults={visitDefaults}
+          initialView={visitStartView ?? undefined}
+          busy={busy}
+          onClose={() => setShowVisit(false)}
+          onBook={handleBookVisit}
+          onStatus={handleVisitStatus}
+          onDone={handleVisitDone}
+        />
       )}
 
       {/* ===== Lower detail grid (2 columns) ===== */}
@@ -1515,6 +1476,15 @@ export default function LeadDetail({ data, currentUser }: Props) {
                       {v.projectId || ""} · {v.date || "TBD"} {v.time}
                     </div>
                     <div className="text-xs text-muted">SM: {v.smName || ""}</div>
+                    {(() => {
+                      const tags = parseShown(v.propertiesShown);
+                      const summary = tags.length > 0 ? shownSummary(tags) : v.propertyShown;
+                      return summary ? (
+                        <div className="mt-0.5 text-xs font-medium text-emerald-700">
+                          Shown: {summary}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   <Badge color={visitStatusMeta(String(v.status)).cls}>
                     {visitStatusMeta(String(v.status)).label}
@@ -1763,6 +1733,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       project: lead.preferredProject || lead.originalProject || "",
       meetingPoint: "",
     });
+    setVisitStartView(null);
     setShowVisit(true);
   }
 
@@ -1777,6 +1748,7 @@ export default function LeadDetail({ data, currentUser }: Props) {
       project: last?.projectId || lead.preferredProject || lead.originalProject || "",
       meetingPoint: last?.meetingPoint || "Project site, Vasai",
     });
+    setVisitStartView("book");
     setShowVisit(true);
     postActivity({
       type: "visit_proposed",

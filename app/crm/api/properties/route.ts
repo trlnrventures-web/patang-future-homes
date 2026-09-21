@@ -66,6 +66,7 @@ export async function GET() {
     projects: projects.map((p) => ({
       slug: p.slug,
       title: p.title || "",
+      category: p.category === "resale" ? "resale" : "primary",
       location: p.location || "",
       area: p.area || "",
       type: p.type || "",
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
 
     const project: ProjectRecord = {
       slug,
+      category: body.category === "resale" ? "resale" : "primary",
       tier: body.tier || "affordable",
       title,
       location: body.location || "Vasai West",

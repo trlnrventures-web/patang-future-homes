@@ -53,6 +53,11 @@ export function istToday(): string {
   return ist.toISOString().slice(0, 10);
 }
 
+export function istNow(): string {
+  const ist = new Date(Date.now() + IST_OFFSET_MS);
+  return ist.toISOString().slice(0, 16);
+}
+
 export function istDayRange(date: string): { from: string; to: string } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error("Invalid date");

@@ -20,6 +20,7 @@ type ConfigRecord = {
 type ProjectShape = {
   slug?: string;
   title?: string;
+  category?: string;
   location?: string;
   area?: string;
   type?: string;
@@ -94,6 +95,7 @@ export default function PropertyForm({
   const [form, setForm] = useState<ProjectShape>({
     slug: initial?.slug || "",
     title: initial?.title || "",
+    category: initial?.category || "primary",
     location: initial?.location || "Vasai West",
     area: initial?.area || "west",
     type: initial?.type || "flat",
@@ -120,6 +122,8 @@ export default function PropertyForm({
 
   const set = <K extends keyof ProjectShape>(key: K, value: ProjectShape[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const isResale = form.category === "resale";
 
   const setListItem = <K extends "usps" | "images" | "nearbyLandmarks">(
     key: K,
@@ -215,10 +219,23 @@ export default function PropertyForm({
     setError("");
     try {
       const basePath = `/crm/api/properties${mode === "edit" && initial?.slug ? `/${initial.slug}` : ""}`;
+      const payload: ProjectShape = isResale
+        ? {
+            ...form,
+            images: [],
+            metaTitle: "",
+            metaDescription: "",
+            configurations: (form.configurations || []).map((c) => ({
+              ...c,
+              amenities: [],
+              floorPlanImage: "",
+            })),
+          }
+        : form;
       const res = await fetch(basePath, {
         method: mode === "edit" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -241,6 +258,41 @@ export default function PropertyForm({
           {error}
         </div>
       )}
+
+      <Section title="Category">
+        <div className="flex flex-wrap gap-2">
+          {[
+            {
+              v: "primary",
+              label: "Primary (Website)",
+              hint: "New launch / builder project shown on the public website.",
+            },
+            {
+              v: "resale",
+              label: "Resale",
+              hint: "Owner resale listing. Amenities, floor plan, SEO and images are hidden.",
+            },
+          ].map((c) => (
+            <button
+              key={c.v}
+              type="button"
+              onClick={() => set("category", c.v)}
+              className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                form.category === c.v
+                  ? "border-primary bg-primary text-white"
+                  : "border-border bg-background/50 text-navy hover:border-primary/40"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-soft">
+          {isResale
+            ? "Resale listing. Amenities, floor plan, SEO and images are hidden."
+            : "Primary listing shown on the public website with the full details."}
+        </p>
+      </Section>
 
       <Section title="Identity">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -358,9 +410,11 @@ export default function PropertyForm({
               <Field label="Price">
                 <input className={inputCls} value={c.price} onChange={(e) => setConfig(i, { price: e.target.value })} placeholder="e.g. ₹54 Lacs" />
               </Field>
-              <Field label="Floor plan image URL">
-                <input className={inputCls} value={c.floorPlanImage} onChange={(e) => setConfig(i, { floorPlanImage: e.target.value })} placeholder="/projects/... or https://..." />
-              </Field>
+              {!isResale && (
+                <Field label="Floor plan image URL">
+                  <input className={inputCls} value={c.floorPlanImage} onChange={(e) => setConfig(i, { floorPlanImage: e.target.value })} placeholder="/projects/... or https://..." />
+                </Field>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-xs font-semibold text-navy">
@@ -372,17 +426,19 @@ export default function PropertyForm({
                 Parking included
               </label>
             </div>
-            <div className="mt-3">
-              <p className="mb-1.5 text-xs font-semibold text-muted">Amenities</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {AMENITY_OPTIONS.map((a) => (
-                  <label key={a.key} className="flex items-center gap-1.5 text-xs text-navy">
-                    <input type="checkbox" checked={c.amenities.includes(a.key)} onChange={() => toggleConfigAmenity(i, a.key)} />
-                    {a.label}
-                  </label>
-                ))}
+            {!isResale && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-xs font-semibold text-muted">Amenities</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {AMENITY_OPTIONS.map((a) => (
+                    <label key={a.key} className="flex items-center gap-1.5 text-xs text-navy">
+                      <input type="checkbox" checked={c.amenities.includes(a.key)} onChange={() => toggleConfigAmenity(i, a.key)} />
+                      {a.label}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ))}
         <button
@@ -423,6 +479,7 @@ export default function PropertyForm({
         </button>
       </Section>
 
+      {!isResale && (
       <Section title="Images (/projects/{slug}/… or full URLs)">
         {(form.images || []).map((img, i) => (
           <div key={i} className="flex gap-2">
@@ -436,6 +493,7 @@ export default function PropertyForm({
           + Add image
         </button>
       </Section>
+      )}
 
       <Section title="Nearby Landmarks">
         {(form.nearbyLandmarks || []).map((lm, i) => (
@@ -452,14 +510,16 @@ export default function PropertyForm({
         </button>
       </Section>
 
-      <Section title="SEO">
-        <Field label="Meta title">
-          <input className={inputCls} value={String(form.metaTitle || "")} onChange={(e) => set("metaTitle", e.target.value)} />
-        </Field>
-        <Field label="Meta description">
-          <textarea rows={2} className={inputCls} value={String(form.metaDescription || "")} onChange={(e) => set("metaDescription", e.target.value)} />
-        </Field>
-      </Section>
+      {!isResale && (
+        <Section title="SEO">
+          <Field label="Meta title">
+            <input className={inputCls} value={String(form.metaTitle || "")} onChange={(e) => set("metaTitle", e.target.value)} />
+          </Field>
+          <Field label="Meta description">
+            <textarea rows={2} className={inputCls} value={String(form.metaDescription || "")} onChange={(e) => set("metaDescription", e.target.value)} />
+          </Field>
+        </Section>
+      )}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={busy}>

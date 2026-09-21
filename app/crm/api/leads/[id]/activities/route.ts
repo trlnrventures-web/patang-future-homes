@@ -96,6 +96,10 @@ export async function POST(
       call_busy: "calling",
       call_wrong_number: "invalid",
       call_not_interested: "nurture",
+      call_switched_off: "no_response",
+      call_number_invalid: "invalid",
+      call_whatsapp_only: "connected",
+      call_language_barrier: "calling",
       whatssap: lead.status === "new" ? "calling" : lead.status,
       qualification: "qualified",
     };
@@ -107,6 +111,10 @@ export async function POST(
       body.type === "call_busy" ||
       body.type === "call_wrong_number" ||
       body.type === "call_not_interested" ||
+      body.type === "call_switched_off" ||
+      body.type === "call_number_invalid" ||
+      body.type === "call_whatsapp_only" ||
+      body.type === "call_language_barrier" ||
       (body.type === "call" && body.outcome);
 
     // ---- Call attempt accounting (never fabricates duration) ----
@@ -184,6 +192,43 @@ export async function POST(
       newStatus = "nurture";
       leadUpdates.concern = lead.concern || "not_interested";
       leadUpdates.nextAction = "nurture";
+    }
+
+    if (body.type === "call_switched_off") {
+      newStatus = "no_response";
+      const attempts = (lead.attemptCount ?? 0) + 1;
+      const nextAt = body.scheduledFollowUp ? String(body.scheduledFollowUp) : nextNoResponseAttempt(attempts);
+      leadUpdates.attemptCount = attempts;
+      leadUpdates.lastAttemptAt = now;
+      leadUpdates.nextAttemptAt = nextAt;
+      leadUpdates.nextAction = nextAt ? "callback" : "nurture";
+      if (nextAt) {
+        leadUpdates.nextFollowUp = nextAt;
+        db.insert(schema.followUps).values({
+          leadId: lead.id,
+          userId: user.id,
+          scheduledFor: nextAt,
+          purpose: `Call back attempt ${attempts}`,
+          status: "pending",
+          notes: body.notes || "",
+          createdAt: now,
+        }).run();
+      }
+    }
+
+    if (body.type === "call_number_invalid") {
+      newStatus = "invalid";
+      leadUpdates.nextAction = "none";
+    }
+
+    if (body.type === "call_whatsapp_only") {
+      newStatus = "connected";
+      leadUpdates.nextAction = "follow_up";
+    }
+
+    if (body.type === "call_language_barrier") {
+      newStatus = "calling";
+      leadUpdates.nextAction = "review_assignment";
     }
 
     if (
@@ -270,6 +315,9 @@ export async function POST(
         transportRequirement: body.transportRequirement || "",
         status: body.visitStatus || body.type.replace("visit_", ""),
         notes: body.notes || "",
+        recommendedProperties: Array.isArray(body.recommendedProperties)
+          ? JSON.stringify(body.recommendedProperties)
+          : null,
         createdAt: now,
       }).run();
       newStatus = body.type === "visit_proposed" ? "visit_proposed" : "visit_booked";
@@ -300,7 +348,11 @@ export async function POST(
           createdAt: now,
         }).run();
         db.update(schema.siteVisits)
-          .set({ status: "visit_done", doneAt: latestVisit.doneAt || now })
+          .set({
+            status: "visit_done",
+            doneAt: latestVisit.doneAt || now,
+            propertyShown: body.propertyShown || latestVisit.propertyShown || null,
+          })
           .where(eq(schema.siteVisits.id, latestVisit.id))
           .run();
       }
@@ -341,11 +393,26 @@ export async function POST(
                 ? "cancelled"
                 : "visit_done";
       if (target) {
+        const visitSet: Partial<typeof schema.siteVisits.$inferInsert> = {
+          status: nextVisitStatus,
+          doneAt: body.type === "visit_done" ? now : target.doneAt,
+        };
+        if (body.type === "visit_done" && Array.isArray(body.propertiesShown)) {
+          visitSet.propertiesShown = JSON.stringify(body.propertiesShown);
+          visitSet.propertyShown = body.propertiesShown
+            .map((p: { title: string; shown: boolean; added?: boolean }) =>
+              p.added
+                ? `+ ${p.title} (added)`
+                : p.shown
+                  ? `${p.title} ✓`
+                  : `${p.title} ✗ (not shown)`
+            )
+            .join(", ");
+        } else if (body.type === "visit_done" && body.propertyShown) {
+          visitSet.propertyShown = body.propertyShown;
+        }
         db.update(schema.siteVisits)
-          .set({
-            status: nextVisitStatus,
-            doneAt: body.type === "visit_done" ? now : target.doneAt,
-          })
+          .set(visitSet)
           .where(eq(schema.siteVisits.id, target.id))
           .run();
         if (body.type === "visit_confirmed") {

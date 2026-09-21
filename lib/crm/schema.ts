@@ -168,7 +168,9 @@ export const activities = sqliteTable("activities", {
   type: text("type", {
     enum: [
       "call", "call_connected", "call_no_answer", "call_busy",
-      "call_wrong_number", "call_back", "whatsapp", "note",
+      "call_wrong_number", "call_back", "call_not_interested", "call_other",
+      "call_switched_off", "call_number_invalid", "call_whatsapp_only",
+      "call_language_barrier", "whatsapp", "note",
       "status_change", "qualification", "assignment", "follow_up",
       "visit_proposed", "visit_booked", "visit_confirmed", "visit_done",
       "visit_no_show", "visit_cancelled", "post_visit_feedback",
@@ -229,6 +231,9 @@ export const siteVisits = sqliteTable("site_visits", {
     .notNull()
     .default("proposed"),
   notes: text("notes"),
+  propertyShown: text("property_shown"),
+  recommendedProperties: text("recommended_properties"),
+  propertiesShown: text("properties_shown"),
   doneAt: text("done_at"),
   createdAt: text("created_at").notNull().default(""),
 });

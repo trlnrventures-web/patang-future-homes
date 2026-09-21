@@ -35,6 +35,7 @@ type PropRow = {
   possessionDate: string;
   shortDescription: string;
   isActive: boolean;
+  category?: string;
   bhkOptions: string[];
   configurations: ConfigRow[];
   source: PropSource;
@@ -215,6 +216,7 @@ export default function PropertiesManager() {
                   <p className="text-xs text-muted">
                     {areaLabel(p.area)}
                     {p.subLocation ? ` · ${p.subLocation}` : ""} · {p.type}
+                    {p.category === "resale" ? " · Resale" : ""}
                   </p>
                 </div>
                 {p.source === "market" ? (

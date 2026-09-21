@@ -9,6 +9,7 @@ import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/crm/leads";
 import { Badge } from "@/components/crm/ui";
 import NegotiationWorkspace, { NegotiationData } from "@/components/crm/NegotiationWorkspace";
 import { projects } from "@/lib/projects";
+import { marketInventory } from "@/lib/crm/market-inventory";
 
 export const metadata: Metadata = {
   title: { absolute: "Negotiation | Patang CRM" },
@@ -94,6 +95,11 @@ export default async function NegotiationPage({
 
   const projectMap = Object.fromEntries(projects.map((p) => [p.slug, p.title]));
 
+  const propertyOptions = [
+    ...projects.map((p) => p.title),
+    ...marketInventory.map((e) => e.project),
+  ].sort((a, b) => a.localeCompare(b));
+
   const leadData = {
     ...lead,
     assignedCallerName: lead.assignedCallerId
@@ -111,6 +117,7 @@ export default async function NegotiationPage({
     visits,
     bookings,
     projectMap,
+    propertyOptions,
   };
 
   return (
