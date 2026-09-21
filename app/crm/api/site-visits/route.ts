@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/crm/auth";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
+import { eq } from "drizzle-orm";
 import { projects } from "@/lib/projects";
 import { marketInventory, marketSlug } from "@/lib/crm/market-inventory";
 
@@ -58,4 +59,33 @@ export async function GET() {
     .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
 
   return NextResponse.json({ visits, role: user.role });
+}
+
+export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (user.role === "marketing") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const visitId = Number(body.visitId);
+  if (!visitId) return NextResponse.json({ error: "visitId required" }, { status: 400 });
+
+  const db = getDb();
+  const visit = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.id, visitId)).get();
+  if (!visit) return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+
+  const isAdmin = user.role === "admin" || user.role === "sales_head";
+  if (!isAdmin && visit.smId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  db.update(schema.siteVisits)
+    .set({ status: "cancelled" })
+    .where(eq(schema.siteVisits.id, visitId))
+    .run();
+
+  return NextResponse.json({ ok: true });
 }

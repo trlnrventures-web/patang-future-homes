@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { getAuthUser, canManageProperties } from "@/lib/crm/auth";
 import {
   readProjectsFile,
   writeProjectsFile,
@@ -59,7 +59,7 @@ function mapConfigurations(p: ProjectRecord) {
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const projects = readProjectsFile();
   return NextResponse.json({
@@ -121,7 +121,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const body: Record<string, unknown> = await request.json();

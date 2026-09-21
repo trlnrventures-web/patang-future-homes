@@ -112,6 +112,7 @@ export default function SiteVisitsCalendar() {
   const [error, setError] = useState("");
   const [view, setView] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState(todayIst());
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -131,6 +132,25 @@ export default function SiteVisitsCalendar() {
       active = false;
     };
   }, []);
+
+  const cancelVisit = async (visitId: number) => {
+    if (!window.confirm("Cancel this site visit?")) return;
+    setDeleting(visitId);
+    try {
+      const res = await fetch("/crm/api/site-visits", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitId }),
+      });
+      if (res.ok) {
+        setVisits((prev) =>
+          prev.map((v) => (v.id === visitId ? { ...v, status: "cancelled" } : v))
+        );
+      }
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const byDate = useMemo(() => {
     const map = new Map<string, Visit[]>();
@@ -276,17 +296,29 @@ export default function SiteVisitsCalendar() {
                       </div>
                       <div className="space-y-1">
                         {dayVisits.slice(0, 3).map((v) => (
-                          <Link
-                            key={v.id}
-                            href={`/crm/leads/${v.leadId}`}
-                            className={`block truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${chipCls(
-                              v.status
-                            )}`}
-                            title={`${v.customerName} · ${v.projectName} · ${statusMeta(v.status).label}`}
-                          >
-                            {v.time ? `${v.time} ` : ""}
-                            {v.customerName || v.projectName || "Visit"}
-                          </Link>
+                          <div key={v.id} className="group flex items-center">
+                            <Link
+                              href={`/crm/leads/${v.leadId}`}
+                              className={`min-w-0 flex-1 truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${chipCls(
+                                v.status
+                              )}`}
+                              title={`${v.customerName} · ${v.projectName} · ${statusMeta(v.status).label}`}
+                            >
+                              {v.time ? `${v.time} ` : ""}
+                              {v.customerName || v.projectName || "Visit"}
+                            </Link>
+                            {v.status !== "cancelled" && v.status !== "visit_done" && (
+                              <button
+                                type="button"
+                                disabled={deleting === v.id}
+                                onClick={(e) => { e.preventDefault(); cancelVisit(v.id); }}
+                                className="ml-0.5 hidden shrink-0 rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600 group-hover:inline-flex disabled:opacity-50"
+                                title="Cancel visit"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3 w-3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                              </button>
+                            )}
+                          </div>
                         ))}
                         {dayVisits.length > 3 && (
                           <div className="px-1 text-[10px] font-semibold text-soft">
@@ -324,29 +356,41 @@ export default function SiteVisitsCalendar() {
                           <p className="text-[11px] text-soft">—</p>
                         ) : (
                           dayVisits.map((v) => (
-                            <Link
-                              key={v.id}
-                              href={`/crm/leads/${v.leadId}`}
-                              className="block rounded-xl border border-border bg-white p-2 transition-colors hover:border-primary/30"
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="text-[11px] font-bold text-navy">
-                                  {v.time || "TBD"}
-                                </span>
-                                <Badge color={statusMeta(v.status).cls}>
-                                  {statusMeta(v.status).label}
-                                </Badge>
-                              </div>
-                              <div className="mt-1 truncate text-xs font-semibold text-navy">
-                                {v.customerName || "Lead"}
-                              </div>
-                              <div className="truncate text-[11px] text-muted">
-                                {v.projectName || "Project TBD"}
-                              </div>
-                              {v.smName && (
-                                <div className="truncate text-[10px] text-soft">SM: {v.smName}</div>
+                            <div key={v.id} className="group relative">
+                              <Link
+                                href={`/crm/leads/${v.leadId}`}
+                                className="block rounded-xl border border-border bg-white p-2 transition-colors hover:border-primary/30"
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[11px] font-bold text-navy">
+                                    {v.time || "TBD"}
+                                  </span>
+                                  <Badge color={statusMeta(v.status).cls}>
+                                    {statusMeta(v.status).label}
+                                  </Badge>
+                                </div>
+                                <div className="mt-1 truncate text-xs font-semibold text-navy">
+                                  {v.customerName || "Lead"}
+                                </div>
+                                <div className="truncate text-[11px] text-muted">
+                                  {v.projectName || "Project TBD"}
+                                </div>
+                                {v.smName && (
+                                  <div className="truncate text-[10px] text-soft">SM: {v.smName}</div>
+                                )}
+                              </Link>
+                              {v.status !== "cancelled" && v.status !== "visit_done" && (
+                                <button
+                                  type="button"
+                                  disabled={deleting === v.id}
+                                  onClick={(e) => { e.preventDefault(); cancelVisit(v.id); }}
+                                  className="absolute right-1.5 top-1.5 hidden rounded-md bg-white/90 p-1 text-red-400 shadow-sm hover:bg-red-50 hover:text-red-600 group-hover:inline-flex disabled:opacity-50"
+                                  title="Cancel visit"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3 w-3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                                </button>
                               )}
-                            </Link>
+                            </div>
                           ))
                         )}
                       </div>

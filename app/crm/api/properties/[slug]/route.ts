@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { getAuthUser, canManageProperties } from "@/lib/crm/auth";
 import {
   readProjectsFile,
   writeProjectsFile,
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { slug } = await params;
   const project = readProjectsFile().find((p) => p.slug === slug);
@@ -29,7 +29,7 @@ export async function PATCH(
 ) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const { slug } = await params;
@@ -96,7 +96,7 @@ export async function DELETE(
 ) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { slug } = await params;
   const projects = readProjectsFile();
