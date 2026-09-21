@@ -71,13 +71,16 @@ export default function MessageCenter({
 
   // Auto-load the recommended template for this lead on mount (no logging).
   useEffect(() => {
-    const first = templates.find((t) => t.category === suggestedCategory);
-    if (first) {
-      setCategory(first.category);
-      setTemplateId(first.id);
-      setIsPersonal(false);
-      setDraft(renderMessage(first.body, buildLeadContext(lead)));
-    }
+    const t = setTimeout(() => {
+      const first = templates.find((tmpl) => tmpl.category === suggestedCategory);
+      if (first) {
+        setCategory(first.category);
+        setTemplateId(first.id);
+        setIsPersonal(false);
+        setDraft(renderMessage(first.body, buildLeadContext(lead)));
+      }
+    }, 0);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

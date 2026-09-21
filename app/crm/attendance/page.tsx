@@ -72,6 +72,18 @@ export default async function AttendancePage() {
   const approvedLeave = getApprovedLeaveDaysForUser(user.id);
   const isAdmin = user.role === "admin" || user.role === "sales_head";
 
+  const weekOffDecisionRow = isWeekOffDate(today, weekOffDay)
+    ? db
+        .select()
+        .from(schema.weekOffDecisions)
+        .where(and(eq(schema.weekOffDecisions.userId, user.id), eq(schema.weekOffDecisions.date, today)))
+        .get()
+    : null;
+
+  const weekOffDecision: "taken_off" | "worked" | null = weekOffDecisionRow
+    ? weekOffDecisionRow.decision as "taken_off" | "worked"
+    : null;
+
   const teamView = isAdmin
     ? db
         .select()
@@ -191,6 +203,7 @@ export default async function AttendancePage() {
           myLeaves,
           pendingLeaves,
           teamView,
+          weekOffDecision,
         }}
       />
     </div>

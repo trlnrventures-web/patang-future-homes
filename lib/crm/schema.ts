@@ -18,6 +18,7 @@ export const users = sqliteTable("users", {
     .default(false),
   lastLoginAt: text("last_login_at"),
   weekOffDay: text("week_off_day"),
+  baseSalary: integer("base_salary"),
   createdAt: text("created_at").notNull().default(""),
 });
 
@@ -413,6 +414,44 @@ export const incentivePayments = sqliteTable("incentive_payments", {
   amount: integer("amount").notNull(),
   paidBy: integer("paid_by").references(() => users.id),
   paidAt: text("paid_at").notNull().default(""),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const weekOffDecisions = sqliteTable("week_off_decisions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  date: text("date").notNull(),
+  decision: text("decision", { enum: ["taken_off", "worked"] }).notNull(),
+  leaveBanked: integer("leave_banked", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const salaryReports = sqliteTable("salary_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  month: text("month").notNull(),
+  baseSalary: integer("base_salary").notNull(),
+  daysPresent: integer("days_present").notNull().default(0),
+  daysLate: integer("days_late").notNull().default(0),
+  daysAbsent: integer("days_absent").notNull().default(0),
+  leaveDays: integer("leave_days").notNull().default(0),
+  leaveDaysBankCovered: integer("leave_days_bank_covered").notNull().default(0),
+  leaveDaysDeductible: integer("leave_days_deductible").notNull().default(0),
+  weekOffsTaken: integer("week_offs_taken").notNull().default(0),
+  weekOffsWorkedBanked: integer("week_offs_worked_banked").notNull().default(0),
+  holidaysInMonth: integer("holidays_in_month").notNull().default(0),
+  incentiveEarned: integer("incentive_earned").notNull().default(0),
+  deductions: integer("deductions").notNull().default(0),
+  netPaid: integer("net_paid").notNull().default(0),
+  paymentStatus: text("payment_status", { enum: ["pending", "paid"] })
+    .notNull()
+    .default("pending"),
+  paymentDate: text("payment_date"),
+  generatedBy: integer("generated_by").references(() => users.id),
   createdAt: text("created_at").notNull().default(""),
 });
 

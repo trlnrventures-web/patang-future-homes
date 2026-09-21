@@ -57,6 +57,7 @@ type AttendanceData = {
   myLeaves: LeaveRow[];
   pendingLeaves: (LeaveRow & { userName: string })[];
   teamView: TeamRow[];
+  weekOffDecision: "taken_off" | "worked" | null;
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -91,6 +92,7 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
   const [leaveReason, setLeaveReason] = useState("");
   const [rejectReason, setRejectReason] = useState<Record<number, string>>({});
   const [notice, setNotice] = useState("");
+  const [weekOffBusy, setWeekOffBusy] = useState(false);
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -162,6 +164,25 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
     }
   };
 
+  const declareWeekOff = async (decision: "taken_off" | "worked") => {
+    setWeekOffBusy(true);
+    try {
+      const res = await fetch("/crm/api/week-off", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      flash(json.message || "Decision saved");
+      router.refresh();
+    } catch (e: unknown) {
+      flash((e as Error).message || "Something went wrong");
+    } finally {
+      setWeekOffBusy(false);
+    }
+  };
+
   const decideLeave = async (id: number, action: "approve" | "reject") => {
     setBusy(`decide-${id}`);
     try {
@@ -197,17 +218,21 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
           <div>
             <div className="text-xl font-bold text-primary">{data.today}</div>
             <div className="mt-1 text-xs text-muted">
-              {data.isWeekOff
-                ? `Week Off: ${data.weekOffDay}`
-                : data.onLeave
-                  ? "On approved leave today"
-                  : row?.mode === "field_duty"
-                    ? `Field duty: ${row.fieldDutyReason || "No reason given"}`
-                    : row?.checkoutTime
-                      ? `Done: ${row.workingLabel} working`
-                      : row?.checkinTime
-                        ? `Checked in at ${row.checkinTimeLabel} · ${row.statusLabel}`
-                        : "Not checked in yet today"}
+              {data.weekOffDecision === "worked"
+                ? "Working today (week-off banked)"
+                : data.weekOffDecision === "taken_off"
+                  ? `Week Off taken: ${data.weekOffDay}`
+                  : data.isWeekOff
+                    ? `Week Off: ${data.weekOffDay}`
+                    : data.onLeave
+                      ? "On approved leave today"
+                      : row?.mode === "field_duty"
+                        ? `Field duty: ${row.fieldDutyReason || "No reason given"}`
+                        : row?.checkoutTime
+                          ? `Done: ${row.workingLabel} working`
+                          : row?.checkinTime
+                            ? `Checked in at ${row.checkinTimeLabel} · ${row.statusLabel}`
+                            : "Not checked in yet today"}
             </div>
             {row?.distanceM != null && (
               <div className="mt-1 text-[11px] text-soft">
@@ -264,6 +289,48 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
           )}
         </div>
       </div>
+
+      {/* Week-off declaration prompt */}
+      {data.isWeekOff && !data.onLeave && !data.weekOffDecision && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
+          <div className="text-center">
+            <div className="text-lg font-bold text-amber-800">It&apos;s your week-off day ({data.weekOffDay})</div>
+            <div className="mt-1 text-sm text-amber-700">Are you taking your week off today?</div>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => declareWeekOff("taken_off")}
+                disabled={weekOffBusy}
+                className="rounded-xl bg-amber-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {weekOffBusy ? "..." : "Yes, taking it off"}
+              </button>
+              <button
+                onClick={() => declareWeekOff("worked")}
+                disabled={weekOffBusy}
+                className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+              >
+                {weekOffBusy ? "..." : "No, I\u2019m working today"}
+              </button>
+            </div>
+            <div className="mt-2 text-[11px] text-amber-600">
+              Working today will bank 1 leave credit for use within the next 2 months.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Week-off already decided */}
+      {data.isWeekOff && !data.onLeave && data.weekOffDecision && (
+        <div className={`rounded-2xl border p-4 text-center text-sm font-medium ${
+          data.weekOffDecision === "worked"
+            ? "border-green-200 bg-green-50 text-green-800"
+            : "border-gray-200 bg-gray-50 text-gray-600"
+        }`}>
+          {data.weekOffDecision === "worked"
+            ? "You chose to work today. 1 leave credit banked."
+            : "Week-off taken. Enjoy your day off!"}
+        </div>
+      )}
 
       {/* This week + leave balance */}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import {
   istToday,
@@ -84,6 +84,18 @@ export async function GET(request: NextRequest) {
   const approvedLeave = getApprovedLeaveDaysForUser(user.id);
   const pendingLeaveCount = getPendingLeaveCount(user.id);
 
+  const weekOffDecisionRow = isWeekOffDate(today, weekOffDay)
+    ? db
+        .select()
+        .from(schema.weekOffDecisions)
+        .where(and(eq(schema.weekOffDecisions.userId, user.id), eq(schema.weekOffDecisions.date, today)))
+        .get()
+    : null;
+
+  const weekOffDecision: "taken_off" | "worked" | null = weekOffDecisionRow
+    ? weekOffDecisionRow.decision as "taken_off" | "worked"
+    : null;
+
   const history = lastNDates(14).map((date) => {
     const r = db
       .select()
@@ -108,7 +120,7 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  let myLeaves = db
+  const myLeaves = db
     .select()
     .from(schema.leaveRequests)
     .where(eq(schema.leaveRequests.userId, user.id))
@@ -116,21 +128,19 @@ export async function GET(request: NextRequest) {
     .limit(10)
     .all();
 
-  let pendingLeaves: any[] = [];
-  if (user.role === "admin" || user.role === "sales_head") {
-    pendingLeaves = db
-      .select()
-      .from(schema.leaveRequests)
-      .where(eq(schema.leaveRequests.status, "pending"))
-      .orderBy(desc(schema.leaveRequests.createdAt))
-      .all()
-      .map((lr) => {
-        const u = db.select().from(schema.users).where(eq(schema.users.id, lr.userId)).get();
-        return { ...lr, userName: u?.name || "Unknown", userRole: u?.role || "" };
-      });
-  }
-
-  myLeaves = myLeaves.map((r) => ({ ...r, pendingCount: pendingLeaveCount })) as any;
+  const pendingLeaves =
+    user.role === "admin" || user.role === "sales_head"
+      ? db
+          .select()
+          .from(schema.leaveRequests)
+          .where(eq(schema.leaveRequests.status, "pending"))
+          .orderBy(desc(schema.leaveRequests.createdAt))
+          .all()
+          .map((lr) => {
+            const u = db.select().from(schema.users).where(eq(schema.users.id, lr.userId)).get();
+            return { ...lr, userName: u?.name || "Unknown", userRole: u?.role || "" };
+          })
+      : [];
 
   return NextResponse.json({
     today,
@@ -149,7 +159,7 @@ export async function GET(request: NextRequest) {
     onLeave: approvedLeave.has(today),
     isWeekOff: isWeekOffDate(today, weekOffDay),
     history,
-    myLeaves: myLeaves.map((r: any) => ({
+    myLeaves: myLeaves.map((r) => ({
       id: r.id,
       startDate: r.startDate,
       endDate: r.endDate,
@@ -157,9 +167,11 @@ export async function GET(request: NextRequest) {
       status: r.status,
       rejectionReason: r.rejectionReason,
       createdAt: r.createdAt,
+      pendingCount: pendingLeaveCount,
     })),
     pendingLeaves,
     teamView,
+    weekOffDecision,
   });
 }
 

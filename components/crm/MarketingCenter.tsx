@@ -168,7 +168,8 @@ export default function MarketingCenter({
   }, [query]);
 
   useEffect(() => {
-    loadAll();
+    const t = setTimeout(loadAll, 0);
+    return () => clearTimeout(t);
   }, [loadAll]);
 
   const finance = overview?.canViewFinance ?? false;

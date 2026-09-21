@@ -375,6 +375,43 @@ function createTables(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_company_holidays_date ON company_holidays(date);
 
+    CREATE TABLE IF NOT EXISTS week_off_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      leave_banked INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_week_off_decisions_user_date ON week_off_decisions(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS salary_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      month TEXT NOT NULL,
+      base_salary INTEGER NOT NULL,
+      days_present INTEGER NOT NULL DEFAULT 0,
+      days_late INTEGER NOT NULL DEFAULT 0,
+      days_absent INTEGER NOT NULL DEFAULT 0,
+      leave_days INTEGER NOT NULL DEFAULT 0,
+      leave_days_bank_covered INTEGER NOT NULL DEFAULT 0,
+      leave_days_deductible INTEGER NOT NULL DEFAULT 0,
+      week_offs_taken INTEGER NOT NULL DEFAULT 0,
+      week_offs_worked_banked INTEGER NOT NULL DEFAULT 0,
+      holidays_in_month INTEGER NOT NULL DEFAULT 0,
+      incentive_earned INTEGER NOT NULL DEFAULT 0,
+      deductions INTEGER NOT NULL DEFAULT 0,
+      net_paid INTEGER NOT NULL DEFAULT 0,
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      payment_date TEXT,
+      generated_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (generated_by) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_salary_reports_user_month ON salary_reports(user_id, month);
+
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
     CREATE INDEX IF NOT EXISTS idx_leads_caller ON leads(assigned_caller_id);
     CREATE INDEX IF NOT EXISTS idx_leads_sm ON leads(assigned_sm_id);
@@ -415,6 +452,9 @@ function migrateUsers(sqlite: Database.Database) {
   }
   if (!have.has("must_change_password")) {
     sqlite.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!have.has("base_salary")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN base_salary INTEGER");
   }
 }
 
@@ -513,6 +553,11 @@ function seedData() {
     insertUser.run("Sajan Mishra", "sajan@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
     insertUser.run("Vishrut Jain", "vishrut@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
     insertUser.run("Kirit Godaniya", "kirit@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
+
+    // Set default base salaries
+    sqlite.exec("UPDATE users SET base_salary = 25000 WHERE role = 'caller'");
+    sqlite.exec("UPDATE users SET base_salary = 30000 WHERE role = 'sales_manager'");
+    sqlite.exec("UPDATE users SET base_salary = 50000 WHERE role = 'admin'");
   }
 
   seedMessageTemplates(sqlite);
