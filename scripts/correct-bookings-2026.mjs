@@ -120,14 +120,15 @@ function incentiveReport(month) {
   const leads = db
     .prepare("select id, status, assigned_sm_id, assigned_caller_id, created_at, updated_at from leads")
     .all();
-  const bookings = db
-    .prepare(
-      "select id, lead_id, sm_id, booking_date, status from bookings"
-    )
+  const allConfirmed = db
+    .prepare("select id, lead_id, sm_id, booking_date, status from bookings")
     .all()
-    .filter((b) => b.status === "confirmed" && istMonthKey(b.booking_date) === month);
+    .filter((b) => b.status === "confirmed");
+  const bookings = allConfirmed.filter(
+    (b) => istMonthKey(b.booking_date) === month
+  );
 
-  const counted = new Set(bookings.map((b) => b.lead_id));
+  const counted = new Set(allConfirmed.map((b) => b.lead_id));
   const callerByLead = new Map(leads.map((l) => [l.id, l.assigned_caller_id]));
   const rows = [
     ...bookings.map((b) => ({ smId: b.sm_id, callerId: callerByLead.get(b.lead_id) ?? null })),

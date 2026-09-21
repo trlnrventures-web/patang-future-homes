@@ -146,7 +146,7 @@ export function confirmedBookingsForMonth(month: string, now: Date = new Date())
     .all();
   const callerById = new Map(leads.map((l) => [l.id, l.assignedCallerId]));
 
-  const fromBookingsModule = db
+  const allConfirmedBookings = db
     .select({
       id: schema.bookings.id,
       leadId: schema.bookings.leadId,
@@ -156,9 +156,16 @@ export function confirmedBookingsForMonth(month: string, now: Date = new Date())
     })
     .from(schema.bookings)
     .all()
-    .filter((b) => b.status === "confirmed" && istMonthKey(b.bookingDate) === month);
+    .filter((b) => b.status === "confirmed");
 
-  const countedLeadIds = new Set(fromBookingsModule.map((b) => b.leadId));
+  const fromBookingsModule = allConfirmedBookings.filter(
+    (b) => istMonthKey(b.bookingDate) === month
+  );
+
+  // De-duplicate against the legacy lead-status fallback across ALL months, not
+  // just this one. Otherwise a lead with a confirmed booking in one month would
+  // also be counted in whichever month its updated_at falls.
+  const countedLeadIds = new Set(allConfirmedBookings.map((b) => b.leadId));
 
   const fromLeadStatus = leads
     .filter((l) => l.status === "booked" && !countedLeadIds.has(l.id))
