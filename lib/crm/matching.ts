@@ -210,7 +210,7 @@ function projectToCandidate(p: Project): Candidate {
     extras: {
       allInclusive: configs.some((c) => c.allInclusive === true),
       parkingIncluded: configs.some((c) => c.parkingIncluded === true),
-      amenities: [...new Set(configs.flatMap((c) => c.amenities ?? []))],
+      amenities: [...new Set(p.amenities ?? [])],
     },
   };
 }

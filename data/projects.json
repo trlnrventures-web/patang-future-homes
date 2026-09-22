@@ -11,8 +11,8 @@
     "priceRange": "1 BHK from ₹54 Lacs onwards*",
     "pricePerSqft": "On request",
     "shortDescription": "Sample project showing the new configuration format — multiple 1 & 2 BHK options with pricing, all-inclusive, parking and amenities. Replace with real inventory.",
-    "description": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive, whether parking is included, and a list of ticked amenities. Add real projects from CRM → Properties → Add Property.",
-    "fullDescription": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive, whether parking is included, and a list of ticked amenities. Add real projects from CRM → Properties → Add Property.",
+    "description": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive and whether parking is included, while amenities are set once at project level. Add real projects from CRM → Properties → Add Property.",
+    "fullDescription": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive and whether parking is included, while amenities are set once at project level. Add real projects from CRM → Properties → Add Property.",
     "usps": [
       {
         "title": "Sample Format",
@@ -39,7 +39,6 @@
         "price": "₹54 Lacs",
         "allInclusive": true,
         "parkingIncluded": true,
-        "amenities": ["lift", "power_backup", "security", "water_supply"],
         "floorPlanImage": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&q=80"
       },
       {
@@ -49,7 +48,6 @@
         "price": "₹58 Lacs",
         "allInclusive": false,
         "parkingIncluded": false,
-        "amenities": ["lift", "power_backup", "security", "gym", "water_supply"],
         "floorPlanImage": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&q=80"
       },
       {
@@ -59,25 +57,21 @@
         "price": "₹72 Lacs",
         "allInclusive": true,
         "parkingIncluded": true,
-        "amenities": [
-          "lift",
-          "power_backup",
-          "security",
-          "gym",
-          "swimming_pool",
-          "clubhouse",
-          "kids_play_area",
-          "water_supply"
-        ],
         "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80"
       }
     ],
-    "amenities": {
-      "convenience": ["Lift", "Power Backup", "24x7 Water Supply"],
-      "safety": ["CCTV Surveillance", "Fire Safety"],
-      "sports": ["Gymnasium", "Kids Play Area"],
-      "leisure": ["Swimming Pool", "Clubhouse"]
-    },
+    "amenities": [
+      "lift",
+      "power_backup",
+      "security",
+      "cctv",
+      "gym",
+      "swimming_pool",
+      "clubhouse",
+      "kids_play_area",
+      "water_supply",
+      "fire_safety"
+    ],
     "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
     "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
     "nearbyLandmarks": [

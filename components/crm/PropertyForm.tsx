@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 import { SUB_LOCATIONS } from "@/lib/projects";
-import { AMENITY_OPTIONS } from "@/lib/amenities";
+import { AMENITY_OPTIONS, amenityKeys } from "@/lib/amenities";
 
 type ConfigRecord = {
   type: string;
@@ -13,7 +13,6 @@ type ConfigRecord = {
   price: string;
   allInclusive: boolean;
   parkingIncluded: boolean;
-  amenities: string[];
   floorPlanImage: string;
 };
 
@@ -43,6 +42,7 @@ type ProjectShape = {
   images?: string[];
   nearbyLandmarks?: { name: string; distance: string }[];
   configurations?: ConfigRecord[];
+  amenities?: string[];
   [k: string]: unknown;
 };
 
@@ -61,7 +61,6 @@ const blankConfig = (): ConfigRecord => ({
   price: "",
   allInclusive: false,
   parkingIncluded: false,
-  amenities: [],
   floorPlanImage: "",
 });
 
@@ -76,10 +75,26 @@ function normalizeConfigurations(raw: unknown): ConfigRecord[] {
       price: String(c.price ?? ""),
       allInclusive: c.allInclusive === true,
       parkingIncluded: c.parkingIncluded === true,
-      amenities: Array.isArray(c.amenities) ? c.amenities.filter((a): a is string => typeof a === "string") : [],
       floorPlanImage: String(c.floorPlanImage ?? ""),
     };
   });
+}
+
+function normalizeAmenities(initial?: ProjectShape): string[] {
+  const raw = initial?.amenities;
+  const configs = Array.isArray(initial?.configurations) ? initial.configurations : [];
+  const configKeys = configs.flatMap((c) => {
+    const a = (c as unknown as Record<string, unknown>).amenities;
+    return Array.isArray(a) ? (a as string[]) : [];
+  });
+  if (Array.isArray(raw)) return amenityKeys(raw);
+  if (raw && typeof raw === "object") {
+    const labels = Object.values(raw as Record<string, unknown>).flatMap((v) =>
+      Array.isArray(v) ? (v as string[]) : []
+    );
+    return amenityKeys(configKeys, labels);
+  }
+  return amenityKeys(configKeys);
 }
 
 export default function PropertyForm({
@@ -118,6 +133,7 @@ export default function PropertyForm({
     images: initial?.images || [],
     nearbyLandmarks: initial?.nearbyLandmarks || [],
     configurations: normalizeConfigurations(initial?.configurations),
+    amenities: normalizeAmenities(initial),
   });
 
   const set = <K extends keyof ProjectShape>(key: K, value: ProjectShape[K]) =>
@@ -197,19 +213,12 @@ export default function PropertyForm({
     }));
   };
 
-  const toggleConfigAmenity = (idx: number, key: string) => {
+  const toggleAmenity = (key: string) => {
     setForm((f) => ({
       ...f,
-      configurations: (f.configurations || []).map((c, i) =>
-        i === idx
-          ? {
-              ...c,
-              amenities: c.amenities.includes(key)
-                ? c.amenities.filter((a) => a !== key)
-                : [...c.amenities, key],
-            }
-          : c,
-      ),
+      amenities: (f.amenities ?? []).includes(key)
+        ? (f.amenities ?? []).filter((a) => a !== key)
+        : [...(f.amenities ?? []), key],
     }));
   };
 
@@ -225,9 +234,9 @@ export default function PropertyForm({
             images: [],
             metaTitle: "",
             metaDescription: "",
+            amenities: [],
             configurations: (form.configurations || []).map((c) => ({
               ...c,
-              amenities: [],
               floorPlanImage: "",
             })),
           }
@@ -384,7 +393,7 @@ export default function PropertyForm({
         </div>
       </Section>
 
-      <Section title="Configurations (BHK, area, price, amenities)">
+      <Section title="Configurations (BHK, area, price)">
         {(form.configurations || []).map((c, i) => (
           <div key={i} className="rounded-xl border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -426,19 +435,6 @@ export default function PropertyForm({
                 Parking included
               </label>
             </div>
-            {!isResale && (
-              <div className="mt-3">
-                <p className="mb-1.5 text-xs font-semibold text-muted">Amenities</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {AMENITY_OPTIONS.map((a) => (
-                    <label key={a.key} className="flex items-center gap-1.5 text-xs text-navy">
-                      <input type="checkbox" checked={c.amenities.includes(a.key)} onChange={() => toggleConfigAmenity(i, a.key)} />
-                      {a.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ))}
         <button
@@ -449,6 +445,19 @@ export default function PropertyForm({
           + Add configuration
         </button>
       </Section>
+
+      {!isResale && (
+        <Section title="Amenities (project level, applies to all configurations)">
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {AMENITY_OPTIONS.map((a) => (
+              <label key={a.key} className="flex items-center gap-1.5 text-xs text-navy">
+                <input type="checkbox" checked={(form.amenities ?? []).includes(a.key)} onChange={() => toggleAmenity(a.key)} />
+                {a.label}
+              </label>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Copy">
         <Field label="Short description">

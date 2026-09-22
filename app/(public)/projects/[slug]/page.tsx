@@ -11,6 +11,7 @@ import {
   type Project,
 } from "@/lib/projects";
 import { startingFrom } from "@/lib/price";
+import { categorizeAmenities, type AmenityCategory } from "@/lib/amenities";
 import ImageCarousel from "@/components/ImageCarousel";
 import ProjectCover from "@/components/ProjectCover";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -192,7 +193,7 @@ const USP_ICONS = [
 ];
 
 const AMENITY_CATEGORIES: {
-  key: keyof Project["amenities"];
+  key: AmenityCategory;
   label: string;
   icon: ReactNode;
 }[] = [
@@ -308,6 +309,7 @@ export default async function ProjectDetail({ params }: Props) {
   }
 
   const startingPrice = startingFrom(project.priceRange);
+  const categorizedAmenities = categorizeAmenities(project.amenities);
   const aboutParagraphs = toParagraphs(project.fullDescription);
   const aboutDescription = project.description ?? aboutParagraphs[0];
   const quickFacts = [
@@ -584,7 +586,7 @@ export default async function ProjectDetail({ params }: Props) {
                   )}
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   {AMENITY_CATEGORIES.filter(
-                    (cat) => project.amenities[cat.key].length > 0
+                    (cat) => categorizedAmenities[cat.key].length > 0
                   ).map((cat) => (
                     <div
                       key={cat.key}
@@ -597,7 +599,7 @@ export default async function ProjectDetail({ params }: Props) {
                         <h3 className="font-bold text-ink">{cat.label}</h3>
                       </div>
                       <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                        {project.amenities[cat.key].map((a) => (
+                        {categorizedAmenities[cat.key].map((a) => (
                           <li
                             key={a}
                             className="flex items-start gap-2 text-sm text-muted"

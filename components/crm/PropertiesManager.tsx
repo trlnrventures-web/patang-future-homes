@@ -16,7 +16,6 @@ type ConfigRow = {
   price: string;
   allInclusive: boolean;
   parkingIncluded: boolean;
-  amenities: string[];
   floorPlanImage: string;
 };
 
@@ -38,6 +37,7 @@ type PropRow = {
   category?: string;
   bhkOptions: string[];
   configurations: ConfigRow[];
+  amenities: string[];
   source: PropSource;
 };
 
@@ -252,9 +252,9 @@ export default function PropertiesManager() {
                   <span className="text-[11px] text-soft">No configurations listed</span>
                 )}
               </div>
-              {p.configurations.some((c) => c.amenities.length > 0) && (
+              {p.amenities.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {[...new Set(p.configurations.flatMap((c) => c.amenities))].map((a) => (
+                  {p.amenities.map((a) => (
                     <span key={a} className="rounded-full bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                       {amenityLabel(a)}
                     </span>

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { Configuration } from "@/lib/projects";
-import { amenityLabel } from "@/lib/amenities";
 import Lightbox from "./Lightbox";
 
 export default function PricingTable({
@@ -34,18 +33,6 @@ export default function PricingTable({
               >
                 <td className="px-5 py-4">
                   <div className="font-semibold text-ink">{c.type}</div>
-                  {c.amenities && c.amenities.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {c.amenities.map((a) => (
-                        <span
-                          key={a}
-                          className="rounded-full bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary"
-                        >
-                          {amenityLabel(a)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </td>
                 <td className="px-5 py-4 text-muted">
                   <div>{c.carpetArea}</div>

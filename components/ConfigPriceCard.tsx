@@ -1,6 +1,5 @@
 import type { Configuration, Project } from "@/lib/projects";
 import { priceValidityInfo } from "@/lib/projects";
-import { amenityLabel } from "@/lib/amenities";
 
 const WHATSAPP_NUMBER = "917249138197";
 
@@ -174,8 +173,7 @@ export default function ConfigPriceCard({ project }: { project: Project }) {
             </dl>
 
             {(group.items.some((c) => c.allInclusive) ||
-              group.items.some((c) => c.parkingIncluded) ||
-              group.items.some((c) => c.amenities?.length)) && (
+              group.items.some((c) => c.parkingIncluded)) && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {group.items.some((c) => c.allInclusive) && (
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
@@ -187,14 +185,6 @@ export default function ConfigPriceCard({ project }: { project: Project }) {
                     Parking included
                   </span>
                 )}
-                {[...new Set(group.items.flatMap((c) => c.amenities ?? []))].map((a) => (
-                  <span
-                    key={a}
-                    className="rounded-full bg-ink/[0.04] px-2 py-0.5 text-[10px] font-semibold text-muted"
-                  >
-                    {amenityLabel(a)}
-                  </span>
-                ))}
               </div>
             )}
 

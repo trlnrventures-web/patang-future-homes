@@ -24,7 +24,6 @@ type ConfigRecord = {
   price?: string;
   allInclusive?: boolean;
   parkingIncluded?: boolean;
-  amenities?: string[];
   floorPlanImage?: string;
 };
 
@@ -50,10 +49,15 @@ function mapConfigurations(p: ProjectRecord) {
       price: String(c?.price || "").trim(),
       allInclusive: c?.allInclusive === true,
       parkingIncluded: c?.parkingIncluded === true,
-      amenities: Array.isArray(c?.amenities) ? c.amenities.filter((a) => typeof a === "string") : [],
       floorPlanImage: String(c?.floorPlanImage || "").trim(),
     }))
     .filter((c) => c.type || c.price);
+}
+
+function projectAmenities(p: ProjectRecord): string[] {
+  return Array.isArray(p?.amenities)
+    ? (p.amenities as unknown[]).filter((a): a is string => typeof a === "string")
+    : [];
 }
 
 export async function GET() {
@@ -81,6 +85,7 @@ export async function GET() {
       isActive: p.isActive !== false,
       bhkOptions: projectBhkOptions(p),
       configurations: mapConfigurations(p),
+      amenities: projectAmenities(p),
       source: "primary" as const,
     })),
     partner: marketInventory.map((e) => ({
@@ -109,10 +114,10 @@ export async function GET() {
           price: marketPriceLabel(e),
           allInclusive: false,
           parkingIncluded: false,
-          amenities: [],
           floorPlanImage: "",
         },
       ],
+      amenities: [],
       source: "market" as const,
     })),
   });
@@ -156,7 +161,7 @@ export async function POST(request: NextRequest) {
       totalTowers: Number(body.totalTowers) || 1,
       landParcel: body.landParcel || "Details on request",
       configurations: Array.isArray(body.configurations) ? body.configurations : [],
-      amenities: body.amenities && typeof body.amenities === "object" ? body.amenities : { convenience: [], safety: [], sports: [], leisure: [] },
+      amenities: Array.isArray(body.amenities) ? (body.amenities as unknown[]).filter((a): a is string => typeof a === "string") : [],
       showFlatVideoUrl: body.showFlatVideoUrl || "PASTE_YOUTUBE_EMBED_URL_HERE",
       walkthroughVideoUrl: body.walkthroughVideoUrl || "PASTE_YOUTUBE_EMBED_URL_HERE",
       nearbyLandmarks: Array.isArray(body.nearbyLandmarks) ? body.nearbyLandmarks : [],

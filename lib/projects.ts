@@ -7,7 +7,6 @@ export type Configuration = {
   price: string;
   allInclusive?: boolean;
   parkingIncluded?: boolean;
-  amenities?: string[];
   floorBreakup?: { floors: string; price: string }[];
   floorPlanImage: string;
 };
@@ -73,12 +72,7 @@ export type Project = {
   totalTowers: number;
   landParcel: string;
   configurations: Configuration[];
-  amenities: {
-    convenience: string[];
-    safety: string[];
-    sports: string[];
-    leisure: string[];
-  };
+  amenities: string[];
   showFlatVideoUrl: string;
   walkthroughVideoUrl: string;
   amenityImages?: AmenityImage[];

@@ -6,6 +6,7 @@ import {
   slugifyTitle,
   type ProjectRecord,
 } from "@/lib/crm/projects-store";
+import { amenityKeys } from "@/lib/amenities";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,15 @@ export async function PATCH(
       if (Array.isArray(body[k])) merged[k] = body[k];
     }
 
-    if (body.amenities && typeof body.amenities === "object") merged.amenities = body.amenities;
+    if (body.amenities !== undefined) {
+      const raw = body.amenities;
+      const labels: string[] = Array.isArray(raw)
+        ? []
+        : Object.values(raw as Record<string, unknown>).flatMap(
+            (v) => (Array.isArray(v) ? (v as string[]) : [])
+          );
+      merged.amenities = amenityKeys(raw, labels);
+    }
     if (body.developer && typeof body.developer === "object") merged.developer = body.developer;
     if (body.isActive !== undefined) merged.isActive = body.isActive === true || body.isActive === "true";
 
