@@ -50,7 +50,6 @@ export function scanAndFetchReactivationAlerts(userId?: number): ReactivationAle
           },
           1,
           weights,
-          false,
         );
         const top = matches[0];
         if (top && top.projectSlug === p.slug && top.score >= 50) {

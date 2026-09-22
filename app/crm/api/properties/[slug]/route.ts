@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, canManageProperties } from "@/lib/crm/auth";
+import { canManageProperties } from "@/lib/crm/auth";
+import { getCurrentUser } from "@/lib/crm/data";
+import { logPropertyHttp } from "@/lib/crm/api";
 import {
   readProjectsFile,
   writeProjectsFile,
@@ -11,33 +13,59 @@ import { amenityKeys } from "@/lib/amenities";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logPropertyHttp(request, null, res.status, { error: "Unauthorized" });
+    return res;
+  }
+  if (!canManageProperties(user)) {
+    const res = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    logPropertyHttp(request, user, res.status, { error: "Forbidden" });
+    return res;
+  }
 
   const { slug } = await params;
   const project = readProjectsFile().find((p) => p.slug === slug);
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!project) {
+    const res = NextResponse.json({ error: "Not found" }, { status: 404 });
+    logPropertyHttp(request, user, res.status, { error: "Not found" });
+    return res;
+  }
+  const res = NextResponse.json({ project });
+  logPropertyHttp(request, user, res.status, { project });
+  return res;
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logPropertyHttp(request, null, res.status, { error: "Unauthorized" });
+    return res;
+  }
+  if (!canManageProperties(user)) {
+    const res = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    logPropertyHttp(request, user, res.status, { error: "Forbidden" });
+    return res;
+  }
 
   try {
     const { slug } = await params;
     const body: Record<string, unknown> = await request.json();
     const projects = readProjectsFile();
     const idx = projects.findIndex((p) => p.slug === slug);
-    if (idx === -1) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (idx === -1) {
+      const res = NextResponse.json({ error: "Not found" }, { status: 404 });
+      logPropertyHttp(request, user, res.status, { error: "Not found" });
+      return res;
+    }
 
     const current = projects[idx];
 
@@ -46,7 +74,9 @@ export async function PATCH(
     if (body.slug && String(body.slug).trim() !== current.slug) {
       newSlug = slugifyTitle(String(body.slug).trim());
       if (projects.some((p) => p.slug === newSlug && p.slug !== current.slug)) {
-        return NextResponse.json({ error: `Slug "${newSlug}" already exists` }, { status: 409 });
+        const res = NextResponse.json({ error: `Slug "${newSlug}" already exists` }, { status: 409 });
+        logPropertyHttp(request, user, res.status, { error: `Slug "${newSlug}" already exists` });
+        return res;
       }
     }
 
@@ -92,27 +122,45 @@ export async function PATCH(
     merged.slug = newSlug;
     projects[idx] = merged as ProjectRecord;
     writeProjectsFile(projects);
-    return NextResponse.json({ project: { slug: newSlug, title: merged.title } });
+    const res = NextResponse.json({ project: { slug: newSlug, title: merged.title } });
+    logPropertyHttp(request, user, res.status, { project: { slug: newSlug, title: merged.title } });
+    return res;
   } catch (error) {
     console.error("Update property error:", error);
-    return NextResponse.json({ error: "Failed to update property" }, { status: 500 });
+    const res = NextResponse.json({ error: "Failed to update property" }, { status: 500 });
+    logPropertyHttp(request, user, res.status, { error: "Failed to update property" });
+    return res;
   }
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logPropertyHttp(request, null, res.status, { error: "Unauthorized" });
+    return res;
+  }
+  if (!canManageProperties(user)) {
+    const res = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    logPropertyHttp(request, user, res.status, { error: "Forbidden" });
+    return res;
+  }
 
   const { slug } = await params;
   const projects = readProjectsFile();
   const idx = projects.findIndex((p) => p.slug === slug);
-  if (idx === -1) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (idx === -1) {
+    const res = NextResponse.json({ error: "Not found" }, { status: 404 });
+    logPropertyHttp(request, user, res.status, { error: "Not found" });
+    return res;
+  }
 
   projects.splice(idx, 1);
   writeProjectsFile(projects);
-  return NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true });
+  logPropertyHttp(request, user, res.status, { ok: true });
+  return res;
 }

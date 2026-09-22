@@ -1,21 +1,8 @@
 import { projects, subLocationMatches, type Project } from "@/lib/projects";
 import { amenityLabel } from "@/lib/amenities";
-import {
-  MARKET_AREA,
-  MARKET_LOCATION,
-  marketBhkOptions,
-  marketPossessionLabel,
-  marketPriceByBhk,
-  marketPriceLabel,
-  marketPriceRange,
-  marketSlug,
-  publishedMarketInventory,
-  type MarketInventoryEntry,
-} from "./market-inventory";
 import type { MatchingWeights } from "./settings";
 
 export type MatchLevel = "strong" | "medium" | "low";
-export type MatchSource = "primary" | "market";
 export type MatchTone = "good" | "warn" | "bad";
 
 const DEFAULT_WEIGHTS: MatchingWeights = {
@@ -24,8 +11,6 @@ const DEFAULT_WEIGHTS: MatchingWeights = {
   budget: 25,
   budgetPartial: 10,
 };
-
-export type { MarketInventoryEntry };
 
 export type MatchReason = { label: string; ok: boolean; tone?: MatchTone };
 
@@ -43,7 +28,6 @@ export type PropertyMatch = {
   level: MatchLevel;
   bhkOptions: string[];
   reasons: MatchReason[];
-  source: MatchSource;
   developer?: string;
   subLocation?: string;
   priceValidUntil?: string;
@@ -63,8 +47,8 @@ type Setter = {
 };
 
 /**
- * Internal, source-agnostic view of a candidate so website projects and
- * partner-network inventory are scored by exactly the same code path.
+ * Internal, source-agnostic view of a candidate so every project is scored
+ * by the same code path.
  */
 type Candidate = {
   slug: string;
@@ -83,7 +67,6 @@ type Candidate = {
   image?: string;
   priceValidUntil?: string;
   developer?: string;
-  source: MatchSource;
   extras: { allInclusive: boolean; parkingIncluded: boolean; amenities: string[] };
 };
 
@@ -207,32 +190,11 @@ function projectToCandidate(p: Project): Candidate {
     image: p.images?.[0],
     priceValidUntil: p.priceValidUntil,
     developer: p.developer?.name,
-    source: "primary",
     extras: {
       allInclusive: configs.some((c) => c.allInclusive === true),
       parkingIncluded: configs.some((c) => c.parkingIncluded === true),
       amenities: [...new Set(p.amenities ?? [])],
     },
-  };
-}
-
-function marketToCandidate(e: MarketInventoryEntry): Candidate {
-  return {
-    slug: marketSlug(e),
-    title: e.project,
-    location: `${MARKET_LOCATION} · Partner`,
-    subLocation: e.subLocation ?? null,
-    area: MARKET_AREA,
-    bhkOptions: marketBhkOptions(e),
-    priceRange: marketPriceRange(e),
-    priceByBhk: marketPriceByBhk(e),
-    priceLabel: marketPriceLabel(e),
-    possessionLabel: marketPossessionLabel(e),
-    tier: null,
-    type: "flat",
-    reraId: "",
-    source: "market",
-    extras: { allInclusive: false, parkingIncluded: false, amenities: [] },
   };
 }
 
@@ -367,7 +329,6 @@ function toPropertyMatch(c: Candidate, s: Scored): PropertyMatch {
     level: s.level,
     bhkOptions: c.bhkOptions,
     reasons: s.reasons,
-    source: c.source,
     developer: c.developer,
     subLocation: c.subLocation ?? undefined,
     priceValidUntil: c.priceValidUntil,
@@ -376,7 +337,7 @@ function toPropertyMatch(c: Candidate, s: Scored): PropertyMatch {
 
 /**
  * Deterministic property matching shared by the CRM lead detail, dashboard
- * price-expiry alerts, reactivation scans and partner inventory.
+ * price-expiry alerts, reactivation scans and site-visit recommendations.
  *
  * Location: an exact sub-location match is worth `subLocation`; failing that a
  * same-area match is worth `location`; anything with no location relevance to
@@ -390,12 +351,8 @@ export function matchProperties(
   setter: Setter,
   limit = 5,
   weights: MatchingWeights = DEFAULT_WEIGHTS,
-  includeMarket = true,
 ): PropertyMatch[] {
   const candidates: Candidate[] = projects.map(projectToCandidate);
-  if (includeMarket) {
-    for (const e of publishedMarketInventory) candidates.push(marketToCandidate(e));
-  }
 
   const scored = candidates
     .map((c) => ({ c, s: scoreCandidate(c, setter, weights) }))

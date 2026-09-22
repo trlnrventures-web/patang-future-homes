@@ -7,8 +7,7 @@ import * as schema from "@/lib/crm/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, findLikelyDuplicates } from "@/lib/crm/leads";
-import { projects } from "@/lib/projects";
-import { marketInventory } from "@/lib/crm/market-inventory";
+import { readProjectsFile } from "@/lib/crm/projects-store";
 import { Badge } from "@/components/crm/ui";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
@@ -138,10 +137,10 @@ activities,
     duplicates: user.role === "admin" || user.role === "sales_head"
       ? findLikelyDuplicates(db, lead)
       : [],
-    propertyOptions: [
-      ...projects.map((p) => p.title),
-      ...marketInventory.map((m) => m.project),
-    ].sort((a, b) => a.localeCompare(b)),
+    propertyOptions: (readProjectsFile()
+      .map((p) => String(p.title || ""))
+      .filter(Boolean) as string[])
+      .sort((a, b) => a.localeCompare(b)),
   };
 
   return (

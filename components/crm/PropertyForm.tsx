@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
-import { SUB_LOCATIONS } from "@/lib/projects";
+import { ALL_SUB_LOCATIONS } from "@/lib/projects";
 import { AMENITY_OPTIONS, amenityKeys } from "@/lib/amenities";
 
 type ConfigRecord = {
@@ -48,7 +48,7 @@ type ProjectShape = {
 
 const LIST_AREAS = ["west", "east"];
 const LIST_TYPES = ["flat", "shop", "bungalow"];
-const LIST_STATUSES = ["New Launch", "Under Construction"];
+const LIST_STATUSES = ["New Launch", "Under Construction", "draft", "published"];
 const LIST_TIERS = ["affordable", "luxury"];
 
 const inputCls =
@@ -338,7 +338,7 @@ export default function PropertyForm({
           <Field label="Sub-location">
             <select value={String(form.subLocation || "")} onChange={(e) => set("subLocation", e.target.value)} className={inputCls}>
               <option value="">None</option>
-              {SUB_LOCATIONS.map((s) => (
+              {ALL_SUB_LOCATIONS.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>

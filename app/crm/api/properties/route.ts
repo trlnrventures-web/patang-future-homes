@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, canManageProperties } from "@/lib/crm/auth";
+import { canManageProperties } from "@/lib/crm/auth";
+import { getCurrentUser } from "@/lib/crm/data";
+import { logPropertyHttp } from "@/lib/crm/api";
 import {
   readProjectsFile,
   writeProjectsFile,
   slugifyTitle,
   type ProjectRecord,
 } from "@/lib/crm/projects-store";
-import {
-  MARKET_AREA,
-  MARKET_LOCATION,
-  marketBhkOptions,
-  marketConfigPriceLabel,
-  marketInventory,
-  marketPossessionLabel,
-  marketPriceLabel,
-  marketSlug,
-} from "@/lib/crm/market-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +54,21 @@ function projectAmenities(p: ProjectRecord): string[] {
     : [];
 }
 
-export async function GET() {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function GET(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logPropertyHttp(request, null, res.status, { error: "Unauthorized" });
+    return res;
+  }
+  if (!canManageProperties(user)) {
+    const res = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    logPropertyHttp(request, user, res.status, { error: "Forbidden" });
+    return res;
+  }
 
   const projects = readProjectsFile();
-  return NextResponse.json({
+  const body = {
     projects: projects.map((p) => ({
       slug: p.slug,
       title: p.title || "",
@@ -88,55 +88,42 @@ export async function GET() {
       bhkOptions: projectBhkOptions(p),
       configurations: mapConfigurations(p),
       amenities: projectAmenities(p),
-      source: "primary" as const,
     })),
-    partner: marketInventory.map((e) => ({
-      slug: marketSlug(e),
-      title: e.project,
-      location: `${MARKET_LOCATION} · Partner`,
-      area: MARKET_AREA,
-      type: "flat",
-      status: String(e.status || ""),
-      tier: "",
-      category: e.category === "resale" ? "resale" : "primary",
-      subLocation: e.subLocation || "",
-      priceRange: marketPriceLabel(e),
-      pricePerSqft: "",
-      reraId: "",
-      possessionDate: marketPossessionLabel(e),
-      shortDescription: "",
-      isActive: e.status !== "draft",
-      bhkOptions: marketBhkOptions(e),
-      configurations: (e.configurations || []).map((c) => ({
-        type: c.type,
-        carpetArea: `${c.carpetAreaRange[0]}–${c.carpetAreaRange[1]} sq.ft`,
-        saleableArea: "",
-        price: marketConfigPriceLabel(c),
-        allInclusive: false,
-        parkingIncluded: false,
-        floorPlanImage: "",
-      })),
-      amenities: [],
-      source: "market" as const,
-    })),
-  });
+  };
+  const res = NextResponse.json(body);
+  logPropertyHttp(request, user, res.status, body);
+  return res;
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageProperties(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) {
+    const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logPropertyHttp(request, null, res.status, { error: "Unauthorized" });
+    return res;
+  }
+  if (!canManageProperties(user)) {
+    const res = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    logPropertyHttp(request, user, res.status, { error: "Forbidden" });
+    return res;
+  }
 
   try {
     const body: Record<string, unknown> = await request.json();
     const title = String(body.title || "").trim();
-    if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    if (!title) {
+      const res = NextResponse.json({ error: "Title is required" }, { status: 400 });
+      logPropertyHttp(request, user, res.status, { error: "Title is required" });
+      return res;
+    }
 
     const projects = readProjectsFile();
     let slug = String(body.slug || "").trim();
     if (!slug) slug = slugifyTitle(title);
     if (projects.some((p) => p.slug === slug)) {
-      return NextResponse.json({ error: `Slug "${slug}" already exists` }, { status: 409 });
+      const res = NextResponse.json({ error: `Slug "${slug}" already exists` }, { status: 409 });
+      logPropertyHttp(request, user, res.status, { error: `Slug "${slug}" already exists` });
+      return res;
     }
 
     const project: ProjectRecord = {
@@ -174,9 +161,13 @@ export async function POST(request: NextRequest) {
 
     projects.push(project);
     writeProjectsFile(projects);
-    return NextResponse.json({ project: { slug, title } }, { status: 201 });
+    const res = NextResponse.json({ project: { slug, title } }, { status: 201 });
+    logPropertyHttp(request, user, res.status, { project: { slug, title } });
+    return res;
   } catch (error) {
     console.error("Create property error:", error);
-    return NextResponse.json({ error: "Failed to create property" }, { status: 500 });
+    const res = NextResponse.json({ error: "Failed to create property" }, { status: 500 });
+    logPropertyHttp(request, user, res.status, { error: "Failed to create property" });
+    return res;
   }
 }

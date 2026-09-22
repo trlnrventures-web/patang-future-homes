@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 import { amenityLabel } from "@/lib/amenities";
 
-type PropSource = "primary" | "market";
-
 type ConfigRow = {
   type: string;
   carpetArea: string;
@@ -37,7 +35,6 @@ type PropRow = {
   bhkOptions: string[];
   configurations: ConfigRow[];
   amenities: string[];
-  source: PropSource;
 };
 
 const BHK_OPTIONS = ["1", "2", "3", "4", "5"];
@@ -51,11 +48,11 @@ function areaLabel(area: string): string {
 export default function PropertiesManager() {
   const router = useRouter();
   const [projects, setProjects] = useState<PropRow[]>([]);
-  const [partner, setPartner] = useState<PropRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
-  const [category, setCategory] = useState<"all" | PropSource>("all");
+  const [category, setCategory] = useState<"all" | "primary" | "resale">("all");
+  const [status, setStatus] = useState<"all" | "draft" | "published">("all");
   const [bhk, setBhk] = useState("all");
   const [location, setLocation] = useState("all");
   const [subLocation, setSubLocation] = useState("all");
@@ -67,10 +64,7 @@ export default function PropertiesManager() {
         const res = await fetch("/crm/api/properties", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (active) {
-            setProjects(data.projects || []);
-            setPartner(data.partner || []);
-          }
+          if (active) setProjects(data.projects || []);
         }
       } finally {
         if (active) setLoading(false);
@@ -81,32 +75,35 @@ export default function PropertiesManager() {
     };
   }, []);
 
-  const allRows = useMemo(() => [...projects, ...partner], [projects, partner]);
-
   const locationOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const r of allRows) {
+    for (const r of projects) {
       const label = areaLabel(r.area);
       if (label !== "-") set.add(label);
     }
     return [...set].sort();
-  }, [allRows]);
+  }, [projects]);
 
   const subLocationOptions = useMemo(() => {
-    const present = new Set(allRows.map((r) => r.subLocation).filter(Boolean));
+    const present = new Set(projects.map((r) => r.subLocation).filter(Boolean));
     return [...present].sort((a, b) => a.localeCompare(b));
-  }, [allRows]);
+  }, [projects]);
 
   const visible = useMemo(() => {
-    return allRows.filter((p) => {
-      if (!showArchived && p.source === "primary" && !p.isActive) return false;
-      if (category !== "all" && p.source !== category) return false;
+    return projects.filter((p) => {
+      if (!showArchived && !p.isActive) return false;
+      if (category !== "all" && (p.category || "primary") !== category) return false;
+      if (status !== "all") {
+        const isDraft = p.status === "draft";
+        if (status === "draft" && !isDraft) return false;
+        if (status === "published" && isDraft) return false;
+      }
       if (bhk !== "all" && !p.bhkOptions.includes(bhk)) return false;
       if (location !== "all" && areaLabel(p.area) !== location) return false;
       if (subLocation !== "all" && p.subLocation !== subLocation) return false;
       return true;
     });
-  }, [allRows, showArchived, category, bhk, location, subLocation]);
+  }, [projects, showArchived, category, status, bhk, location, subLocation]);
 
   const toggleArchived = async (p: PropRow) => {
     const res = await fetch(`/crm/api/properties/${p.slug}`, {
@@ -154,9 +151,6 @@ export default function PropertiesManager() {
           >
             All website ({projects.length})
           </button>
-          <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-            Partner network ({partner.length})
-          </span>
         </div>
         <Link href="/crm/properties/new">
           <Button size="sm">+ Add Property</Button>
@@ -164,10 +158,15 @@ export default function PropertiesManager() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-white p-3">
-        <select className={selectCls} value={category} onChange={(e) => setCategory(e.target.value as "all" | PropSource)}>
+        <select className={selectCls} value={category} onChange={(e) => setCategory(e.target.value as "all" | "primary" | "resale")}>
           <option value="all">Category: All</option>
-          <option value="primary">Website</option>
-          <option value="market">Partner Network</option>
+          <option value="primary">New Project</option>
+          <option value="resale">Resale</option>
+        </select>
+        <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as "all" | "draft" | "published")}>
+          <option value="all">Status: All</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
         </select>
         <select className={selectCls} value={bhk} onChange={(e) => setBhk(e.target.value)}>
           <option value="all">Configuration: All</option>
@@ -204,10 +203,10 @@ export default function PropertiesManager() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((p) => (
             <div
-              key={`${p.source}-${p.slug}`}
-              className={`flex flex-col rounded-2xl border bg-white p-4 shadow-sm ${
-                p.source === "market" ? "border-blue-100 bg-blue-50/30" : "border-border"
-              } ${p.source === "primary" && !p.isActive ? "opacity-60" : ""}`}
+              key={p.slug}
+              className={`flex flex-col rounded-2xl border border-border bg-white p-4 shadow-sm ${
+                !p.isActive ? "opacity-60" : ""
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -218,9 +217,9 @@ export default function PropertiesManager() {
                     {p.category === "resale" ? " · Resale" : ""}
                   </p>
                 </div>
-                {p.source === "market" ? (
-                  <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">
-                    Partner Network
+                {p.status === "draft" ? (
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                    Draft
                   </span>
                 ) : !p.isActive ? (
                   <span className="shrink-0 rounded-full bg-soft px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
@@ -272,32 +271,26 @@ export default function PropertiesManager() {
                 </div>
               </div>
 
-              {p.source === "market" ? (
-                <p className="mt-2 text-[11px] text-soft">Possession {p.possessionDate}</p>
-              ) : p.shortDescription ? (
+              {p.shortDescription ? (
                 <p className="mt-2 line-clamp-2 text-xs text-soft">{p.shortDescription}</p>
+              ) : p.possessionDate ? (
+                <p className="mt-2 text-[11px] text-soft">Possession {p.possessionDate}</p>
               ) : null}
 
               <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
-                {p.source === "primary" ? (
-                  <>
-                    <Link href={`/crm/properties/${p.slug}/edit`}>
-                      <Button size="sm" variant="secondary">Edit</Button>
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant={p.isActive ? "secondary" : "whatsapp"}
-                      onClick={() => toggleArchived(p)}
-                    >
-                      {p.isActive ? "Archive" : "Restore"}
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => deleteProperty(p)}>
-                      Delete
-                    </Button>
-                  </>
-                ) : (
-                  <span className="text-[11px] font-semibold text-blue-600">Available via partner network</span>
-                )}
+                <Link href={`/crm/properties/${p.slug}/edit`}>
+                  <Button size="sm" variant="secondary">Edit</Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant={p.isActive ? "secondary" : "whatsapp"}
+                  onClick={() => toggleArchived(p)}
+                >
+                  {p.isActive ? "Archive" : "Restore"}
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => deleteProperty(p)}>
+                  Delete
+                </Button>
               </div>
             </div>
           ))}

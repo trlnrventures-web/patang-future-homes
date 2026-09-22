@@ -19,7 +19,12 @@ export type ShowFlatImage = {
   src: string;
 };
 
-export { SUB_LOCATIONS, subLocationTokens, subLocationMatches } from "./sub-locations";
+export {
+  SUB_LOCATIONS,
+  ALL_SUB_LOCATIONS,
+  subLocationTokens,
+  subLocationMatches,
+} from "./sub-locations";
 
 export type PriceValidityInfo = {
   validUntil: string;
@@ -58,7 +63,7 @@ export type Project = {
   priceValidUntil?: string;
   area: "west" | "east";
   type: "shop" | "flat" | "bungalow";
-  status: "New Launch" | "Under Construction";
+  status: "New Launch" | "Under Construction" | "draft" | "published";
   tier?: "affordable" | "luxury";
   priceRange: string;
   pricePerSqft: string;
@@ -89,7 +94,7 @@ export type Project = {
 };
 
 export const projects: Project[] = (rawProjects as Project[]).filter(
-  (p) => p.isActive !== false
+  (p) => p.isActive !== false && p.status !== "draft"
 );
 
 export function getProject(slug: string): Project | undefined {

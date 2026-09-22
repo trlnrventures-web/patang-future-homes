@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import projects from "@/data/projects.json";
+import { projects } from "@/lib/projects";
 import seoLandingPages from "@/data/seo-landing-pages.json";
 
 const BASE = "https://patangfuturehomes.com";

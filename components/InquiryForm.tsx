@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import projects from "@/data/projects.json";
+import { projects } from "@/lib/projects";
 
 const WHATSAPP_NUMBER = "917249138197";
 

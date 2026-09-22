@@ -6,7 +6,6 @@ import { Badge, Button } from "./ui";
 export type RecommendedProperty = {
   slug: string;
   title: string;
-  source?: string;
 };
 
 export type ShownProperty = {
@@ -249,7 +248,7 @@ export default function SiteVisitModal({
                     const selected = projectTitle === r.title;
                     return (
                       <button
-                        key={`${r.source || ""}-${r.slug}`}
+                        key={r.slug || r.title}
                         type="button"
                         onClick={() => setProjectTitle(r.title)}
                         className={`rounded-xl border px-3 py-2 text-left text-xs transition-colors ${
@@ -259,11 +258,6 @@ export default function SiteVisitModal({
                         }`}
                       >
                         <div className="font-semibold">{r.title}</div>
-                        {r.source && (
-                          <div className="mt-0.5 text-[10px] uppercase tracking-wide text-soft">
-                            {r.source === "market" ? "Partner" : "Primary"}
-                          </div>
-                        )}
                       </button>
                     );
                   })}
@@ -434,7 +428,7 @@ export default function SiteVisitModal({
                     const shown = !!marks[r.title];
                     return (
                       <div
-                        key={`${r.source || ""}-${r.slug}`}
+                        key={r.slug || r.title}
                         className="flex items-center justify-between gap-2 rounded-xl border border-border bg-white px-3 py-2"
                       >
                         <span className="min-w-0 truncate text-sm font-semibold text-navy">

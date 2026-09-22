@@ -311,7 +311,7 @@ const smMetrics =
           preferredProject: lead.preferredProject,
           familyRequirements: lead.familyRequirements,
           otherPreferences: lead.otherPreferences,
-        }, 1, weights, false);
+        }, 1, weights);
         if (matches[0]?.projectSlug === p.slug && matches[0].score >= 50) {
           priceExpiringLeads.push({
             projectTitle: p.title,

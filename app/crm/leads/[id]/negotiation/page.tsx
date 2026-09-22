@@ -8,8 +8,7 @@ import { eq, desc } from "drizzle-orm";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/crm/leads";
 import { Badge } from "@/components/crm/ui";
 import NegotiationWorkspace, { NegotiationData } from "@/components/crm/NegotiationWorkspace";
-import { projects } from "@/lib/projects";
-import { marketInventory } from "@/lib/crm/market-inventory";
+import { readProjectsFile } from "@/lib/crm/projects-store";
 
 export const metadata: Metadata = {
   title: { absolute: "Negotiation | Patang CRM" },
@@ -81,6 +80,8 @@ export default async function NegotiationPage({
         .get() || null,
     }));
 
+  const projects = readProjectsFile();
+
   const bookings = db
     .select()
     .from(schema.bookings)
@@ -93,12 +94,12 @@ export default async function NegotiationPage({
       smName: userMap.get(b.smId)?.name || "",
     }));
 
-  const projectMap = Object.fromEntries(projects.map((p) => [p.slug, p.title]));
+  const projectMap: Record<string, string> = Object.fromEntries(
+    projects.map((p) => [p.slug, String(p.title || p.slug)])
+  );
 
-  const propertyOptions = [
-    ...projects.map((p) => p.title),
-    ...marketInventory.map((e) => e.project),
-  ].sort((a, b) => a.localeCompare(b));
+  const propertyOptions = [...projects.map((p) => String(p.title || "")).filter(Boolean)]
+    .sort((a, b) => a.localeCompare(b));
 
   const leadData = {
     ...lead,

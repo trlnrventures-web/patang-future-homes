@@ -3,8 +3,7 @@ import { getAuthUser } from "@/lib/crm/auth";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { projects } from "@/lib/projects";
-import { marketInventory, marketSlug } from "@/lib/crm/market-inventory";
+import { readProjectsFile } from "@/lib/crm/projects-store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +23,12 @@ export async function GET() {
   const userMap = new Map(users.map((u) => [u.id, u]));
 
   const projectMap: Record<string, string> = {};
-  for (const p of projects) projectMap[p.slug] = p.title;
-  for (const e of marketInventory) projectMap[marketSlug(e)] = e.project;
+  for (const p of readProjectsFile()) {
+    const slug = p.slug;
+    const title = String(p.title || slug || "");
+    if (slug) projectMap[slug] = title;
+    if (title) projectMap[title] = title;
+  }
 
   const isAdmin = user.role === "admin" || user.role === "sales_head";
 

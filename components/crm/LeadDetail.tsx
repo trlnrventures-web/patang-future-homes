@@ -430,7 +430,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
   const recommendedProperties: RecommendedProperty[] = matches.map((m) => ({
     slug: m.projectSlug,
     title: m.title,
-    source: m.source,
   }));
 
   const SECOND_VISIT_MESSAGE =
@@ -1317,14 +1316,11 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
           ) : (
             <div className="space-y-2.5">
               {matches.map((m) => (
-                <div key={m.projectSlug} className={`rounded-xl border p-3 ${m.source === "market" ? "border-blue-100 bg-blue-50/40" : "border-border bg-white"}`}>
+                <div key={m.projectSlug} className="rounded-xl border border-border bg-white p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-navy">{m.title}</span>
-                        {m.source === "market" && (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Partner network</span>
-                        )}
                         {m.developer && (
                           <span className="text-[10px] text-soft">· {m.developer}</span>
                         )}
@@ -1368,20 +1364,14 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
                       );
                     })}
                   </div>
-                  {m.source === "primary" ? (
-                    <a
-                      href={`/projects/${m.projectSlug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
-                    >
-                      View project →
-                    </a>
-                  ) : (
-                    <span className="mt-2 inline-block text-[11px] font-semibold text-blue-600">
-                      Available via partner network
-                    </span>
-                  )}
+                  <a
+                    href={`/projects/${m.projectSlug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+                  >
+                    View project →
+                  </a>
                 </div>
               ))}
             </div>

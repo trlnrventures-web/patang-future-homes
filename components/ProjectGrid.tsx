@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import ProjectCover from "./ProjectCover";
-import projects from "@/data/projects.json";
+import { projects } from "@/lib/projects";
 import { startingFrom } from "@/lib/price";
 
 const FILTERS = [
