@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/crm/data";
+import { canManageProperties } from "@/lib/crm/auth";
 import PropertiesManager from "@/components/crm/PropertiesManager";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export default async function PropertiesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/crm/login");
 
-  const canManage = user.role === "admin" || user.role === "sales_head";
+  const canManage = canManageProperties(user);
   if (!canManage) redirect("/crm/dashboard");
 
   return (

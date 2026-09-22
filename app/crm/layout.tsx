@@ -49,7 +49,7 @@ export default async function CrmLayout({
         </div>
 
         {/* Mobile bottom nav */}
-        <MobileNav />
+        <MobileNav userRole={user.role} />
       </div>
     </AuthProvider>
   );

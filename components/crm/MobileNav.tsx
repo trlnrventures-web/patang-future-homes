@@ -10,8 +10,11 @@ const PRIMARY_ITEMS = [
   { href: "/crm/attendance", label: "Attendance", icon: "M12 7v5l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
 ];
 
-const MORE_ITEMS = [
+type MobileItem = { href: string; label: string; icon: string; roles?: string[] };
+
+const MORE_ITEMS: MobileItem[] = [
   { href: "/crm/site-visits", label: "Site Visits", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" },
+  { href: "/crm/properties", label: "Properties", icon: "M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6", roles: ["admin", "sales_head", "sales_manager"] },
   { href: "/crm/reports", label: "Daily Report", icon: "M8 13v5M12 9v9M16 5v13M3 3v18h18M3 5h14M17 5l3 3V3.5" },
   { href: "/crm/attendance/report", label: "Attendance Report", icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" },
   { href: "/crm/leaderboard", label: "Leaderboard", icon: "M8 21h8M12 17v4M17 3h4v4M7 7h10v4M17 11a5 5 0 0 1-10 0 5 5 0 0 1 10 0Z" },
@@ -39,9 +42,13 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-export default function MobileNav() {
+export default function MobileNav({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const visibleMore = MORE_ITEMS.filter(
+    (item) => !item.roles || (userRole && item.roles.includes(userRole))
+  );
 
   useEffect(() => {
     if (open) {
@@ -53,7 +60,7 @@ export default function MobileNav() {
   }, [open]);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const moreActive = MORE_ITEMS.some((m) => isActive(m.href));
+  const moreActive = visibleMore.some((m) => isActive(m.href));
 
   return (
     <>
@@ -90,7 +97,7 @@ export default function MobileNav() {
               More
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {MORE_ITEMS.map((item) => (
+              {visibleMore.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

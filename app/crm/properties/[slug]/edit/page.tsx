@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/crm/data";
+import { canManageProperties } from "@/lib/crm/auth";
 import PropertyForm from "@/components/crm/PropertyForm";
 import { readProjectsFile } from "@/lib/crm/projects-store";
 
@@ -18,7 +19,7 @@ export default async function EditPropertyPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/crm/login");
-  if (user.role !== "admin" && user.role !== "sales_head") redirect("/crm/dashboard");
+  if (!canManageProperties(user)) redirect("/crm/dashboard");
 
   const { slug } = await params;
   const project = readProjectsFile().find((p) => p.slug === slug);

@@ -71,16 +71,14 @@ export function isAdmin(user: AuthUser | null): boolean {
 }
 
 /**
- * Users allowed to manage the public property/project catalogue. Everyone in
- * the admin/sales-head roles, plus an explicit per-user allowlist so individual
- * sales managers can be granted access without opening it to the whole role.
+ * Users allowed to manage the public property/project catalogue: admins,
+ * sales heads, and all sales managers (full add/edit/archive capability).
  */
-const PROPERTY_MANAGER_EMAILS = new Set(["vishrut@patangfuturehomes.com"]);
-
-export function canManageProperties(
-  user: { role: string; email?: string | null } | null
-): boolean {
+export function canManageProperties(user: { role: string } | null): boolean {
   if (!user) return false;
-  if (user.role === "admin" || user.role === "sales_head") return true;
-  return PROPERTY_MANAGER_EMAILS.has(String(user.email || "").trim().toLowerCase());
+  return (
+    user.role === "admin" ||
+    user.role === "sales_head" ||
+    user.role === "sales_manager"
+  );
 }
