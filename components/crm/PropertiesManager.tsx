@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
-import { SUB_LOCATIONS } from "@/lib/projects";
 import { amenityLabel } from "@/lib/amenities";
 
 type PropSource = "primary" | "market";
@@ -41,7 +40,7 @@ type PropRow = {
   source: PropSource;
 };
 
-const BHK_OPTIONS = ["1", "2", "3", "4"];
+const BHK_OPTIONS = ["1", "2", "3", "4", "5"];
 
 function areaLabel(area: string): string {
   if (area === "east") return "Vasai East";
@@ -95,7 +94,7 @@ export default function PropertiesManager() {
 
   const subLocationOptions = useMemo(() => {
     const present = new Set(allRows.map((r) => r.subLocation).filter(Boolean));
-    return SUB_LOCATIONS.filter((s) => present.has(s));
+    return [...present].sort((a, b) => a.localeCompare(b));
   }, [allRows]);
 
   const visible = useMemo(() => {

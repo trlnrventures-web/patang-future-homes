@@ -4,11 +4,12 @@ import {
   MARKET_AREA,
   MARKET_LOCATION,
   marketBhkOptions,
-  marketInventory,
   marketPossessionLabel,
+  marketPriceByBhk,
   marketPriceLabel,
   marketPriceRange,
   marketSlug,
+  publishedMarketInventory,
   type MarketInventoryEntry,
 } from "./market-inventory";
 import type { MatchingWeights } from "./settings";
@@ -216,11 +217,6 @@ function projectToCandidate(p: Project): Candidate {
 }
 
 function marketToCandidate(e: MarketInventoryEntry): Candidate {
-  const priceRange = marketPriceRange(e);
-  const priceByBhk: Record<string, { min: number; max: number }> = {};
-  if (priceRange) {
-    for (const b of marketBhkOptions(e)) priceByBhk[b] = priceRange;
-  }
   return {
     slug: marketSlug(e),
     title: e.project,
@@ -228,8 +224,8 @@ function marketToCandidate(e: MarketInventoryEntry): Candidate {
     subLocation: e.subLocation ?? null,
     area: MARKET_AREA,
     bhkOptions: marketBhkOptions(e),
-    priceRange,
-    priceByBhk,
+    priceRange: marketPriceRange(e),
+    priceByBhk: marketPriceByBhk(e),
     priceLabel: marketPriceLabel(e),
     possessionLabel: marketPossessionLabel(e),
     tier: null,
@@ -397,7 +393,9 @@ export function matchProperties(
   includeMarket = true,
 ): PropertyMatch[] {
   const candidates: Candidate[] = projects.map(projectToCandidate);
-  if (includeMarket) for (const e of marketInventory) candidates.push(marketToCandidate(e));
+  if (includeMarket) {
+    for (const e of publishedMarketInventory) candidates.push(marketToCandidate(e));
+  }
 
   const scored = candidates
     .map((c) => ({ c, s: scoreCandidate(c, setter, weights) }))
