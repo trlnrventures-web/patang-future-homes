@@ -44,7 +44,7 @@ const BLOCKING_REFS = [
   ["message_logs", "user_id"],
   ["negotiations", "assigned_sm_id"],
   ["bookings", "sm_id"],
-  ["leads", "assigned_sm_id"],
+  // leads.assigned_sm_id is deliberately absent: those leads are redistributed below.
   ["leads", "assigned_caller_id"],
   ["leads", "assigned_by"],
 ];
@@ -97,15 +97,21 @@ if (!sms.length) throw new Error("no active sales manager available to receive l
 const unassigned = db
   .prepare("select id, name, status from leads where assigned_sm_id is null and deleted_at is null")
   .all();
+const owned = db
+  .prepare("select id, name, status from leads where assigned_sm_id = ? and deleted_at is null")
+  .all(departing.id);
+const pool = [...unassigned, ...owned];
 
 console.log(`departing : ${departing.name} (id ${departing.id}, ${departing.role})`);
 console.log(`actor     : ${actor.name} (id ${actor.id})`);
 console.log(`receivers : ${sms.map((s) => `${s.name} (id ${s.id})`).join(", ")}`);
-console.log(`leads     : ${unassigned.length} unassigned`);
+console.log(
+  `leads     : ${unassigned.length} unassigned + ${owned.length} owned by ${departing.name} = ${pool.length} to redistribute`
+);
 
 if (DRY_RUN) {
   const plan = new Map(sms.map((s) => [s.id, 0]));
-  for (let i = 0; i < unassigned.length; i++) plan.set(sms[i % sms.length].id, plan.get(sms[i % sms.length].id) + 1);
+  for (let i = 0; i < pool.length; i++) plan.set(sms[i % sms.length].id, plan.get(sms[i % sms.length].id) + 1);
   console.log("\nDRY RUN - no writes. Plan:");
   for (const s of sms) console.log(`  ${s.name}: +${plan.get(s.id)} leads`);
   process.exit(0);
@@ -113,9 +119,9 @@ if (DRY_RUN) {
 
 // Randomized round-robin: shuffle the pool so the deal order is random, then hand
 // out one lead at a time in a cycle so the split stays even.
-for (let i = unassigned.length - 1; i > 0; i--) {
+for (let i = pool.length - 1; i > 0; i--) {
   const j = Math.floor(Math.random() * (i + 1));
-  [unassigned[i], unassigned[j]] = [unassigned[j], unassigned[i]];
+  [pool[i], pool[j]] = [pool[j], pool[i]];
 }
 
 const now = new Date().toISOString();
@@ -133,7 +139,7 @@ const insertActivity = db.prepare(
 const counts = new Map(sms.map((s) => [s.id, 0]));
 
 const run = db.transaction(() => {
-  unassigned.forEach((lead, i) => {
+  pool.forEach((lead, i) => {
     const sm = sms[i % sms.length];
     updateLead.run(sm.id, now, actor.id, now, lead.id);
     insertActivity.run(lead.id, actor.id, `Assigned: SM → ${sm.name}`, now);

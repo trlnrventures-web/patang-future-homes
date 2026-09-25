@@ -161,6 +161,24 @@ if (DRY_RUN) {
 
 const ids = plan.map((r) => r.userId);
 const placeholders = ids.map(() => "?").join(",");
+
+// The workbook is authoritative for day type, but clock-in and clock-out times
+// only exist where somebody actually used the app. Carry those over so a real
+// check-in is never downgraded to an untimed "present" marker, and so a clock-in
+// on a day the sheet calls a week off or holiday counts as worked.
+const existing = new Map();
+for (const r of db
+  .prepare(
+    `SELECT user_id, date, checkin_time, checkout_time, checkin_lat, checkin_lng,
+            checkout_lat, checkout_lng
+       FROM attendance
+      WHERE user_id IN (${placeholders}) AND date BETWEEN ? AND ?`
+  )
+  .all(...ids, IMPORT_START, IMPORT_END)) {
+  if (r.checkin_time) existing.set(`${r.user_id}:${r.date}`, r);
+}
+console.log(`\nfound ${existing.size} existing clock-in(s) in range to preserve`);
+
 const cleared = db.prepare(
   `DELETE FROM attendance WHERE user_id IN (${placeholders}) AND date BETWEEN ? AND ?`
 ).run(...ids, IMPORT_START, IMPORT_END).changes;
@@ -176,14 +194,49 @@ const ins = db.prepare(
   `INSERT INTO attendance (user_id, date, day_type, mode, checkin_time, created_at)
    VALUES (?, ?, ?, 'office', ?, ?)`
 );
+const restore = db.prepare(
+  `UPDATE attendance
+      SET checkout_time = ?, checkin_lat = ?, checkin_lng = ?, checkout_lat = ?, checkout_lng = ?
+    WHERE user_id = ? AND date = ?`
+);
+
+const WORKED_OVERRIDE = new Set(["week_off", "holiday", "left_job"]);
+let preserved = 0;
+let promoted = 0;
+const merged = plan.map((r) => {
+  const prior = existing.get(`${r.userId}:${r.date}`);
+  if (!prior) return r;
+  preserved++;
+  let dayType = r.dayType;
+  if (!r.checkinTime && WORKED_OVERRIDE.has(dayType)) {
+    dayType = "present";
+    promoted++;
+  }
+  return { ...r, dayType, prior, checkinTime: r.checkinTime ?? prior.checkin_time };
+});
+
 const run = db.transaction(() => {
-  for (const r of plan) ins.run(r.userId, r.date, r.dayType, r.checkinTime, now);
+  for (const r of merged) {
+    ins.run(r.userId, r.date, r.dayType, r.checkinTime, now);
+    if (r.prior) {
+      restore.run(
+        r.prior.checkout_time,
+        r.prior.checkin_lat,
+        r.prior.checkin_lng,
+        r.prior.checkout_lat,
+        r.prior.checkout_lng,
+        r.userId,
+        r.date
+      );
+    }
+  }
   db.prepare(
     `INSERT INTO leave_requests (user_id, start_date, end_date, reason, status, decided_by, decided_at, created_at)
      VALUES (?, ?, ?, ?, 'approved', ?, ?, ?)`
   ).run(leave.userId, leave.date, leave.date, "On leave", ADMIN_ID, now, now);
 });
 run();
+console.log(`preserved ${preserved} existing clock-in(s), promoted ${promoted} to present`);
 
 const total = db.prepare("SELECT COUNT(*) AS c FROM attendance").get().c;
 const inRange = db.prepare(
