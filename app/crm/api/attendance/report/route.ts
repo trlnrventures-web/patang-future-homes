@@ -9,6 +9,7 @@ import {
   getApprovedLeaveDaysForUser,
   checkinStatus,
   classifyDay,
+  istToday,
   type AttendanceRow,
 } from "@/lib/crm/attendance";
 import { currentMonthKey, getUserIncentiveForMonth } from "@/lib/crm/incentives";
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
 
   const weekOffDay = getWeekOffDay({ weekOffDay: targetUser.weekOffDay });
   const approvedLeave = getApprovedLeaveDaysForUser(targetUserId);
+  const today = istToday();
 
   const attendanceRows = db
     .select()
@@ -94,8 +96,11 @@ export async function GET(request: NextRequest) {
   const holidayDates = new Set(holidays.map((h) => h.date));
 
   let daysPresent = 0;
+  let halfDays = 0;
   let daysLate = 0;
   let daysAbsent = 0;
+  let personalHolidays = 0;
+  let leftJobDays = 0;
   let leaveDays = 0;
   let leaveDaysBankCovered = 0;
   let leaveDaysDeductible = 0;
@@ -117,13 +122,14 @@ export async function GET(request: NextRequest) {
     const dateKey = `${year}-${String(monthNum).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const dayOfWeek = new Date(`${dateKey}T12:00:00+05:30`).getDay();
     const dayName = DAY_NAMES[dayOfWeek];
-    const row = attendanceByDate.get(dateKey) || null;
-    const isHoliday = holidayDates.has(dateKey);
+    const row = attendanceByDate.get(dateKey) || null;    const isHoliday = holidayDates.has(dateKey);
     const isWeekOff = isWeekOffDate(dateKey, weekOffDay);
     const onLeave = approvedLeave.has(dateKey);
     const weekOffDecision = weekOffDecisionMap.get(dateKey);
 
-    const classified = classifyDay(row, { isWeekOff, onLeave, date: dateKey, today: from });
+    const classified = classifyDay(row, { isWeekOff, onLeave, date: dateKey, today });
+    const workedExplicitly = Boolean(row?.checkinTime) || row?.dayType === "present";
+    const isFuture = dateKey > today;
 
     let detailType: string = classified.type;
     let detailLabel = classified.label;
@@ -138,6 +144,11 @@ export async function GET(request: NextRequest) {
       detailLabel = "Worked (week-off banked)";
     }
 
+    if (isFuture) {
+      detailType = "upcoming";
+      detailLabel = "Upcoming";
+    }
+
     dayDetails.push({
       date: dateKey,
       dayName,
@@ -148,9 +159,17 @@ export async function GET(request: NextRequest) {
       status: row?.checkinTime ? checkinStatus(row) : null,
     });
 
-    if (isHoliday && !isWeekOff && !onLeave && !row?.checkinTime) {
-      // Holiday - don't count as absent
-    } else if (isWeekOff) {
+    if (isFuture) {
+      // Day has not happened yet - shown above but never tallied.
+    } else if (classified.type === "left_job") {
+      // Employment ended - neither present nor absent, and never deducted.
+      leftJobDays++;
+    } else if (classified.type === "holiday") {
+      // Per-person holiday - not an absence, no deduction.
+      if (row?.dayType === "holiday") personalHolidays++;
+    } else if (isHoliday && !isWeekOff && !workedExplicitly && !onLeave) {
+      // Company-wide holiday - don't count as absent
+    } else if (row?.dayType === "week_off" || (isWeekOff && !workedExplicitly)) {
       if (weekOffDecision?.decision === "worked") {
         weekOffsWorkedBanked++;
       } else {
@@ -163,7 +182,11 @@ export async function GET(request: NextRequest) {
       } else {
         leaveDaysDeductible++;
       }
-    } else if (row?.checkinTime) {
+    } else if (classified.type === "half_day" || row?.dayType === "half_day") {
+      // A half day is half present and half unpaid - see salary computation.
+      halfDays++;
+      daysPresent += 0.5;
+    } else if (row?.checkinTime || row?.dayType === "present") {
       daysPresent++;
       if (checkinStatus(row) === "late") {
         daysLate++;
@@ -195,8 +218,11 @@ export async function GET(request: NextRequest) {
     summary: {
       totalDays,
       daysPresent,
+      halfDays,
       daysLate,
       daysAbsent,
+      personalHolidays,
+      leftJobDays,
       leaveDays,
       leaveDaysBankCovered,
       leaveDaysDeductible,

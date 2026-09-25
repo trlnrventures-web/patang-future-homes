@@ -270,6 +270,7 @@ function createTables(sqlite: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       date TEXT NOT NULL,
+      day_type TEXT NOT NULL DEFAULT 'full_day',
       mode TEXT NOT NULL DEFAULT 'office',
       field_duty_reason TEXT,
       checkin_time TEXT,
@@ -439,6 +440,8 @@ function createTables(sqlite: Database.Database) {
   migrateUsers(sqlite);
   migrateSiteVisits(sqlite);
   migrateMessageTemplates(sqlite);
+  migrateAttendance(sqlite);
+  migrateSalaryReports(sqlite);
 }
 
 function migrateUsers(sqlite: Database.Database) {
@@ -461,6 +464,22 @@ function migrateUsers(sqlite: Database.Database) {
   }
 }
 
+function migrateAttendance(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(attendance)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("day_type")) {
+    sqlite.exec("ALTER TABLE attendance ADD COLUMN day_type TEXT NOT NULL DEFAULT 'full_day'");
+  }
+}
+
+function migrateSalaryReports(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(salary_reports)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("half_days")) {
+    sqlite.exec("ALTER TABLE salary_reports ADD COLUMN half_days INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
 function migrateLeads(sqlite: Database.Database) {
   const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as { name: string }[];
   const have = new Set(cols.map((c) => c.name));
@@ -477,6 +496,8 @@ function migrateLeads(sqlite: Database.Database) {
     ["assigned_by", "INTEGER"],
     ["sublocation", "TEXT"],
     ["deleted_at", "TEXT"],
+    ["reactivated_at", "TEXT"],
+    ["reactivated_from", "TEXT"],
   ];
   for (const [name, decl] of additions) {
     if (!have.has(name)) {

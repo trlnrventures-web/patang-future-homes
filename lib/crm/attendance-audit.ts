@@ -178,12 +178,19 @@ export function buildAttendanceAudit(filters: {
     }
 
     const attendanceInRange = db
-      .select({ userId: schema.attendance.userId, date: schema.attendance.date, checkinTime: schema.attendance.checkinTime })
+      .select({
+        userId: schema.attendance.userId,
+        date: schema.attendance.date,
+        checkinTime: schema.attendance.checkinTime,
+        dayType: schema.attendance.dayType,
+      })
       .from(schema.attendance)
       .where(and(gte(schema.attendance.date, from), lte(schema.attendance.date, to)))
       .all();
     const checkinKeys = new Set(
-      attendanceInRange.filter((r) => r.checkinTime).map((r) => `${r.userId}:${r.date}`)
+      attendanceInRange
+        .filter((r) => r.checkinTime || r.dayType === "present")
+        .map((r) => `${r.userId}:${r.date}`)
     );
 
     const today = new Date(Date.now() + (5 * 60 + 30) * 60 * 1000).toISOString().slice(0, 10);

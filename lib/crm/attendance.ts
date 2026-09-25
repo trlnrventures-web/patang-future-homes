@@ -88,10 +88,19 @@ export function validateLatLng(
   return { lat: la, lng: ln };
 }
 
+export type AttendanceDayType =
+  | "full_day"
+  | "half_day"
+  | "holiday"
+  | "left_job"
+  | "week_off"
+  | "present";
+
 export type AttendanceRow = {
   id: number;
   userId: number;
   date: string;
+  dayType: AttendanceDayType;
   mode: "office" | "field_duty";
   fieldDutyReason: string | null;
   checkinTime: string | null;
@@ -114,6 +123,10 @@ export function getAttendanceRow(userId: number, dateKey: string): AttendanceRow
     .get() as AttendanceRow | null;
 }
 
+function nextDateKey(dateKey: string): string {
+  return new Date(Date.parse(`${dateKey}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+}
+
 export function getApprovedLeaveDaysForUser(userId: number): Set<string> {
   const db = getDb();
   const rows = db
@@ -123,10 +136,11 @@ export function getApprovedLeaveDaysForUser(userId: number): Set<string> {
     .all();
   const days = new Set<string>();
   for (const r of rows) {
-    const start = new Date(`${r.startDate}T00:00:00+05:30`).getTime();
-    const end = new Date(`${r.endDate}T00:00:00+05:30`).getTime();
-    for (let ms = start; ms <= end; ms += 86400000) {
-      days.add(new Date(ms).toISOString().slice(0, 10));
+    // start_date/end_date are plain YYYY-MM-DD calendar values, so iterate them
+    // as calendar days. Converting through an IST midnight instant and reading
+    // back a UTC date shifts every leave one day earlier.
+    for (let d = r.startDate, guard = 0; d <= r.endDate && guard < 366; d = nextDateKey(d), guard++) {
+      days.add(d);
     }
   }
   return days;
@@ -173,6 +187,9 @@ export function checkinStatus(row: AttendanceRow | null): "on_time" | "late" | n
 export type DayType =
   | "week_off"
   | "leave"
+  | "holiday"
+  | "left_job"
+  | "half_day"
   | "absent"
   | "not_checked_in"
   | "checked_in"
@@ -184,8 +201,14 @@ export function classifyDay(
   row: AttendanceRow | null,
   opts: { isWeekOff: boolean; onLeave: boolean; date: string; today: string }
 ): { type: DayType; label: string } {
+  if (row?.dayType === "week_off") return { type: "week_off", label: "Week Off" };
+  if (row?.dayType === "holiday") return { type: "holiday", label: "Holiday" };
+  if (row?.dayType === "left_job") return { type: "left_job", label: "Left Job" };
+  if (row?.dayType === "half_day") return { type: "half_day", label: "Half Day" };
+  if (row?.dayType === "present") return { type: "on_time", label: "Present" };
   if (opts.isWeekOff) return { type: "week_off", label: "Week Off" };
   if (opts.onLeave) return { type: "leave", label: "Leave" };
+
   if (!row || !row.checkinTime) {
     return opts.date === opts.today
       ? { type: "not_checked_in", label: "Not Checked In" }

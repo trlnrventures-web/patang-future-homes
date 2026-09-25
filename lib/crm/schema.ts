@@ -28,6 +28,11 @@ export const attendance = sqliteTable("attendance", {
     .notNull()
     .references(() => users.id),
   date: text("date").notNull(),
+  dayType: text("day_type", {
+    enum: ["full_day", "half_day", "holiday", "left_job", "week_off", "present"],
+  })
+    .notNull()
+    .default("full_day"),
   mode: text("mode", { enum: ["office", "field_duty"] })
     .notNull()
     .default("office"),
@@ -149,6 +154,8 @@ export const leads = sqliteTable("leads", {
   createdAt: text("created_at").notNull().default(""),
   updatedAt: text("updated_at").notNull().default(""),
   deletedAt: text("deleted_at"),
+  reactivatedAt: text("reactivated_at"),
+  reactivatedFrom: text("reactivated_from"),
 });
 
 export const crmSettings = sqliteTable("crm_settings", {
@@ -441,6 +448,7 @@ export const salaryReports = sqliteTable("salary_reports", {
   month: text("month").notNull(),
   baseSalary: integer("base_salary").notNull(),
   daysPresent: integer("days_present").notNull().default(0),
+  halfDays: integer("half_days").notNull().default(0),
   daysLate: integer("days_late").notNull().default(0),
   daysAbsent: integer("days_absent").notNull().default(0),
   leaveDays: integer("leave_days").notNull().default(0),

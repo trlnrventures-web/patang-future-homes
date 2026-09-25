@@ -9,6 +9,8 @@ import {
   getWeekOffDay,
   getApprovedLeaveDaysForUser,
   checkinStatus,
+  classifyDay,
+  istToday,
   type AttendanceRow,
 } from "@/lib/crm/attendance";
 import { currentMonthKey, getUserIncentiveForMonth } from "@/lib/crm/incentives";
@@ -40,6 +42,7 @@ async function computeSalaryReport(userId: number, month: string) {
 
   const baseSalary = targetUser.baseSalary || 0;
   const weekOffDay = getWeekOffDay({ weekOffDay: targetUser.weekOffDay });
+  const today = istToday();
   const approvedLeave = getApprovedLeaveDaysForUser(userId);
 
   const attendanceRows = db
@@ -77,8 +80,11 @@ async function computeSalaryReport(userId: number, month: string) {
   const holidayDates = new Set(holidays.map((h) => h.date));
 
   let daysPresent = 0;
+  let halfDays = 0;
   let daysLate = 0;
   let daysAbsent = 0;
+  let personalHolidays = 0;
+  let leftJobDays = 0;
   let leaveDays = 0;
   let leaveDaysBankCovered = 0;
   let leaveDaysDeductible = 0;
@@ -87,15 +93,23 @@ async function computeSalaryReport(userId: number, month: string) {
 
   for (let d = 1; d <= totalDays; d++) {
     const dateKey = `${year}-${String(monthNum).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    if (dateKey > today) continue;
     const row = attendanceByDate.get(dateKey) || null;
     const isHoliday = holidayDates.has(dateKey);
     const isWeekOff = isWeekOffDate(dateKey, weekOffDay);
     const onLeave = approvedLeave.has(dateKey);
     const weekOffDecision = weekOffDecisionMap.get(dateKey);
 
-    if (isHoliday && !isWeekOff && !onLeave && !row?.checkinTime) {
-      // Holiday - no deduction
-    } else if (isWeekOff) {
+    const classified = classifyDay(row, { isWeekOff, onLeave, date: dateKey, today });
+    const workedExplicitly = Boolean(row?.checkinTime) || row?.dayType === "present";
+
+    if (classified.type === "left_job") {
+      leftJobDays++;
+    } else if (classified.type === "holiday" && row?.dayType === "holiday") {
+      personalHolidays++;
+    } else if (isHoliday && !isWeekOff && !workedExplicitly && !onLeave) {
+      // Company-wide holiday - no deduction
+    } else if (row?.dayType === "week_off" || (isWeekOff && !workedExplicitly)) {
       if (weekOffDecision?.decision === "worked") {
         weekOffsWorkedBanked++;
       } else {
@@ -108,7 +122,9 @@ async function computeSalaryReport(userId: number, month: string) {
       } else {
         leaveDaysDeductible++;
       }
-    } else if (row?.checkinTime) {
+    } else if (classified.type === "half_day" || row?.dayType === "half_day") {
+      halfDays++;
+    } else if (row?.checkinTime || row?.dayType === "present") {
       daysPresent++;
       if (checkinStatus(row) === "late") daysLate++;
     } else {
@@ -120,17 +136,25 @@ async function computeSalaryReport(userId: number, month: string) {
   const incentiveEarned = incentiveEntry?.total || 0;
 
   const perDaySalary = totalDays > 0 ? Math.round(baseSalary / totalDays) : 0;
-  const unpaidDays = leaveDaysDeductible + daysAbsent;
-  const deductions = unpaidDays * perDaySalary;
+  // A half day is paid at half rate, so it contributes half a day of unpaid time.
+  const unpaidDays = leaveDaysDeductible + daysAbsent + halfDays * 0.5;
+  const deductions = Math.round(unpaidDays * perDaySalary);
   const netPaid = baseSalary - deductions + incentiveEarned;
+  // Payable presence including half days. days_present stays integral so the
+  // persisted salary_reports column keeps whole-day semantics.
+  const effectiveDaysPresent = daysPresent + halfDays * 0.5;
 
   return {
     userId,
     month,
     baseSalary,
     daysPresent,
+    effectiveDaysPresent,
+    halfDays,
     daysLate,
     daysAbsent,
+    personalHolidays,
+    leftJobDays,
     leaveDays,
     leaveDaysBankCovered,
     leaveDaysDeductible,
@@ -221,10 +245,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // effectiveDaysPresent / personalHolidays / leftJobDays are derived display
+    // values with no matching column, so keep them out of the persisted row.
+    const { effectiveDaysPresent, personalHolidays, leftJobDays, ...persistable } = computed;
+    void effectiveDaysPresent;
+    void personalHolidays;
+    void leftJobDays;
+
     const inserted = db
       .insert(schema.salaryReports)
       .values({
-        ...computed,
+        ...persistable,
         generatedBy: user.id,
         createdAt: new Date().toISOString(),
       })
