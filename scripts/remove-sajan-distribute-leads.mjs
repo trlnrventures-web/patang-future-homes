@@ -32,7 +32,8 @@ const BLOCKING_REFS = [
   ["salary_reports", "generated_by"],
   ["reactivation_alerts", "user_id"],
   ["audit_log", "actor_user_id"],
-  ["audit_log", "target_user_id"],
+  // audit_log.target_user_id is deliberately absent: it is unlinked below. The
+  // row keeps the actor, timestamp and a summary that already names the person.
   ["company_holidays", "created_by"],
   ["company_holidays", "removed_by"],
   ["activities", "user_id"],
@@ -145,15 +146,20 @@ const run = db.transaction(() => {
     insertActivity.run(lead.id, actor.id, `Assigned: SM → ${sm.name}`, now);
     counts.set(sm.id, counts.get(sm.id) + 1);
   });
+  const unlinkedAuditRows = db
+    .prepare("update audit_log set target_user_id = null where target_user_id = ?")
+    .run(departing.id).changes;
   const removed = db.prepare("delete from users where id = ?").run(departing.id);
-  return removed.changes;
+  return { removed: removed.changes, unlinkedAuditRows };
 });
 
-const removed = run();
+
+const result = run();
 
 console.log("\nassigned:");
 for (const s of sms) console.log(`  ${s.name}: +${counts.get(s.id)} leads`);
-console.log(`\nremoved ${REMOVE_NAME}: ${removed} user row(s) deleted`);
+console.log(`\nremoved ${REMOVE_NAME}: ${result.removed} user row(s) deleted`);
+console.log(`unlinked audit_log rows: ${result.unlinkedAuditRows}`);
 
 const check = db.prepare("select count(*) n from leads where assigned_sm_id is null and deleted_at is null").get();
 console.log(`remaining unassigned leads: ${check.n}`);
