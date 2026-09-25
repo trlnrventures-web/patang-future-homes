@@ -129,8 +129,10 @@ export function carpetAreaRange(configs: Configuration[]): string {
 }
 
 export function toParagraphs(text: string, count = 3): string[] {
+  const source = typeof text === "string" ? text.trim() : "";
+  if (!source) return [];
   const sentences =
-    (text.match(/[^.!?]+[.!?]+(?:["'])?|.+$/g) || [text])
+    (source.match(/[^.!?]+[.!?]+(?:["'])?|.+$/g) || [source])
       .map((s) => s.trim())
       .filter(Boolean);
   const per = Math.ceil(sentences.length / count);
@@ -138,7 +140,7 @@ export function toParagraphs(text: string, count = 3): string[] {
   for (let i = 0; i < sentences.length; i += per) {
     groups.push(sentences.slice(i, i + per).join(" "));
   }
-  return groups.length ? groups : [text];
+  return groups.length ? groups : [source];
 }
 
 export function developerYears(since: number): string {

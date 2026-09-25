@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const project = getProject(slug);
   if (!project) notFound();
-  const heroImage = project.images[0];
+  const heroImage = project.images?.[0];
 
   return {
     title: { absolute: project.metaTitle },
@@ -311,7 +311,7 @@ export default async function ProjectDetail({ params }: Props) {
   const startingPrice = startingFrom(project.priceRange);
   const categorizedAmenities = categorizeAmenities(project.amenities);
   const aboutParagraphs = toParagraphs(project.fullDescription);
-  const aboutDescription = project.description ?? aboutParagraphs[0];
+  const aboutDescription = project.description ?? aboutParagraphs[0] ?? "";
   const quickFacts = [
     {
       label: "Configuration",
