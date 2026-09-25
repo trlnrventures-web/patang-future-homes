@@ -71,6 +71,13 @@ for (const [table, column] of BLOCKING_REFS) {
   if (n) blockers.push(`${table}.${column}=${n}`);
 }
 if (blockers.length) {
+  if (DRY_RUN) {
+    console.log(`\nBLOCKED - ${REMOVE_NAME} (id ${departing.id}) is still referenced:`);
+    for (const b of blockers) console.log(`  ${b}`);
+    console.log("\nDRY RUN - no writes. The account cannot be removed until these are");
+    console.log("reassigned or nulled. Nothing has been changed.");
+    process.exit(0);
+  }
   throw new Error(
     `${REMOVE_NAME} is still referenced (${blockers.join(", ")}). ` +
       "Reassign or reassign-to-null these rows before deleting the account."
