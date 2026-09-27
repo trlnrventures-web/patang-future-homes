@@ -49,6 +49,10 @@ data/crm.db
 data/crm.db-shm
 data/crm.db-wal
 
+# local pre-import snapshots of the CRM database
+data/crm.db.backup-*
+data/crm.backup-*
+
 # cloudflare / opennext
 .open-next
 .dev.vars

@@ -193,30 +193,11 @@ export const LEAD_STATUS_LABELS: Record<string, string> =
   Object.fromEntries(LEAD_STATUSES.map((s) => [s.value, s.label]));
 
 /**
- * The primary sales funnel. Every other status folds into exactly one column, so
- * this is the canonical map used by the lead-detail stepper, the status picker
- * and the Kanban board columns.
+ * The funnel map lives in `board-shared.ts` so the Kanban board — a client
+ * component — can use it without dragging this database-backed module into the
+ * browser bundle. Re-exported here for the many server-side callers.
  */
-export const LEAD_FUNNEL_STAGES: {
-  key: string;
-  label: string;
-  status: string;
-  matches: string[];
-}[] = [
-  { key: "new", label: "New", status: "new", matches: ["new", "calling", "connected", "no_response"] },
-  { key: "qualified", label: "Qualified", status: "qualified", matches: ["qualified"] },
-  { key: "follow_up", label: "Follow-up", status: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
-  { key: "visit_booked", label: "Visit Booked", status: "visit_booked", matches: ["visit_proposed", "visit_booked"] },
-  { key: "visit_confirmed", label: "Visit Confirmed", status: "visit_confirmed", matches: ["visit_confirmed"] },
-  { key: "visit_done", label: "Visit Done", status: "visit_done", matches: ["visit_done"] },
-  { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation"] },
-  { key: "booked", label: "Booked", status: "booked", matches: ["booked"] },
-];
-
-/** Which funnel column a status belongs to, or null for exited leads. */
-export function funnelStageForStatus(status: string) {
-  return LEAD_FUNNEL_STAGES.find((s) => s.matches.includes(status)) || null;
-}
+export { LEAD_FUNNEL_STAGES, funnelStageForStatus } from "./board-shared";
 
 export const LEAD_STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-800",

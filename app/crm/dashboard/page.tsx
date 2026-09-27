@@ -13,6 +13,8 @@ import { dealHealthFor, elapsedSinceMs, FINAL_STAGES, NEGOTIATION_STATUS_LABELS 
 import { matchProperties } from "@/lib/crm/matching";
 import { getMatchingWeights } from "@/lib/crm/settings";
 import { scanAndFetchReactivationAlerts } from "@/lib/crm/reactivation";
+import { getTodayTeamStatus } from "@/lib/crm/team-status";
+import TeamStatus from "@/components/crm/TeamStatus";
 
 export const metadata: Metadata = {
   title: { absolute: "Dashboard | Patang CRM" },
@@ -37,7 +39,7 @@ const smMetrics =
   const threeHoursMs = 3 * 3600 * 1000;
   const projectToTitle = Object.fromEntries(projects.map((p) => [p.slug, p.title]));
   const usersMap = new Map(db.select().from(schema.users).all().map((u) => [u.id, u.name]));
-  const leadsMap = new Map(db.select().from(schema.leads).all().map((l) => [l.id, l]));
+  const leadsMap = new Map(db.select().from(schema.leads).all().filter((l) => !l.deletedAt).map((l) => [l.id, l]));
 
   const lastActiveFor = (
     n: { updatedAt: string },
@@ -132,7 +134,7 @@ const smMetrics =
       .where(and(eq(schema.siteVisits.smId, user.id), eq(schema.siteVisits.date, today)))
       .orderBy(schema.siteVisits.time)
       .all()
-      .filter((v) => v.status !== "cancelled" && v.status !== "no_show");
+      .filter((v) => v.status !== "cancelled" && v.status !== "no_show" && leadsMap.has(v.leadId));
     for (const v of dayVisits) {
       scheduledVisits.push({
         id: v.id,
@@ -153,6 +155,7 @@ const smMetrics =
       .filter(
         (n) =>
           n.assignedSmId === user.id &&
+          leadsMap.has(n.leadId) &&
           !FINAL_STAGES.includes(n.status as (typeof FINAL_STAGES)[number])
       );
     const negLeadIds = [...new Set(activeNegotiations.map((n) => n.leadId))];
@@ -179,7 +182,8 @@ const smMetrics =
       .select()
       .from(schema.siteVisits)
       .where(and(eq(schema.siteVisits.smId, user.id), eq(schema.siteVisits.status, "visit_done")))
-      .all();
+      .all()
+      .filter((v) => leadsMap.has(v.leadId));
     for (const v of doneVisits) {
       if (db.select().from(schema.postVisitFeedback).where(eq(schema.postVisitFeedback.visitId, v.id)).get()) {
         continue;
@@ -200,7 +204,8 @@ const smMetrics =
       .select()
       .from(schema.siteVisits)
       .where(eq(schema.siteVisits.smId, user.id))
-      .all();
+      .all()
+      .filter((v) => leadsMap.has(v.leadId));
     for (const v of smVisits) {
       if (!needsTagging(v)) continue;
       taggingPending.push({
@@ -220,7 +225,7 @@ const smMetrics =
       .select()
       .from(schema.negotiations)
       .all()
-      .filter((n) => !FINAL_STAGES.includes(n.status as (typeof FINAL_STAGES)[number]));
+      .filter((n) => !FINAL_STAGES.includes(n.status as (typeof FINAL_STAGES)[number]) && leadsMap.has(n.leadId));
     const allNegLeadIds = [...new Set(allActive.map((n) => n.leadId))];
     const allLatestByLead = new Map<number, string>();
     for (const a of db
@@ -246,7 +251,8 @@ const smMetrics =
       .select()
       .from(schema.siteVisits)
       .where(eq(schema.siteVisits.status, "visit_done"))
-      .all();
+      .all()
+      .filter((v) => leadsMap.has(v.leadId));
     for (const v of allDoneVisits) {
       if (db.select().from(schema.postVisitFeedback).where(eq(schema.postVisitFeedback.visitId, v.id)).get()) {
         continue;
@@ -264,7 +270,7 @@ const smMetrics =
       }
     }
 
-    for (const v of db.select().from(schema.siteVisits).all()) {
+    for (const v of db.select().from(schema.siteVisits).all().filter((x) => leadsMap.has(x.leadId))) {
       if (!needsTagging(v)) continue;
       adminTaggingPending.push({
         visitId: v.id,
@@ -295,7 +301,7 @@ const smMetrics =
 
   if (expiringProjects.length > 0) {
     const excludedStatuses = [...FINAL_STAGES, "invalid", "dnc", "nurture", "lost", "booked"];
-    const activeLeads = db.select().from(schema.leads).all().filter((l) => !excludedStatuses.includes(l.status));
+    const activeLeads = db.select().from(schema.leads).all().filter((l) => !l.deletedAt && !excludedStatuses.includes(l.status));
     const weights = getMatchingWeights();
     for (const p of expiringProjects) {
       for (const lead of activeLeads) {
@@ -329,6 +335,9 @@ const smMetrics =
   const reactivationAlerts = (isAdmin || isSm)
     ? scanAndFetchReactivationAlerts(isSm ? user.id : undefined)
     : [];
+
+  // ---- Today's team status (admin view) ----
+  const teamStatus = isAdmin ? getTodayTeamStatus() : [];
 
 return (
     <div className="space-y-6">
@@ -593,10 +602,12 @@ return (
         </section>
       )}
 
-      {/* Team performance - Owner view */}
+{/* Team performance - Owner view */}
       {isAdmin && (
         <>
-<section>
+          <TeamStatus members={teamStatus} date={today} />
+
+          <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-bold text-primary">
                 Sales Manager Performance

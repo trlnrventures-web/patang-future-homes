@@ -54,8 +54,9 @@ export async function getDashboardData(user: CrmUser) {
   }
 
   const allLeads = db.select().from(schema.leads).all().filter(activeLeadCond);
-  const allSiteVisits = db.select().from(schema.siteVisits).all();
-  const allBookings = db.select().from(schema.bookings).all();
+  const liveLeadIds = new Set(allLeads.map((l) => l.id));
+  const allSiteVisits = db.select().from(schema.siteVisits).all().filter((v) => liveLeadIds.has(v.leadId));
+  const allBookings = db.select().from(schema.bookings).all().filter((b) => liveLeadIds.has(b.leadId));
   const users = db.select().from(schema.users).all();
   const callerMap = new Map(users.filter((u) => u.role === "caller").map((u) => [u.id, u.name]));
   const smMap = new Map(users.filter((u) => u.role === "sales_manager").map((u) => [u.id, u.name]));
@@ -67,9 +68,19 @@ export async function getDashboardData(user: CrmUser) {
     const connected = assigned.filter((l) =>
       ["qualified", "assigned", "follow_up", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked"].includes(l.status)
     ).length;
-    const followUps = db.select().from(schema.followUps).where(eq(schema.followUps.userId, sm.id)).all();
+    const followUps = db
+      .select()
+      .from(schema.followUps)
+      .where(eq(schema.followUps.userId, sm.id))
+      .all()
+      .filter((f) => liveLeadIds.has(f.leadId));
     const overdue = followUps.filter((f) => f.status === "pending" && f.scheduledFor < nowIso).length;
-    const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.smId, sm.id)).all();
+    const visits = db
+      .select()
+      .from(schema.siteVisits)
+      .where(eq(schema.siteVisits.smId, sm.id))
+      .all()
+      .filter((v) => liveLeadIds.has(v.leadId));
     const visitsCompleted = visits.filter((v) => v.status === "visit_done").length;
     const bookings = assigned.filter((l) => l.status === "booked").length;
     return {

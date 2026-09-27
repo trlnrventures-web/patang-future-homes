@@ -3,6 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { resolveDefaultCallerId } from "@/lib/crm/leads";
+import { handleReInquiry } from "@/lib/crm/reinquiry";
 
 export const runtime = "nodejs";
 
@@ -66,28 +67,40 @@ export async function POST(request: NextRequest) {
     const db = getDb();
     const now = new Date().toISOString();
 
-    const callerId = resolveDefaultCallerId(db);
+    const admin = db.select().from(schema.users).where(eq(schema.users.role, "admin")).all()[0] || null;
 
-    const lead = db
-      .insert(schema.leads)
-      .values({
-        name,
-        phone,
-        whatsappNumber: phone,
-        source: "website",
-        originalProject: project,
-        originalMessage: theirMessage ? `${project ? `${project}: ` : ""}${theirMessage}` : project,
-        location: null,
-        status: "new",
-        assignedCallerId: callerId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning()
-      .get();
+    const result = handleReInquiry({
+      db,
+      phone,
+      project,
+      message: theirMessage,
+      source: "website",
+      userId: admin?.id ?? null,
+      insertLead: () => {
+        const callerId = resolveDefaultCallerId(db);
+        return db
+          .insert(schema.leads)
+          .values({
+            name,
+            phone,
+            whatsappNumber: phone,
+            source: "website",
+            originalProject: project,
+            originalMessage: theirMessage ? `${project ? `${project}: ` : ""}${theirMessage}` : project,
+            location: null,
+            status: "new",
+            assignedCallerId: callerId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning()
+          .get();
+      },
+    });
 
-    const admin = db.select().from(schema.users).where(eq(schema.users.role, "admin")).all()[0];
-    if (admin) {
+    const lead = result.lead;
+
+    if (result.kind === "new" && admin) {
       db.insert(schema.activities)
         .values({
           leadId: lead.id,
@@ -100,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, leadId: lead.id },
+      { ok: true, leadId: lead.id, duplicate: result.kind === "duplicate", reactivated: result.kind === "reactivated" },
       { status: 201, headers: corsHeaders(origin) }
     );
   } catch (error) {

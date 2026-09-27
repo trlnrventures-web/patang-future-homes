@@ -2,25 +2,26 @@
 
 import { useState } from "react";
 import CallerInbox from "./CallerInbox";
-import LeadsList from "./LeadsList";
+import LeadBoard from "./LeadBoard";
 import NewLeadForm from "./NewLeadForm";
 
-export type LeadsListContext = {
+/**
+ * Filters carried in the URL so lead detail can offer Previous/Next Lead through
+ * the exact queue on screen, and "Back to Leads" can restore it. The board is
+ * the only Leads view, so there is no view or page to carry.
+ */
+export type LeadsViewContext = {
   status: string;
   quick: string;
   sort: string;
   q: string;
-  page: number;
-  view: "list" | "board";
 };
 
-const EMPTY_CONTEXT: LeadsListContext = {
+const EMPTY_CONTEXT: LeadsViewContext = {
   status: "all",
   quick: "",
-  sort: "newest",
+  sort: "",
   q: "",
-  page: 1,
-  view: "list",
 };
 
 export default function LeadsPageContent({
@@ -29,7 +30,7 @@ export default function LeadsPageContent({
   inbox = true,
 }: {
   role?: string;
-  listContext?: LeadsListContext;
+  listContext?: LeadsViewContext;
   inbox?: boolean;
 }) {
   const [showNewLead, setShowNewLead] = useState(false);
@@ -42,12 +43,12 @@ export default function LeadsPageContent({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-primary">
-            {isCaller ? "Caller Inbox" : "Lead Inbox"}
+            {isCaller ? "Caller Inbox" : "Lead Board"}
           </h1>
           <p className="mt-0.5 text-sm text-muted">
             {isCaller
               ? "Handle new leads quickly. Prioritize what is overdue."
-              : "Leads assigned to you"}
+              : "Drag a lead between columns to change its stage."}
           </p>
         </div>
         <button
@@ -57,7 +58,7 @@ export default function LeadsPageContent({
           + New Lead
         </button>
       </div>
-      {isCaller ? <CallerInbox listContext={ctx} /> : <LeadsList listContext={ctx} />}
+      {isCaller ? <CallerInbox listContext={ctx} /> : <LeadBoard listContext={ctx} />}
       <NewLeadForm isOpen={showNewLead} onClose={() => setShowNewLead(false)} />
     </>
   );

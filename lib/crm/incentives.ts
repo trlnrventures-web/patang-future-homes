@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
 import { writeAuditLog, getUserName } from "./audit";
@@ -143,6 +143,7 @@ export function confirmedBookingsForMonth(month: string, now: Date = new Date())
       updatedAt: schema.leads.updatedAt,
     })
     .from(schema.leads)
+    .where(isNull(schema.leads.deletedAt))
     .all();
   const callerById = new Map(leads.map((l) => [l.id, l.assignedCallerId]));
 

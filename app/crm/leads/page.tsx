@@ -4,14 +4,13 @@ import { redirect } from "next/navigation";
 import LeadsPageContent from "@/components/crm/LeadsPageContent";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
 import { QUICK_FILTERS } from "@/lib/crm/lead-query";
-import { INBOX_TABS } from "@/lib/crm/inbox-shared";
+import { BOARD_SORT_KEYS, BOARD_STATUS_FILTERS } from "@/lib/crm/board-shared";
+import { INBOX_SORTS, INBOX_TABS } from "@/lib/crm/inbox-shared";
 
 export const metadata: Metadata = {
   title: { absolute: "Leads | Patang CRM" },
   robots: { index: false, follow: false },
 };
-
-const LIST_SORTS = ["newest", "oldest", "overdue"] as const;
 
 function first(v: string | string[] | undefined): string {
   const raw = Array.isArray(v) ? v[0] : v;
@@ -19,17 +18,15 @@ function first(v: string | string[] | undefined): string {
 }
 
 /**
- * Lead links carry the list's filters/sort so lead detail can offer
+ * Lead links carry the board's filters/sort so lead detail can offer
  * Previous/Next Lead and a Back link that returns to the same view. These
- * values are whitelisted here so the list cannot be driven into a bad state.
+ * values are whitelisted here so the board cannot be driven into a bad state.
  */
-export type LeadsListContext = {
+export type LeadsViewContext = {
   status: string;
   quick: string;
   sort: string;
   q: string;
-  page: number;
-  view: "list" | "board";
 };
 
 export default async function LeadsPage({
@@ -44,11 +41,9 @@ export default async function LeadsPage({
   const status = first(sp.status);
   const quick = first(sp.quick);
   const sort = first(sp.sort);
-  const page = Number.parseInt(first(sp.page), 10);
-  const view = first(sp.view);
   const fromInbox = first(sp.inbox) === "1";
 
-  const context: LeadsListContext = {
+  const context: LeadsViewContext = {
     // A caller coming back from a lead carries the inbox tab in `status`; the two
     // inboxes name their buckets differently, so accept either vocabulary.
     status:
@@ -56,11 +51,24 @@ export default async function LeadsPage({
         ? status
         : "all",
     quick: (QUICK_FILTERS as readonly string[]).includes(quick) ? quick : "",
-    sort: (LIST_SORTS as readonly string[]).includes(sort) ? sort : "newest",
+    // The board and the caller inbox order differently, so each gets its own
+    // default: the board surfaces the leads most stuck in their column, the
+    // inbox wants the newest work first.
+    sort: fromInbox
+      ? (INBOX_SORTS as readonly string[]).includes(sort)
+        ? sort
+        : "newest"
+      : BOARD_SORT_KEYS.includes(sort)
+        ? sort
+        : "longest_in_stage",
     q: first(sp.q).slice(0, 100),
-    page: Number.isFinite(page) && page > 1 ? page : 1,
-    view: view === "board" ? "board" : "list",
   };
+
+  // The board is the only Leads view, so a status outside its filter row is
+  // meaningless here — but the caller inbox has its own tab vocabulary.
+  if (!fromInbox && !(BOARD_STATUS_FILTERS as readonly string[]).includes(status)) {
+    context.status = "all";
+  }
 
   return <LeadsPageContent role={user.role} listContext={context} inbox={fromInbox} />;
 }

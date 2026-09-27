@@ -35,7 +35,7 @@ export default async function NegotiationPage({
 
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
-  if (!lead) notFound();
+  if (!lead || lead.deletedAt) notFound();
 
   if (user.role === "caller") notFound();
   if (user.role === "sales_manager" && lead.assignedSmId !== user.id) notFound();

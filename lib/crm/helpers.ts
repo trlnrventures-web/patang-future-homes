@@ -44,7 +44,7 @@ export function userIsAdmin(user: AuthUser | null): boolean {
 
 export function getLeadsForUser(user: AuthUser, status?: string) {
   const db = getDb();
-  let rows = db.select().from(schema.leads).all();
+  let rows = db.select().from(schema.leads).all().filter((l) => !l.deletedAt);
   if (user.role === "caller") {
     rows = rows.filter((l) => l.assignedCallerId === user.id);
   } else if (user.role === "sales_manager") {

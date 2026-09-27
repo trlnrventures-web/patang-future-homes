@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
-import { eq, and, gte, lt, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, lt, sql, inArray, isNull } from "drizzle-orm";
 
 const CALL_TYPES = [
   "call",
@@ -88,6 +88,18 @@ function countActivitiesForTypes(type: string, userId: number, from: string, to:
     .all().length;
 }
 
+function liveLeadIds(): Set<number> {
+  const db = getDb();
+  return new Set(
+    db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(isNull(schema.leads.deletedAt))
+      .all()
+      .map((r) => r.id)
+  );
+}
+
 export function getDailyMetricsForEmployee(
   employee: EmployeeForReport,
   date: string
@@ -95,6 +107,7 @@ export function getDailyMetricsForEmployee(
   const db = getDb();
   const { from, to } = istDayRange(date);
   const metrics: DailyMetrics = { ...EMPTY_METRICS };
+  const activeIds = liveLeadIds();
 
   // ---- Shared (call + qualification + follow-up) ----
   metrics.calls = CALL_TYPES.reduce((sum, t) => sum + countActivitiesForTypes(t, employee.id, from, to), 0);
@@ -112,7 +125,8 @@ export function getDailyMetricsForEmployee(
         lt(schema.followUps.completedAt, to)
       )
     )
-    .all().length;
+    .all()
+    .filter((f) => activeIds.has(f.leadId)).length;
 
   if (employee.role === "caller") {
     metrics.newLeads = db
@@ -121,6 +135,7 @@ export function getDailyMetricsForEmployee(
       .where(
         and(
           eq(schema.leads.assignedCallerId, employee.id),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.createdAt, from),
           lt(schema.leads.createdAt, to)
         )
@@ -136,6 +151,7 @@ export function getDailyMetricsForEmployee(
         and(
           eq(schema.leads.assignedCallerId, employee.id),
           eq(schema.leads.status, "no_response"),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.updatedAt, from),
           lt(schema.leads.updatedAt, to)
         )
@@ -148,6 +164,7 @@ export function getDailyMetricsForEmployee(
       .where(
         and(
           eq(schema.leads.assignedSmId, employee.id),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.assignedAt, from),
           lt(schema.leads.assignedAt, to)
         )
@@ -164,7 +181,8 @@ export function getDailyMetricsForEmployee(
           lt(schema.siteVisits.createdAt, to)
         )
       )
-      .all().length;
+      .all()
+      .filter((v) => activeIds.has(v.leadId)).length;
 
     const completionRows = db
       .select({ leadId: schema.activities.leadId })
@@ -177,7 +195,8 @@ export function getDailyMetricsForEmployee(
           lt(schema.activities.createdAt, to)
         )
       )
-      .all();
+      .all()
+      .filter((r) => activeIds.has(r.leadId));
     metrics.visitsCompleted = new Set(completionRows.map((r) => r.leadId)).size;
 
     metrics.negotiations = db
@@ -190,7 +209,8 @@ export function getDailyMetricsForEmployee(
           lt(schema.negotiations.createdAt, to)
         )
       )
-      .all().length;
+      .all()
+      .filter((n) => activeIds.has(n.leadId)).length;
 
     metrics.bookings = db
       .select()
@@ -203,7 +223,8 @@ export function getDailyMetricsForEmployee(
           lt(schema.bookings.updatedAt, to)
         )
       )
-      .all().length;
+      .all()
+      .filter((b) => activeIds.has(b.leadId)).length;
   }
 
   return metrics;
@@ -222,6 +243,8 @@ export function getTeamReport(date: string): TeamReport {
 
   const users = db.select().from(schema.users).all().filter((u) => u.active);
 
+  const activeIds = liveLeadIds();
+
   const activityCount = (type: string) =>
     db
       .select()
@@ -239,7 +262,7 @@ export function getTeamReport(date: string): TeamReport {
   totals.newLeads = db
     .select()
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
+    .where(and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
     .all().length;
   totals.calls = CALL_TYPES.reduce((sum, t) => sum + activityCount(t), 0);
   totals.connected = activityCount("call_connected");
@@ -255,13 +278,15 @@ export function getTeamReport(date: string): TeamReport {
         lt(schema.followUps.completedAt, to)
       )
     )
-    .all().length;
+    .all()
+    .filter((f) => activeIds.has(f.leadId)).length;
 
   totals.visitsBooked = db
     .select()
     .from(schema.siteVisits)
     .where(and(gte(schema.siteVisits.createdAt, from), lt(schema.siteVisits.createdAt, to)))
-    .all().length;
+    .all()
+    .filter((v) => activeIds.has(v.leadId)).length;
 
   const completionRows = db
     .select({ leadId: schema.activities.leadId })
@@ -273,14 +298,16 @@ export function getTeamReport(date: string): TeamReport {
         lt(schema.activities.createdAt, to)
       )
     )
-    .all();
+    .all()
+    .filter((r) => activeIds.has(r.leadId));
   totals.visitsCompleted = new Set(completionRows.map((r) => r.leadId)).size;
 
   totals.negotiations = db
     .select()
     .from(schema.negotiations)
     .where(and(gte(schema.negotiations.createdAt, from), lt(schema.negotiations.createdAt, to)))
-    .all().length;
+    .all()
+    .filter((n) => activeIds.has(n.leadId)).length;
 
   totals.bookings = db
     .select()
@@ -292,7 +319,8 @@ export function getTeamReport(date: string): TeamReport {
         lt(schema.bookings.updatedAt, to)
       )
     )
-    .all().length;
+    .all()
+    .filter((b) => activeIds.has(b.leadId)).length;
 
   const callers = users
     .filter((u) => u.role === "caller")

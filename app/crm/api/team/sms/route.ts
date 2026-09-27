@@ -32,14 +32,25 @@ export async function GET() {
       .where(and(eq(schema.leads.assignedSmId, sm.id), isNull(schema.leads.deletedAt)))
       .all();
     const activeLeads = myLeads.filter((l) => activeStatuses.includes(l.status));
-    const followUps = db.select().from(schema.followUps).where(eq(schema.followUps.userId, sm.id)).all();
+    const myLeadIds = new Set(myLeads.map((l) => l.id));
+    const followUps = db
+      .select()
+      .from(schema.followUps)
+      .where(eq(schema.followUps.userId, sm.id))
+      .all()
+      .filter((f) => myLeadIds.has(f.leadId));
     const todaysFollowUps = followUps.filter(
       (f) => f.status === "pending" && f.scheduledFor.slice(0, 10) === today
     );
     const overdueFollowUps = followUps.filter(
       (f) => f.status === "pending" && f.scheduledFor < nowIso
     );
-    const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.smId, sm.id)).all();
+    const visits = db
+      .select()
+      .from(schema.siteVisits)
+      .where(eq(schema.siteVisits.smId, sm.id))
+      .all()
+      .filter((v) => myLeadIds.has(v.leadId));
     const upcomingVisits = visits.filter(
       (v) =>
         ["proposed", "booked", "confirmed"].includes(v.status) &&

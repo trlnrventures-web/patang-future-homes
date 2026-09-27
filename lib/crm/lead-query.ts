@@ -131,6 +131,13 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
       if (ao !== bo) return ao ? -1 : 1;
       return actionAtMs(a) - actionAtMs(b);
     });
+  } else if (sort === "longest_in_stage") {
+    // Oldest stage entry first. The board draws a column in exactly this order,
+    // so the leads most stuck in their column surface at the top, and Previous /
+    // Next Lead on the detail page walks the same sequence.
+    const stageMs = (l: (typeof rows)[number]) =>
+      new Date(l.stageChangedAt || l.createdAt).getTime();
+    rows.sort((a, b) => stageMs(a) - stageMs(b));
   }
 
   const users = db.select().from(schema.users).all();

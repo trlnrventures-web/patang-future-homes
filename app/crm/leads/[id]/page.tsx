@@ -9,7 +9,8 @@ import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, findLikelyDuplicates } from "@/lib/crm/leads";
 import { queryLeadList, QUICK_FILTERS } from "@/lib/crm/lead-query";
 import { queryInboxLeads } from "@/lib/crm/inbox-query";
-import { isInboxTab } from "@/lib/crm/inbox-shared";
+import { INBOX_SORTS, isInboxTab } from "@/lib/crm/inbox-shared";
+import { BOARD_SORT_KEYS } from "@/lib/crm/board-shared";
 import { readProjectsFile } from "@/lib/crm/projects-store";
 import { Badge } from "@/components/crm/ui";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const LIST_SORTS = ["newest", "oldest", "overdue"] as const;
+const LIST_SORTS = [
+  ...INBOX_SORTS,
+  ...BOARD_SORT_KEYS,
+].filter((s, i, all) => all.indexOf(s) === i) as string[];
 
 /** `searchParams` values may be arrays and are untrusted, so take one and whitelist it. */
 function firstValue(v: string | string[] | undefined): string {

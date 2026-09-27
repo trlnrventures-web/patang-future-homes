@@ -19,7 +19,7 @@ export async function GET(
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
 
-  if (!lead) {
+  if (!lead || lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
   if (!canAccessSales(user, lead)) {
@@ -54,7 +54,7 @@ export async function POST(
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
 
-  if (!lead) {
+  if (!lead || lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
   if (!canAccessSales(user, lead)) {

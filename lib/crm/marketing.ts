@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
-import { eq, and, gte, lt, sql, inArray, desc, asc } from "drizzle-orm";
+import { eq, and, gte, lt, sql, inArray, desc, asc, isNull } from "drizzle-orm";
 
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
@@ -148,6 +148,18 @@ export type CrossProjectRow = {
 };
 
 // ─── Helpers ───
+
+function liveLeadIdSet(): Set<number> {
+  const db = getDb();
+  return new Set(
+    db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(isNull(schema.leads.deletedAt))
+      .all()
+      .map((r) => r.id),
+  );
+}
 
 function countLeadActivities(
   type: string,
@@ -306,7 +318,9 @@ export function getMarketingOverview(range: Range): OverviewKPIs {
   const allLeads = db
     .select({ id: schema.leads.id })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
+    .where(
+      and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)),
+    )
     .all();
   const leadIds = allLeads.map((l) => l.id);
 
@@ -324,7 +338,7 @@ export function getMarketingOverview(range: Range): OverviewKPIs {
 
   // Totals
   const totalBookingValueRows = db
-    .select({ totalValue: schema.bookings.totalValue, bookingAmount: schema.bookings.bookingAmount })
+    .select({ totalValue: schema.bookings.totalValue, bookingAmount: schema.bookings.bookingAmount, leadId: schema.bookings.leadId })
     .from(schema.bookings)
     .where(
       and(
@@ -333,7 +347,8 @@ export function getMarketingOverview(range: Range): OverviewKPIs {
         lt(schema.bookings.updatedAt, to),
       ),
     )
-    .all();
+    .all()
+    .filter((b) => liveLeadIdSet().has(b.leadId));
   const totalBookingValue = totalBookingValueRows.reduce(
     (sum, b) => sum + (b.totalValue || b.bookingAmount || 0),
     0,
@@ -342,7 +357,9 @@ export function getMarketingOverview(range: Range): OverviewKPIs {
   const totalLeadsCount = db
     .select({ count: sql<number>`COUNT(*)` })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
+    .where(
+      and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)),
+    )
     .get()?.count || 0;
 
   return {
@@ -389,6 +406,7 @@ export function getCampaignList(
       .from(schema.leads)
       .where(
         and(
+          isNull(schema.leads.deletedAt),
           eq(schema.leads.campaignName, c.name),
           gte(schema.leads.createdAt, from),
           lt(schema.leads.createdAt, to),
@@ -441,6 +459,7 @@ export function getCampaignDetail(campaignId: number, range: Range) {
     .from(schema.leads)
     .where(
       and(
+        isNull(schema.leads.deletedAt),
         eq(schema.leads.campaignName, campaign.name),
         gte(schema.leads.createdAt, from),
         lt(schema.leads.createdAt, to),
@@ -499,6 +518,7 @@ export function getCampaignDetail(campaignId: number, range: Range) {
     .from(schema.leads)
     .where(
       and(
+        isNull(schema.leads.deletedAt),
         eq(schema.leads.campaignName, campaign.name),
         gte(schema.leads.createdAt, from),
         lt(schema.leads.createdAt, to),
@@ -575,6 +595,7 @@ export function getSourcePerformance(range: Range): SourceRow[] {
       .from(schema.leads)
       .where(
         and(
+          isNull(schema.leads.deletedAt),
           eq(schema.leads.source, src as never),
           gte(schema.leads.createdAt, from),
           lt(schema.leads.createdAt, to),
@@ -622,7 +643,9 @@ export function getProjectDemand(range: Range): {
   const projectRows = db
     .select({ originalProject: schema.leads.originalProject })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
+    .where(
+      and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)),
+    )
     .all();
   const projects = [...new Set(projectRows.map((r) => r.originalProject).filter(Boolean))] as string[];
 
@@ -632,6 +655,7 @@ export function getProjectDemand(range: Range): {
       .from(schema.leads)
       .where(
         and(
+          isNull(schema.leads.deletedAt),
           eq(schema.leads.originalProject, proj),
           gte(schema.leads.createdAt, from),
           lt(schema.leads.createdAt, to),
@@ -672,14 +696,15 @@ export function getProjectDemand(range: Range): {
         lt(schema.bookings.updatedAt, to),
       ),
     )
-    .all();
+    .all()
+    .filter((b) => liveLeadIdSet().has(b.leadId));
 
   const bookedLeadIds = bookedLeads.map((b) => b.leadId);
   if (bookedLeadIds.length > 0) {
     const leadOrigins = db
       .select({ id: schema.leads.id, originalProject: schema.leads.originalProject })
       .from(schema.leads)
-      .where(inArray(schema.leads.id, bookedLeadIds))
+      .where(and(inArray(schema.leads.id, bookedLeadIds), isNull(schema.leads.deletedAt)))
       .all();
     const originMap: Record<number, string | null> = {};
     leadOrigins.forEach((l) => { originMap[l.id] = l.originalProject; });

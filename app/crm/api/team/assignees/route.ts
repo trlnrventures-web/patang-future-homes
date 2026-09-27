@@ -34,8 +34,9 @@ export async function GET() {
     .from(schema.leads)
     .where(isNull(schema.leads.deletedAt))
     .all();
-  const allFollowUps = db.select().from(schema.followUps).all();
-  const allVisits = db.select().from(schema.siteVisits).all();
+  const liveLeadIds = new Set(allLeads.map((l) => l.id));
+  const allFollowUps = db.select().from(schema.followUps).all().filter((f) => liveLeadIds.has(f.leadId));
+  const allVisits = db.select().from(schema.siteVisits).all().filter((v) => liveLeadIds.has(v.leadId));
 
   const build = (
     u: { id: number; name: string; email: string },

@@ -15,7 +15,7 @@ import {
   type InboxTab,
 } from "@/lib/crm/inbox-shared";
 import { slaStatusMeta, type SlaStatus, leadAccentCls } from "@/lib/crm/sla";
-import type { LeadsListContext } from "./LeadsPageContent";
+import type { LeadsViewContext } from "./LeadsPageContent";
 
 const TABS: { key: string; label: string }[] = [
   { key: "new", label: "New" },
@@ -45,7 +45,7 @@ const SOURCE_LABELS: Record<string, string> = {
   other: "Lead",
 };
 
-export default function CallerInbox({ listContext }: { listContext?: LeadsListContext }) {
+export default function CallerInbox({ listContext }: { listContext?: LeadsViewContext }) {
   const [leads, setLeads] = useState<InboxLead[]>([]);
   const [loading, setLoading] = useState(true);
   // The inbox tab is passed through the same `status`-shaped query the Leads list

@@ -18,7 +18,7 @@ export async function GET(
   const { id } = await params;
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
-  if (!lead) {
+  if (!lead || lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 

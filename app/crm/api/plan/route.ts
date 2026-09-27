@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { and, eq, lt, inArray } from "drizzle-orm";
+import { and, eq, lt, inArray, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { istToday } from "@/lib/crm/attendance";
 import { getApprovedLeaveDaysForUser, isWeekOffDate } from "@/lib/crm/attendance";
@@ -18,26 +18,32 @@ export async function GET() {
   const today = istToday();
   const istNow = new Date(new Date().getTime() + (5 * 60 + 30) * 60 * 1000).toISOString();
 
+  const liveLeadIds = new Set(
+    db.select({ id: schema.leads.id }).from(schema.leads).where(isNull(schema.leads.deletedAt)).all().map((r) => r.id)
+  );
+
   let overdueFollowUps = 0;
   if (user.role === "sales_manager" || user.role === "caller") {
     overdueFollowUps = db
       .select()
       .from(schema.followUps)
       .where(and(eq(schema.followUps.userId, user.id), eq(schema.followUps.status, "pending"), lt(schema.followUps.scheduledFor, istNow)))
-      .all().length;
+      .all()
+      .filter((f) => liveLeadIds.has(f.leadId)).length;
   } else {
     overdueFollowUps = db
       .select()
       .from(schema.followUps)
       .where(and(eq(schema.followUps.status, "pending"), lt(schema.followUps.scheduledFor, istNow)))
-      .all().length;
+      .all()
+      .filter((f) => liveLeadIds.has(f.leadId)).length;
   }
 
   const todayVisitsRaw = db
     .select()
     .from(schema.siteVisits)
     .all()
-    .filter((v) => v.date === today);
+    .filter((v) => v.date === today && liveLeadIds.has(v.leadId));
   const todayVisits =
     user.role === "sales_manager"
       ? todayVisitsRaw.filter((v) => v.smId === user.id).length
@@ -49,19 +55,19 @@ export async function GET() {
     hotLeads = db
       .select()
       .from(schema.leads)
-      .where(and(eq(schema.leads.assignedSmId, user.id), inArray(schema.leads.status, hotStatuses)))
+      .where(and(eq(schema.leads.assignedSmId, user.id), inArray(schema.leads.status, hotStatuses), isNull(schema.leads.deletedAt)))
       .all().length;
   } else if (user.role === "caller") {
     hotLeads = db
       .select()
       .from(schema.leads)
-      .where(and(eq(schema.leads.assignedCallerId, user.id), inArray(schema.leads.status, hotStatuses)))
+      .where(and(eq(schema.leads.assignedCallerId, user.id), inArray(schema.leads.status, hotStatuses), isNull(schema.leads.deletedAt)))
       .all().length;
   } else {
     hotLeads = db
       .select()
       .from(schema.leads)
-      .where(inArray(schema.leads.status, hotStatuses))
+      .where(and(inArray(schema.leads.status, hotStatuses), isNull(schema.leads.deletedAt)))
       .all().length;
   }
 

@@ -2,7 +2,7 @@ import { getDb } from "./db";
 import * as schema from "./schema";
 import { projects } from "@/lib/projects";
 import { matchProperties } from "./matching";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getMatchingWeights } from "./settings";
 
 export type ReactivationAlert = {
@@ -29,7 +29,7 @@ export function scanAndFetchReactivationAlerts(userId?: number): ReactivationAle
     const nurtureLostLeads = db
       .select()
       .from(schema.leads)
-      .where(inArray(schema.leads.status, ["nurture", "lost"]))
+      .where(and(inArray(schema.leads.status, ["nurture", "lost"]), isNull(schema.leads.deletedAt)))
       .all();
     const weights = getMatchingWeights();
 
@@ -104,7 +104,7 @@ export function scanAndFetchReactivationAlerts(userId?: number): ReactivationAle
     .filter((r) => !r.dismissed);
 
   const projectsMap = Object.fromEntries(projects.map((p) => [p.slug, p.title]));
-  const leadsRows = db.select().from(schema.leads).all();
+  const leadsRows = db.select().from(schema.leads).all().filter((l) => !l.deletedAt);
   const leadsMap = new Map(leadsRows.map((l) => [l.id, l]));
 
   return rows.map((r) => ({

@@ -17,7 +17,7 @@ export async function GET() {
 
   const db = getDb();
   const allVisits = db.select().from(schema.siteVisits).all();
-  const leads = db.select().from(schema.leads).all();
+  const leads = db.select().from(schema.leads).all().filter((l) => !l.deletedAt);
   const leadMap = new Map(leads.map((l) => [l.id, l]));
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u]));
@@ -33,6 +33,7 @@ export async function GET() {
   const isAdmin = user.role === "admin" || user.role === "sales_head";
 
   const scoped = allVisits.filter((v) => {
+    if (!leadMap.has(v.leadId)) return false;
     if (isAdmin) return true;
     if (user.role === "sales_manager") return v.smId === user.id;
     if (user.role === "caller") return leadMap.get(v.leadId)?.assignedCallerId === user.id;
@@ -79,6 +80,11 @@ export async function DELETE(request: NextRequest) {
   const db = getDb();
   const visit = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.id, visitId)).get();
   if (!visit) return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+
+  const visitLead = db.select().from(schema.leads).where(eq(schema.leads.id, visit.leadId)).get();
+  if (!visitLead || visitLead.deletedAt) {
+    return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+  }
 
   const isAdmin = user.role === "admin" || user.role === "sales_head";
   if (!isAdmin && visit.smId !== user.id) {
