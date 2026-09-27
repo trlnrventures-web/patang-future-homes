@@ -29,13 +29,27 @@ type Props = {
   accentCls?: string;
   selected?: boolean;
   onToggleSelect?: () => void;
+  /**
+   * Query string (e.g. "?status=qualified&sort=overdue") carried over from the
+   * list so the detail page can offer Previous/Next Lead in the same order.
+   */
+  hrefQuery?: string;
 };
 
-export default function LeadCard({ lead, badges, pills, footerNote, accentCls, selected, onToggleSelect }: Props) {
+export default function LeadCard({
+  lead,
+  badges,
+  pills,
+  footerNote,
+  accentCls,
+  selected,
+  onToggleSelect,
+  hrefQuery = "",
+}: Props) {
   const router = useRouter();
   const overdue = !!lead.hasOverdueFollowUp && !!lead.nextFollowUpDisplay;
 
-  const open = () => router.push(`/crm/leads/${lead.id}`);
+  const open = () => router.push(`/crm/leads/${lead.id}${hrefQuery}`);
   const stop = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -138,7 +152,7 @@ export default function LeadCard({ lead, badges, pills, footerNote, accentCls, s
             <WhatsAppIcon />
           </a>
           <Link
-            href={`/crm/leads/${lead.id}`}
+            href={`/crm/leads/${lead.id}${hrefQuery}`}
             title="Open lead"
             onClick={stop}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"

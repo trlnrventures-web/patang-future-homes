@@ -27,7 +27,7 @@ function positiveInt(value: unknown, field: string): number | null {
 function loadAuthLead(id: string) {
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
-  return { db, lead };
+  return { db, lead: lead && !lead.deletedAt ? lead : null };
 }
 
 function getOpenNegotiation(
@@ -144,6 +144,7 @@ export async function POST(
     const leadUpdate: Record<string, unknown> = {
       status: "negotiation",
       nextAction: negotiation.nextAction || "Call customer",
+      stageChangedAt: now,
       updatedAt: now,
     };
     if (negotiation.nextActionAt) leadUpdate.nextFollowUp = negotiation.nextActionAt;
@@ -251,6 +252,7 @@ export async function POST(
     const leadUpdate: Record<string, unknown> = {
       status: "follow_up",
       nextAction,
+      stageChangedAt: now,
       updatedAt: now,
     };
     if (nextActionAt) leadUpdate.nextFollowUp = nextActionAt;
@@ -373,6 +375,7 @@ export async function PATCH(
         status: "negotiation",
         nextAction: String(update.nextAction !== undefined ? update.nextAction : negotiation.nextAction || ""),
         nextFollowUp: nextFollowUpTarget,
+        stageChangedAt: now,
         updatedAt: now,
       })
       .where(eq(schema.leads.id, lead.id))

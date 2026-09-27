@@ -135,6 +135,8 @@ export const leads = sqliteTable("leads", {
   })
     .notNull()
     .default("new"),
+  /** When the lead last entered its current status — drives "days in stage". */
+  stageChangedAt: text("stage_changed_at"),
   leadScore: integer("lead_score").default(0),
   nextFollowUp: text("next_follow_up"),
   nextAction: text("next_action"),

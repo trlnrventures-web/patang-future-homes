@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       const changed = targetLeads.filter((l) => l.status !== status);
       const changeNote = "Bulk status update";
       for (const l of changed) {
-        db.update(schema.leads).set({ status, updatedAt: now }).where(eq(schema.leads.id, l.id)).run();
+        db.update(schema.leads).set({ status, stageChangedAt: now, updatedAt: now }).where(eq(schema.leads.id, l.id)).run();
         db.insert(schema.activities).values({
           leadId: l.id,
           userId: user.id,
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       for (const l of targetLeads) {
         if (l.assignedSmId === resolvedSm) continue;
         db.update(schema.leads)
-          .set({ assignedSmId: resolvedSm, assignedAt: now, assignedBy: user.id, status: "assigned", nextAction: "sm_follow_up", updatedAt: now })
+          .set({ assignedSmId: resolvedSm, assignedAt: now, assignedBy: user.id, status: "assigned", stageChangedAt: now, nextAction: "sm_follow_up", updatedAt: now })
           .where(eq(schema.leads.id, l.id))
           .run();
         db.insert(schema.activities).values({
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       }
       for (const l of targetLeads) {
         db.update(schema.leads)
-          .set({ status: "invalid", deletedAt: now, updatedAt: now })
+          .set({ status: "invalid", deletedAt: now, stageChangedAt: now, updatedAt: now })
           .where(eq(schema.leads.id, l.id))
           .run();
       }

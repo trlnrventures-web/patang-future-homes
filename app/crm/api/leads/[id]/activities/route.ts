@@ -17,7 +17,7 @@ export async function POST(
   const { id } = await params;
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
-  if (!lead) {
+  if (!lead || lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
@@ -447,6 +447,7 @@ export async function POST(
           assignedBy: user.id,
           status: "assigned",
           nextAction: "sm_follow_up",
+          stageChangedAt: now,
           updatedAt: now,
         })
         .where(eq(schema.leads.id, lead.id))
@@ -489,7 +490,10 @@ export async function POST(
       if (quals.otherPreferences) update.otherPreferences = quals.otherPreferences;
       if (quals.notes) update.notes = quals.notes;
       if (quals.concern) update.concern = quals.concern;
-      if (lead.status !== "qualified" && lead.status !== "assigned") update.status = "qualified";
+      if (lead.status !== "qualified" && lead.status !== "assigned") {
+        update.status = "qualified";
+        update.stageChangedAt = now;
+      }
       update.nextAction = "review_assignment";
       update.updatedAt = now;
 
@@ -512,6 +516,7 @@ export async function POST(
     // Apply status + follow-up changes once
     if (newStatus && newStatus !== lead.status) {
       leadUpdates.status = newStatus;
+      leadUpdates.stageChangedAt = now;
     }
 
     if (Object.keys(leadUpdates).length > 0) {

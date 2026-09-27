@@ -78,6 +78,7 @@ function createTables(sqlite: Database.Database) {
       other_preferences TEXT,
       notes TEXT,
       status TEXT NOT NULL DEFAULT 'new',
+      stage_changed_at TEXT,
       lead_score INTEGER DEFAULT 0,
       next_follow_up TEXT,
       next_action TEXT,
@@ -485,6 +486,7 @@ function migrateLeads(sqlite: Database.Database) {
   const have = new Set(cols.map((c) => c.name));
   const additions: Array<[string, string]> = [
     ["next_action", "TEXT"],
+    ["stage_changed_at", "TEXT"],
     ["concern", "TEXT"],
     ["first_call_at", "TEXT"],
     ["first_response_time_seconds", "INTEGER"],
@@ -504,7 +506,28 @@ function migrateLeads(sqlite: Database.Database) {
       sqlite.exec(`ALTER TABLE leads ADD COLUMN ${name} ${decl}`);
     }
   }
+  backfillStageChangedAt(sqlite);
   seedSettings(sqlite);
+}
+
+/**
+ * Leads created before `stage_changed_at` existed fall back to `created_at`, which
+ * badly overstates how long they have sat in their current stage. Recover the real
+ * value from the lead's most recent `status_change` activity.
+ */
+function backfillStageChangedAt(sqlite: Database.Database) {
+  if (!sqlite.prepare("PRAGMA table_info(activities)").all().length) return;
+  sqlite.exec(`
+    UPDATE leads
+    SET stage_changed_at = COALESCE(
+      (
+        SELECT MAX(a.created_at) FROM activities a
+        WHERE a.lead_id = leads.id AND a.type = 'status_change'
+      ),
+      created_at
+    )
+    WHERE stage_changed_at IS NULL
+  `);
 }
 
 function migrateBookings(sqlite: Database.Database) {

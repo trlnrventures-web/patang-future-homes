@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Badge } from "./ui";
 import LeadCard from "./LeadCard";
+import LeadBoard, { type BoardLead } from "./LeadBoard";
 import InboxSnapshot from "./InboxSnapshot";
 import AccentLegend from "./AccentLegend";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, bhkLabel } from "@/lib/crm/leads";
+import type { LeadsListContext } from "./LeadsPageContent";
 import { dealHealthFor } from "@/lib/crm/sales";
 import { leadAccentCls } from "@/lib/crm/sla";
 
@@ -29,9 +31,12 @@ type Lead = {
   hasOverdueFollowUp?: boolean;
   negotiationLastActive?: string | null;
   slaStatus?: string;
+  daysInStage?: number;
 };
 
 type McUser = { id: number; name: string; role: string };
+
+type View = "list" | "board";
 
 const STATUS_FILTERS = ["all", "new", "calling", "qualified", "follow_up", "visit_booked", "visit_done", "negotiation", "booked", "no_response", "nurture", "lost"];
 
@@ -49,15 +54,15 @@ const SORT_OPTIONS = [
   { key: "overdue", label: "Most Overdue First" },
 ];
 
-export default function LeadsList() {
+export default function LeadsList({ listContext }: { listContext?: LeadsListContext }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("all");
-  const [quick, setQuick] = useState("");
-  const [sort, setSort] = useState("newest");
-  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState(listContext?.status ?? "all");
+  const [quick, setQuick] = useState(listContext?.quick ?? "");
+  const [sort, setSort] = useState(listContext?.sort ?? "newest");
+  const [query, setQuery] = useState(listContext?.q ?? "");
   const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(listContext?.page ?? 1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -70,7 +75,23 @@ export default function LeadsList() {
   const [bulkAction, setBulkAction] = useState<"" | "assign_sm" | "status" | "delete">("");
   const [bulkSmId, setBulkSmId] = useState<number | "">("");
   const [bulkStatus, setBulkStatus] = useState("");
+  const [view, setView] = useState<View>(listContext?.view ?? "list");
   const loadSeq = useRef(0);
+
+  // Carried into every lead link so the detail page can offer Previous/Next Lead
+  // inside the exact list the user is looking at, and "Back to list" can restore
+  // the same filters and page number.
+  const hrefQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    if (status !== "all") params.set("status", status);
+    if (quick) params.set("quick", quick);
+    if (sort !== "newest") params.set("sort", sort);
+    if (query.trim()) params.set("q", query.trim());
+    if (view === "board") params.set("view", "board");
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  }, [status, quick, sort, query, view, page]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,8 +103,13 @@ export default function LeadsList() {
       if (quick) params.set("quick", quick);
       if (sort !== "newest") params.set("sort", sort);
       if (query.trim()) params.set("q", query.trim());
-      params.set("page", String(page));
-      params.set("pageSize", "20");
+      if (view === "board") {
+        // The board draws every lead of the current filter at once.
+        params.set("view", "board");
+      } else {
+        params.set("page", String(page));
+        params.set("pageSize", "20");
+      }
       const res = await fetch(`/crm/api/leads?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
@@ -99,7 +125,7 @@ export default function LeadsList() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [status, quick, query, sort, page]);
+  }, [status, quick, query, sort, page, view]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -283,7 +309,26 @@ export default function LeadsList() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AccentLegend />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <div
+              className="flex items-center gap-0.5 rounded-full border border-border bg-white p-0.5"
+              role="group"
+              aria-label="Leads view"
+            >
+              {(["list", "board"] as View[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  aria-pressed={view === v}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${
+                    view === v ? "bg-primary text-white" : "text-muted hover:bg-primary/5"
+                  }`}
+                >
+                  {v === "list" ? "List View" : "Board View"}
+                </button>
+              ))}
+            </div>
             <select
               value={sort}
               onChange={(e) => { setSort(e.target.value); setPage(1); }}
@@ -323,6 +368,12 @@ export default function LeadsList() {
             Try changing the filters, or create a new lead.
           </p>
         </div>
+      ) : view === "board" ? (
+        <LeadBoard
+          leads={leads as BoardLead[]}
+          hrefQuery={hrefQuery}
+          onChanged={load}
+        />
       ) : (
         <>
           <div className="flex items-center justify-between px-1 text-xs text-muted">
@@ -370,6 +421,7 @@ export default function LeadsList() {
                 }}
                 selected={selected.has(lead.id)}
                 onToggleSelect={() => toggleSelect(lead.id)}
+                hrefQuery={hrefQuery}
                 accentCls={leadAccentCls({
                   status: lead.status,
                   slaStatus: lead.slaStatus,

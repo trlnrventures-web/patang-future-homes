@@ -146,6 +146,12 @@ export async function PATCH(
       }
     }
 
+    // Stamp the moment the lead entered its current stage so the board can show
+    // "days in stage" without parsing the activity log.
+    if (statusChange) {
+      update.stageChangedAt = now;
+    }
+
     // ---- Assignment: caller / SM / auto-rebalance ----
     let newCaller = existing.assignedCallerId;
     let newSm = existing.assignedSmId;
@@ -281,11 +287,13 @@ export async function DELETE(
 
   // Soft-delete: keep the row for audit trail but hide it everywhere via
   // deletedAt. Also mark as invalid so any status-based aggregations skip it.
+  const deletedAt = new Date().toISOString();
   db.update(schema.leads)
     .set({
       status: "invalid",
-      deletedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      deletedAt,
+      stageChangedAt: deletedAt,
+      updatedAt: deletedAt,
     })
     .where(eq(schema.leads.id, Number(id)))
     .run();

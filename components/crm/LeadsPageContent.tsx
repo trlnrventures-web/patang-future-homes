@@ -5,9 +5,37 @@ import CallerInbox from "./CallerInbox";
 import LeadsList from "./LeadsList";
 import NewLeadForm from "./NewLeadForm";
 
-export default function LeadsPageContent({ role = "caller" }: { role?: string }) {
+export type LeadsListContext = {
+  status: string;
+  quick: string;
+  sort: string;
+  q: string;
+  page: number;
+  view: "list" | "board";
+};
+
+const EMPTY_CONTEXT: LeadsListContext = {
+  status: "all",
+  quick: "",
+  sort: "newest",
+  q: "",
+  page: 1,
+  view: "list",
+};
+
+export default function LeadsPageContent({
+  role = "caller",
+  listContext,
+  inbox = true,
+}: {
+  role?: string;
+  listContext?: LeadsListContext;
+  inbox?: boolean;
+}) {
   const [showNewLead, setShowNewLead] = useState(false);
-  const isCaller = role === "caller";
+  // The page defaults to the caller inbox, so only an explicit `inbox=0` opts out.
+  const isCaller = inbox ? role === "caller" : false;
+  const ctx = listContext ?? EMPTY_CONTEXT;
 
   return (
     <>
@@ -29,7 +57,7 @@ export default function LeadsPageContent({ role = "caller" }: { role?: string })
           + New Lead
         </button>
       </div>
-      {isCaller ? <CallerInbox /> : <LeadsList />}
+      {isCaller ? <CallerInbox listContext={ctx} /> : <LeadsList listContext={ctx} />}
       <NewLeadForm isOpen={showNewLead} onClose={() => setShowNewLead(false)} />
     </>
   );

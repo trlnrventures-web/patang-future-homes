@@ -8,6 +8,7 @@ import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUS_COLORS,
+  LEAD_FUNNEL_STAGES,
   ACTIVITY_LABELS,
   LEAD_LOST_REASONS,
   lostReasonLabel,
@@ -39,15 +40,15 @@ export type LeadDetailData = {
   propertyOptions: string[];
 };
 
-const FUNNEL_STAGES: { key: string; label: string; status: string; matches: string[] }[] = [
-  { key: "new", label: "New", status: "new", matches: ["new", "calling", "connected", "no_response"] },
-  { key: "qualified", label: "Qualified", status: "qualified", matches: ["qualified"] },
-  { key: "follow_up", label: "Follow-up", status: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
-  { key: "visit_booked", label: "Visit Booked", status: "visit_booked", matches: ["visit_proposed", "visit_booked"] },
-  { key: "visit_confirmed", label: "Visit Confirmed", status: "visit_confirmed", matches: ["visit_confirmed"] },
-  { key: "visit_done", label: "Visit Done", status: "visit_done", matches: ["visit_done"] },
-  { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation"] },
-  { key: "booked", label: "Booked", status: "booked", matches: ["booked"] },
+const FUNNEL_STAGES = LEAD_FUNNEL_STAGES;
+
+/** Lead detail is tabbed so the page is not one endless stack of cards. */
+type DetailTabKey = "overview" | "activity" | "comms";
+
+const DETAIL_TABS: { key: DetailTabKey; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "activity", label: "Activity" },
+  { key: "comms", label: "Visits & Messages" },
 ];
 
 const EXIT_STATUSES: { value: string; label: string }[] = [
@@ -67,13 +68,34 @@ const OVERFLOW_STATUSES = [
   "nurture",
 ];
 
+function reactivationPreviousLabel(from: string | null | undefined): string {
+  if (!from) return "";
+  if (from === "deleted") return "Inactive";
+  return LEAD_STATUS_LABELS[from] || from;
+}
+
+function reactivationDateLabel(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
 type Props = {
   data: LeadDetailData;
   currentUser: { id: number; role: string; name: string };
   initialVisitOpen?: boolean;
+  /** Rendered inside the "Visits & Messages" tab by the server page. */
+  messageCenter?: React.ReactNode;
 };
 
-export default function LeadDetail({ data, currentUser, initialVisitOpen }: Props) {
+export default function LeadDetail({ data, currentUser, initialVisitOpen, messageCenter }: Props) {
   const [lead, setLead] = useState(data.lead);
   const [activities, setActivities] = useState(data.activities);
   const [followUps, setFollowUps] = useState(data.followUps);
@@ -110,6 +132,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
     meetingPoint: "",
   });
   const [visitStartView, setVisitStartView] = useState<"book" | "manage" | null>(null);
+  const [tab, setTab] = useState<DetailTabKey>("overview");
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
   const callerUsers = data.users.filter((u) => u.role === "caller");
@@ -459,11 +482,19 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
     visits.length > 0 ||
     !["new", "calling", "connected", "no_response"].includes(lead.status);
 
-  const scrollToSection = useCallback((id: string) => {
+  // Header actions sit above the tabs, so revealing a section means switching to
+  // the tab that owns it first, then scrolling to the anchor.
+  const goToSection = useCallback((target: DetailTabKey, id: string) => {
+    setTab(target);
     setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 80);
+    }, 140);
   }, []);
+
+  const detailTabs = DETAIL_TABS.map((t) => ({
+    ...t,
+    count: t.key === "activity" ? activities.length : t.key === "comms" ? visits.length : 0,
+  }));
 
   const qualificationFields = [
     { key: "Location", filled: Boolean(lead.location) },
@@ -478,7 +509,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
   const qualificationDone = qualificationFields.filter((f) => f.filled).length;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       {toast && (
         <div className="fixed left-1/2 top-16 z-[100] -translate-x-1/2 rounded-xl bg-navy px-4 py-2.5 text-sm font-medium text-white shadow-2xl">
           {toast}
@@ -520,11 +551,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
         </div>
       )}
 
-      {/* ===== Two-column layout ===== */}
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-      {/* ===== LEFT COLUMN ===== */}
-      <div className="space-y-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
-
       {/* ===== Contact row (2 primary actions) ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-white p-4">
         <div className="min-w-0">
@@ -546,7 +572,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
         <div className="flex shrink-0 items-center gap-2">
           <a
             href={`tel:+${phone}`}
-            onClick={() => scrollToSection("call-outcome")}
+            onClick={() => goToSection("activity", "call-outcome")}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-secondary"
           >
             <PhoneIcon />
@@ -556,7 +582,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
             href={`https://wa.me/${waNumber}`}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => scrollToSection("message-center")}
+            onClick={() => goToSection("comms", "message-center")}
             className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-[#25D366]/30 transition-colors hover:bg-[#1DA851]"
           >
             <WhatsAppIcon />
@@ -611,7 +637,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
                 label="Message Center"
                 hint="Templates and WhatsApp"
                 color="bg-blue-50 text-blue-700"
-                onClick={() => { setMoreActionsOpen(false); scrollToSection("message-center"); }}
+                onClick={() => { setMoreActionsOpen(false); goToSection("comms", "message-center"); }}
                 icon={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10ZM8 10h8" />}
               />
               {!readOnly && (
@@ -620,7 +646,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
                     label="Schedule Follow-up"
                     hint="Set next action"
                     color="bg-amber-50 text-amber-700"
-                    onClick={() => { setMoreActionsOpen(false); const willShow = !showFollowUp; setShowFollowUp(willShow); if (willShow) scrollToSection("follow-up-form"); }}
+                    onClick={() => { setMoreActionsOpen(false); const willShow = !showFollowUp; setShowFollowUp(willShow); if (willShow) goToSection("activity", "follow-up-form"); }}
                     icon={<path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
                   />
                   <MoreAction
@@ -636,7 +662,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
                 label="Find Property"
                 hint="Run the matching engine"
                 color="bg-accent text-primary"
-                onClick={() => { setMoreActionsOpen(false); setShowMatches(true); loadMatches(); scrollToSection("matching-properties"); }}
+                onClick={() => { setMoreActionsOpen(false); setShowMatches(true); loadMatches(); goToSection("overview", "matching-properties"); }}
                 icon={<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /></>}
               />
               {!isCaller && hasProgressed && (
@@ -704,411 +730,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
           </p>
         </div>
       )}
-
-      {/* ===== Row 2: Call Outcome + Original Enquiry ===== */}
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-border bg-white p-4 scroll-mt-24" id="call-outcome" data-section="true">
-          <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { t: "call_connected", label: "Connected", color: "bg-green-100 text-green-800" },
-              { t: "call_no_answer", label: "No Answer", color: "bg-amber-100 text-amber-800" },
-              { t: "call_busy", label: "Busy", color: "bg-orange-100 text-orange-800" },
-              { t: "call_wrong_number", label: "Wrong Number", color: "bg-red-100 text-red-700" },
-              { t: "call_back", label: "Call Back", color: "bg-blue-100 text-blue-800" },
-              { t: "call_not_interested", label: "Not Interested", color: "bg-slate-200 text-slate-700" },
-              { t: "call_switched_off", label: "Switched Off", color: "bg-amber-100 text-amber-800" },
-              { t: "call_number_invalid", label: "Number Invalid", color: "bg-red-100 text-red-700" },
-              { t: "call_whatsapp_only", label: "Requested WhatsApp Only", color: "bg-emerald-100 text-emerald-800" },
-              { t: "call_language_barrier", label: "Language Barrier", color: "bg-purple-100 text-purple-800" },
-              { t: "call_other", label: "Other", color: "bg-gray-100 text-gray-700" },
-            ].map((b) => (
-              <button
-                key={b.t}
-                disabled={busy || readOnly}
-                onClick={() => {
-                  if (b.t === "call_back") {
-                    setShowCallback((s) => !s);
-                  } else {
-                    handleCallOutcome(b.t);
-                  }
-                }}
-                className={`rounded-full px-4 py-2 text-xs font-bold transition-opacity disabled:opacity-50 ${b.color}`}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-          {showCallback && (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input
-                type="datetime-local"
-                value={callbackTime}
-                onChange={(e) => setCallbackTime(e.target.value)}
-                className="flex-1 rounded-xl border border-blue-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
-              />
-              <Button
-                disabled={busy || !callbackTime}
-                onClick={() => {
-                  handleCallOutcome("call_back", { callbackTime: new Date(callbackTime).toISOString() });
-                  setShowCallback(false);
-                  setCallbackTime("");
-                }}
-              >
-                Confirm Call Back
-              </Button>
-            </div>
-          )}
-          <p className="mt-2 text-[10px] text-soft">
-            The CALL button dials the phone. Log the outcome here after the call.
-          </p>
-        </div>
-
-        {/* Concern / Rejected project */}
-        {lead.originalProject && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-primary">
-                Original Enquiry: {lead.originalProject}
-              </h3>
-              {lead.concern && (
-                <Badge color="bg-amber-100 text-amber-800">Concern: {lead.concern}</Badge>
-              )}
-            </div>
-            <p className="mb-2 text-xs text-muted">
-              The project can be rejected, not the customer. Record the agenda and show alternative options.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { v: "budget", l: "Budget too high" },
-                { v: "location", l: "Location not preferred" },
-                { v: "bhk", l: "BHK size" },
-                { v: "possession", l: "Possession time" },
-                { v: "comparing", l: "Comparing with others" },
-              ].map((c) => (
-                <button
-                  key={c.v}
-                  disabled={busy || readOnly}
-                  onClick={() => handleRecordConcern(c.v)}
-                  className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                    lead.concern === c.v
-                      ? "border-amber-500 bg-amber-100 text-amber-800"
-                      : "border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
-                  }`}
-                >
-                  {c.l}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ===== Requirement card ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-primary">Requirement</h3>
-          {(isCaller || isAdmin) && !readOnly && (
-            <button
-              onClick={() => setEditingReq((s) => !s)}
-              className="text-xs font-semibold text-accent-ink hover:underline"
-            >
-              {editingReq ? "Cancel ✕" : "✎ Edit"}
-            </button>
-          )}
-        </div>
-
-        <div className="mb-3">
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="font-semibold text-navy">Qualification Progress</span>
-            <span className="font-bold text-primary">
-              {qualificationDone}/8 captured
-            </span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${(qualificationDone / 8) * 100}%` }}
-            />
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {qualificationFields.map((f) => (
-              <span
-                key={f.key}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                  f.filled
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-gray-100 text-soft"
-                }`}
-              >
-                {f.filled ? "✓ " : "○ "}{f.key}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {!requiredFieldsFilled && (
-          <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
-              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <p className="text-sm font-semibold leading-snug text-amber-800">
-              Requirement is not complete yet — call and qualify the lead.
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
-          <ReqItem label="Location" value={lead.location || ""} />
-          <ReqItem label="Sub-location" value={lead.sublocation || ""} />
-          <ReqItem label="Budget" value={budgetLabel(lead)} />
-          <ReqItem label="BHK" value={bhkLabel(lead.bhk)} />
-          <ReqItem label="Purpose" value={purposeLabel(lead.purpose)} />
-          <ReqItem label="Timeline" value={timelineLabel(lead.timeline)} />
-          <ReqItem label="Loan Required" value={loanLabel(lead.loanRequired)} />
-        </div>
-
-        {lead.preferredProject && (
-          <div className="mt-3 text-sm">
-            <span className="text-soft">Preferred project: </span>
-            <span className="font-semibold text-navy">{lead.preferredProject}</span>
-          </div>
-        )}
-        {lead.familyRequirements && (
-          <div className="mt-1 text-sm">
-            <span className="text-soft">Family: </span>
-            <span className="text-navy">{lead.familyRequirements}</span>
-          </div>
-        )}
-        {lead.notes && (
-          <div className="mt-1 text-sm">
-            <span className="text-soft">Notes: </span>
-            <span className="text-navy">{lead.notes}</span>
-          </div>
-        )}
-
-        {editingReq && (
-          <RequirementEditor
-            lead={lead}
-            onSave={handleSaveRequirement}
-            onCancel={() => setEditingReq(false)}
-          />
-        )}
-      </div>
-
-      </div>
-      {/* ===== END LEFT COLUMN ===== */}
-
-      {/* ===== RIGHT COLUMN ===== */}
-      <div className="space-y-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
-
-      {/* ===== Notes (highlighted) ===== */}
-      <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
-          </span>
-          <h3 className="text-sm font-bold text-primary">Notes</h3>
-          {notesList.length > 0 && (
-            <Badge color="bg-amber-100 text-amber-800">{notesList.length}</Badge>
-          )}
-          <span className="ml-auto text-[10px] text-soft">Call updates & reminders</span>
-        </div>
-        {notesList.length === 0 ? (
-          <p className="rounded-xl bg-white/70 px-3 py-2 text-xs text-muted">No notes yet.</p>
-        ) : (
-          <div className="max-h-64 space-y-2 overflow-y-auto pr-0.5">
-            {notesList.map((a) => (
-              <div key={a.id} className="rounded-xl bg-white px-3 py-2 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
-                  <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
-                </div>
-                <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {!readOnly && (
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddNote();
-              }}
-              placeholder="Add a note..."
-              className="flex-1 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
-            />
-            <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
-          </div>
-        )}
-      </div>
-
-      {/* ===== Status / funnel stepper ===== */}
-      <div className="rounded-2xl border border-border bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-primary">Lead Progress</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value=""
-              disabled={busy || readOnly}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                handleStatusChange(v);
-              }}
-              className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-muted focus:border-primary focus:outline-none"
-            >
-              <option value="">More statuses…</option>
-              {OVERFLOW_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {LEAD_STATUS_LABELS[s] || s}
-                </option>
-              ))}
-            </select>
-            <select
-              value=""
-              disabled={busy || readOnly}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                if (v === "lost") {
-                  setLostReason(getLeadLostReason(lead.notes) || "");
-                  setLostNote("");
-                  setShowLostPicker(true);
-                } else {
-                  handleStatusChange(v);
-                }
-              }}
-              className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 focus:border-red-400 focus:outline-none"
-            >
-              <option value="">Close lead…</option>
-              {EXIT_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="flex items-start">
-          {FUNNEL_STAGES.map((stage, i) => {
-            const done = stageIndex > i;
-            const current = stageIndex === i;
-            const reached = stageIndex >= i && stageIndex !== -1;
-            return (
-              <div key={stage.key} className="flex flex-1 flex-col items-center">
-                <div className="flex w-full items-center">
-                  <div className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : reached ? "bg-primary" : "bg-border"}`} />
-                  <button
-                    type="button"
-                    disabled={busy || readOnly}
-                    onClick={() => {
-                      if (current) return;
-                      handleStatusChange(stage.status);
-                    }}
-                    title={`Move to ${stage.label}`}
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                      current
-                        ? "bg-primary text-white ring-4 ring-primary/15"
-                        : done
-                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                          : "border border-border bg-white text-soft hover:border-primary hover:text-primary"
-                    }`}
-                  >
-                    {done ? "✓" : i + 1}
-                  </button>
-                  <div className={`h-0.5 flex-1 ${i === FUNNEL_STAGES.length - 1 ? "bg-transparent" : done ? "bg-primary" : "bg-border"}`} />
-                </div>
-                <span
-                  className={`mt-1.5 text-center text-[10px] font-semibold leading-tight ${
-                    current ? "text-primary" : done ? "text-emerald-600" : "text-soft"
-                  }`}
-                >
-                  {stage.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]">
-          <span className="text-soft">Current:</span>
-          <Badge color={LEAD_STATUS_COLORS[lead.status] || "bg-primary/10 text-primary"}>{LEAD_STATUS_LABELS[lead.status] || lead.status}</Badge>
-          {lead.status === "lost" && (
-            <span className="text-red-600">· {getLeadLostReason(lead.notes) || "No reason"}</span>
-          )}
-        </div>
-      </div>
-
-      {/* ===== Lead lost / reason ===== */}
-      {lead.status === "lost" && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-primary">Lead Lost</h3>
-              <Badge color="bg-red-100 text-red-700">
-                {getLeadLostReason(lead.notes) || "No reason"}
-              </Badge>
-            </div>
-            <button
-              onClick={() => {
-                setLostReason(getLeadLostReason(lead.notes) || "");
-                setLostNote("");
-                setShowLostPicker(true);
-              }}
-              className="text-xs font-semibold text-red-700 hover:underline"
-            >
-              Change reason
-            </button>
-          </div>
-          <p className="mt-1.5 text-xs text-muted">
-            Original enquiry is preserved, so the customer can be reactivated. Lost reason is used in
-            Reports for project-level loss analysis.
-          </p>
-        </div>
-      )}
-
-      {/* ===== Lead Tag ===== */}
-      <div className="rounded-2xl border border-primary/15 bg-white p-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
-            {!tagShown && (
-              <button
-                onClick={handleGenerateTag}
-                disabled={busy}
-                className="rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                Generate Lead Tag
-              </button>
-            )}
-          </div>
-          {tagShown ? (
-            <div>
-              <pre className="whitespace-pre-wrap rounded-xl bg-navy p-3 text-[11px] leading-relaxed text-white">{tagText}</pre>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button onClick={handleCopyTag} disabled={busy}>Copy Tag Message</Button>
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(tagText)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleShareTag}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
-                >
-                  Share on WhatsApp
-                </a>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-muted">
-              Generate a summary of the client and visit details to share easily on WhatsApp.
-            </p>
-          )}
-        </div>
 
         {/* ===== Admin Zone: lead assignment + admin controls ===== */}
         {canAssign && !readOnly && (
@@ -1247,171 +868,731 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
           </section>
         )}
 
-      {/* ===== SM Handoff ===== */}
-      {lead.assignedSmName && (
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-primary">SM Handoff</h3>
-            <Badge color="bg-violet-100 text-violet-800">Assigned to {lead.assignedSmName}</Badge>
-          </div>
-          <div className="rounded-xl bg-white p-3 text-sm">
-            <div className="mb-1 font-bold text-navy">CUSTOMER REQUIREMENT: {lead.name}</div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <HandoffItem label="Location" value={lead.location || ""} />
-              <HandoffItem label="Sub-location" value={lead.sublocation || ""} />
-              <HandoffItem label="Budget" value={budgetLabel(lead)} />
-              <HandoffItem label="BHK" value={bhkLabel(lead.bhk)} />
-              <HandoffItem label="Purpose" value={purposeLabel(lead.purpose)} />
-              <HandoffItem label="Timeline" value={timelineLabel(lead.timeline)} />
-              <HandoffItem label="Loan" value={loanLabel(lead.loanRequired)} />
-              <HandoffItem label="Original Enquiry" value={lead.originalProject || ""} />
-              <HandoffItem label="Customer Concern" value={lead.concern || ""} />
-            </dl>
-            {lead.familyRequirements && (
-              <p className="mt-2 text-xs text-muted">Family: {lead.familyRequirements}</p>
-            )}
-            {lead.otherPreferences && (
-              <p className="mt-1 text-xs text-muted">Prefs: {lead.otherPreferences}</p>
-            )}
-            {lead.assignedAt && (
-              <p className="mt-2 text-[10px] text-soft">
-                Assigned {formatDateTime(String(lead.assignedAt))}
+      {/* ===== Section tabs ===== */}
+      <div
+        role="tablist"
+        aria-label="Lead detail sections"
+        className="flex gap-1 overflow-x-auto border-b border-border [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {detailTabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            id={`lead-tab-${t.key}`}
+            aria-selected={tab === t.key}
+            aria-controls={`lead-tabpanel-${t.key}`}
+            onClick={() => setTab(t.key)}
+            className={`-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-xs font-bold transition-colors ${
+              tab === t.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted hover:border-border hover:text-navy"
+            }`}
+          >
+            {t.label}
+            {t.count ? (
+              <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                {t.count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div role="tabpanel" id="lead-tabpanel-overview" aria-labelledby="lead-tab-overview" className="space-y-6">
+          {/* Concern / Rejected project */}
+          {lead.originalProject && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-primary">
+                  Original Enquiry: {lead.originalProject}
+                </h3>
+                {lead.concern && (
+                  <Badge color="bg-amber-100 text-amber-800">Concern: {lead.concern}</Badge>
+                )}
+              </div>
+              <p className="mb-2 text-xs text-muted">
+                The project can be rejected, not the customer. Record the agenda and show alternative options.
               </p>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { v: "budget", l: "Budget too high" },
+                  { v: "location", l: "Location not preferred" },
+                  { v: "bhk", l: "BHK size" },
+                  { v: "possession", l: "Possession time" },
+                  { v: "comparing", l: "Comparing with others" },
+                ].map((c) => (
+                  <button
+                    key={c.v}
+                    disabled={busy || readOnly}
+                    onClick={() => handleRecordConcern(c.v)}
+                    className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                      lead.concern === c.v
+                        ? "border-amber-500 bg-amber-100 text-amber-800"
+                        : "border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                    }`}
+                  >
+                    {c.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-      </div>
-      {/* ===== END RIGHT COLUMN ===== */}
-      </div>
-      {/* ===== END TWO-COLUMN LAYOUT ===== */}
-
-      {/* ===== Property matches ===== */}
-      {(showMatches || matches.length > 0 || requiredFieldsFilled) && (
-        <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-primary">Matching Properties</h3>
-            {!readOnly && (
+        {/* ===== Requirement card ===== */}
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-primary">Requirement</h3>
+            {(isCaller || isAdmin) && !readOnly && (
               <button
-                type="button"
-                disabled={busy}
-                onClick={() => { setShowMatches(true); refreshMatches(); }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                onClick={() => setEditingReq((s) => !s)}
+                className="text-xs font-semibold text-accent-ink hover:underline"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-                Recommend Property
+                {editingReq ? "Cancel ✕" : "✎ Edit"}
               </button>
             )}
           </div>
-          {matches.length === 0 ? (
-            <p className="text-xs text-muted">
-              {requiredFieldsFilled
-                ? "No matching properties yet — tap Recommend Property to refresh."
-                : "Complete the requirement (budget, location, BHK) to see the best matches automatically."}
-            </p>
+
+          <div className="mb-3">
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="font-semibold text-navy">Qualification Progress</span>
+              <span className="font-bold text-primary">
+                {qualificationDone}/8 captured
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${(qualificationDone / 8) * 100}%` }}
+              />
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {qualificationFields.map((f) => (
+                <span
+                  key={f.key}
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                    f.filled
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-gray-100 text-soft"
+                  }`}
+                >
+                  {f.filled ? "✓ " : "○ "}{f.key}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {!requiredFieldsFilled && (
+            <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <p className="text-sm font-semibold leading-snug text-amber-800">
+                Requirement is not complete yet — call and qualify the lead.
+              </p>
+            </div>
+          )}
+
+          {/* The read-only summary and the edit form are mutually exclusive: the
+              form fully replaces the summary in this same spot, never both. */}
+          {editingReq ? (
+            <RequirementEditor
+              lead={lead}
+              onSave={handleSaveRequirement}
+              onCancel={() => setEditingReq(false)}
+            />
           ) : (
-            <div className="space-y-2.5">
-              {matches.map((m) => (
-                <div key={m.projectSlug} className="rounded-xl border border-border bg-white p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-navy">{m.title}</span>
-                        {m.developer && (
-                          <span className="text-[10px] text-soft">· {m.developer}</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted">
-                        {m.location} · {m.bhkOptions.map(bhkLabel).join(", ") || ""}
-                      </div>
-                    </div>
-                    <Badge color={matchLevelMeta(m.level).cls}>
-                      {matchLevelMeta(m.level).label}
-                    </Badge>
+            <>
+              <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
+                <ReqItem label="Location" value={lead.location || ""} />
+                <ReqItem label="Sub-location" value={lead.sublocation || ""} />
+                <ReqItem label="Budget" value={budgetLabel(lead)} />
+                <ReqItem label="BHK" value={bhkLabel(lead.bhk)} />
+                <ReqItem label="Purpose" value={purposeLabel(lead.purpose)} />
+                <ReqItem label="Timeline" value={timelineLabel(lead.timeline)} />
+                <ReqItem label="Loan Required" value={loanLabel(lead.loanRequired)} />
+              </div>
+
+              {lead.preferredProject && (
+                <div className="mt-3 text-sm">
+                  <span className="text-soft">Preferred project: </span>
+                  <span className="font-semibold text-navy">{lead.preferredProject}</span>
+                </div>
+              )}
+              {lead.familyRequirements && (
+                <div className="mt-1 text-sm">
+                  <span className="text-soft">Family: </span>
+                  <span className="text-navy">{lead.familyRequirements}</span>
+                </div>
+              )}
+              {lead.notes && (
+                <div className="mt-1 text-sm">
+                  <span className="text-soft">Notes: </span>
+                  <span className="text-navy">{lead.notes}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ===== Status / funnel stepper ===== */}
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-primary">Lead Progress</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value=""
+                disabled={busy || readOnly}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  handleStatusChange(v);
+                }}
+                className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-muted focus:border-primary focus:outline-none"
+              >
+                <option value="">More statuses…</option>
+                {OVERFLOW_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {LEAD_STATUS_LABELS[s] || s}
+                  </option>
+                ))}
+              </select>
+              <select
+                value=""
+                disabled={busy || readOnly}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  if (v === "lost") {
+                    setLostReason(getLeadLostReason(lead.notes) || "");
+                    setLostNote("");
+                    setShowLostPicker(true);
+                  } else {
+                    handleStatusChange(v);
+                  }
+                }}
+                className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 focus:border-red-400 focus:outline-none"
+              >
+                <option value="">Close lead…</option>
+                {EXIT_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-start">
+            {FUNNEL_STAGES.map((stage, i) => {
+              const done = stageIndex > i;
+              const current = stageIndex === i;
+              const reached = stageIndex >= i && stageIndex !== -1;
+              return (
+                <div key={stage.key} className="flex flex-1 flex-col items-center">
+                  <div className="flex w-full items-center">
+                    <div className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : reached ? "bg-primary" : "bg-border"}`} />
+                    <button
+                      type="button"
+                      disabled={busy || readOnly}
+                      onClick={() => {
+                        if (current) return;
+                        handleStatusChange(stage.status);
+                      }}
+                      title={`Move to ${stage.label}`}
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                        current
+                          ? "bg-primary text-white ring-4 ring-primary/15"
+                          : done
+                            ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                            : "border border-border bg-white text-soft hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {done ? "✓" : i + 1}
+                    </button>
+                    <div className={`h-0.5 flex-1 ${i === FUNNEL_STAGES.length - 1 ? "bg-transparent" : done ? "bg-primary" : "bg-border"}`} />
                   </div>
-                  <div className="mt-1 text-xs text-soft">
-                    {m.priceRange} · Possession {m.possessionDate}
-                  </div>
-                  {m.priceValidUntil && (() => {
-                    const pv = priceValidityInfo({ priceValidUntil: m.priceValidUntil });
-                    return pv ? (
-                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        ⏰ Price valid till {pv.validUntil} · {pv.daysLeft} day{pv.daysLeft === 1 ? "" : "s"} left
-                      </span>
-                    ) : null;
-                  })()}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.reasons.map((r, i) => {
-                      const tone = r.tone ?? (r.ok ? "good" : "bad");
-                      const cls =
-                        tone === "good"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : tone === "warn"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-red-50 text-red-600";
-                      const mark = tone === "good" ? "✓" : tone === "bad" ? "✗" : "!";
-                      return (
-                        <span
-                          key={i}
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}
-                        >
-                          {mark} {r.label}
-                        </span>
-                      );
-                    })}
-                  </div>
+                  <span
+                    className={`mt-1.5 text-center text-[10px] font-semibold leading-tight ${
+                      current ? "text-primary" : done ? "text-emerald-600" : "text-soft"
+                    }`}
+                  >
+                    {stage.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]">
+            <span className="text-soft">Current:</span>
+            <Badge color={LEAD_STATUS_COLORS[lead.status] || "bg-primary/10 text-primary"}>{LEAD_STATUS_LABELS[lead.status] || lead.status}</Badge>
+            {lead.reactivatedAt && (
+              <Badge color="bg-emerald-100 text-emerald-700">
+                🔄 Reactivated on {reactivationDateLabel(lead.reactivatedAt)}
+                {lead.reactivatedFrom ? `, previously ${reactivationPreviousLabel(lead.reactivatedFrom)}` : ""}
+              </Badge>
+            )}
+            {lead.status === "lost" && (
+              <span className="text-red-600">· {getLeadLostReason(lead.notes) || "No reason"}</span>
+            )}
+          </div>
+        </div>
+
+        {/* ===== Lead lost / reason ===== */}
+        {lead.status === "lost" && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-primary">Lead Lost</h3>
+                <Badge color="bg-red-100 text-red-700">
+                  {getLeadLostReason(lead.notes) || "No reason"}
+                </Badge>
+              </div>
+              <button
+                onClick={() => {
+                  setLostReason(getLeadLostReason(lead.notes) || "");
+                  setLostNote("");
+                  setShowLostPicker(true);
+                }}
+                className="text-xs font-semibold text-red-700 hover:underline"
+              >
+                Change reason
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              Original enquiry is preserved, so the customer can be reactivated. Lost reason is used in
+              Reports for project-level loss analysis.
+            </p>
+          </div>
+        )}
+
+        {/* ===== Lead Tag ===== */}
+        <div className="rounded-2xl border border-primary/15 bg-white p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary">Lead Tag</h3>
+              {!tagShown && (
+                <button
+                  onClick={handleGenerateTag}
+                  disabled={busy}
+                  className="rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  Generate Lead Tag
+                </button>
+              )}
+            </div>
+            {tagShown ? (
+              <div>
+                <pre className="whitespace-pre-wrap rounded-xl bg-navy p-3 text-[11px] leading-relaxed text-white">{tagText}</pre>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button onClick={handleCopyTag} disabled={busy}>Copy Tag Message</Button>
                   <a
-                    href={`/projects/${m.projectSlug}`}
+                    href={`https://wa.me/?text=${encodeURIComponent(tagText)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+                    onClick={handleShareTag}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
                   >
-                    View project →
+                    Share on WhatsApp
                   </a>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted">
+                Generate a summary of the client and visit details to share easily on WhatsApp.
+              </p>
+            )}
+          </div>
+
+        {/* ===== SM Handoff ===== */}
+        {lead.assignedSmName && (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary">SM Handoff</h3>
+              <Badge color="bg-violet-100 text-violet-800">Assigned to {lead.assignedSmName}</Badge>
+            </div>
+            <div className="rounded-xl bg-white p-3 text-sm">
+              <div className="mb-1 font-bold text-navy">CUSTOMER REQUIREMENT: {lead.name}</div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <HandoffItem label="Location" value={lead.location || ""} />
+                <HandoffItem label="Sub-location" value={lead.sublocation || ""} />
+                <HandoffItem label="Budget" value={budgetLabel(lead)} />
+                <HandoffItem label="BHK" value={bhkLabel(lead.bhk)} />
+                <HandoffItem label="Purpose" value={purposeLabel(lead.purpose)} />
+                <HandoffItem label="Timeline" value={timelineLabel(lead.timeline)} />
+                <HandoffItem label="Loan" value={loanLabel(lead.loanRequired)} />
+                <HandoffItem label="Original Enquiry" value={lead.originalProject || ""} />
+                <HandoffItem label="Customer Concern" value={lead.concern || ""} />
+              </dl>
+              {lead.familyRequirements && (
+                <p className="mt-2 text-xs text-muted">Family: {lead.familyRequirements}</p>
+              )}
+              {lead.otherPreferences && (
+                <p className="mt-1 text-xs text-muted">Prefs: {lead.otherPreferences}</p>
+              )}
+              {lead.assignedAt && (
+                <p className="mt-2 text-[10px] text-soft">
+                  Assigned {formatDateTime(String(lead.assignedAt))}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Property matches ===== */}
+        {(showMatches || matches.length > 0 || requiredFieldsFilled) && (
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 scroll-mt-24" id="matching-properties" data-section="true">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary">Matching Properties</h3>
+              {!readOnly && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => { setShowMatches(true); refreshMatches(); }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  Recommend Property
+                </button>
+              )}
+            </div>
+            {matches.length === 0 ? (
+              <p className="text-xs text-muted">
+                {requiredFieldsFilled
+                  ? "No matching properties yet — tap Recommend Property to refresh."
+                  : "Complete the requirement (budget, location, BHK) to see the best matches automatically."}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {matches.map((m) => (
+                  <div key={m.projectSlug} className="rounded-xl border border-border bg-white p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-navy">{m.title}</span>
+                          {m.developer && (
+                            <span className="text-[10px] text-soft">· {m.developer}</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted">
+                          {m.location} · {m.bhkOptions.map(bhkLabel).join(", ") || ""}
+                        </div>
+                      </div>
+                      <Badge color={matchLevelMeta(m.level).cls}>
+                        {matchLevelMeta(m.level).label}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 text-xs text-soft">
+                      {m.priceRange} · Possession {m.possessionDate}
+                    </div>
+                    {m.priceValidUntil && (() => {
+                      const pv = priceValidityInfo({ priceValidUntil: m.priceValidUntil });
+                      return pv ? (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          ⏰ Price valid till {pv.validUntil} · {pv.daysLeft} day{pv.daysLeft === 1 ? "" : "s"} left
+                        </span>
+                      ) : null;
+                    })()}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {m.reasons.map((r, i) => {
+                        const tone = r.tone ?? (r.ok ? "good" : "bad");
+                        const cls =
+                          tone === "good"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : tone === "warn"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-red-50 text-red-600";
+                        const mark = tone === "good" ? "✓" : tone === "bad" ? "✗" : "!";
+                        return (
+                          <span
+                            key={i}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}
+                          >
+                            {mark} {r.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <a
+                      href={`/projects/${m.projectSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+                    >
+                      View project →
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        </div>
+      )}
+
+      {tab === "activity" && (
+        <div role="tabpanel" id="lead-tabpanel-activity" aria-labelledby="lead-tab-activity" className="space-y-6">
+          <div className="rounded-2xl border border-border bg-white p-4 scroll-mt-24" id="call-outcome" data-section="true">
+            <h3 className="mb-3 text-sm font-bold text-primary">Call Outcome</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { t: "call_connected", label: "Connected", color: "bg-green-100 text-green-800" },
+                { t: "call_no_answer", label: "No Answer", color: "bg-amber-100 text-amber-800" },
+                { t: "call_busy", label: "Busy", color: "bg-orange-100 text-orange-800" },
+                { t: "call_wrong_number", label: "Wrong Number", color: "bg-red-100 text-red-700" },
+                { t: "call_back", label: "Call Back", color: "bg-blue-100 text-blue-800" },
+                { t: "call_not_interested", label: "Not Interested", color: "bg-slate-200 text-slate-700" },
+                { t: "call_switched_off", label: "Switched Off", color: "bg-amber-100 text-amber-800" },
+                { t: "call_number_invalid", label: "Number Invalid", color: "bg-red-100 text-red-700" },
+                { t: "call_whatsapp_only", label: "Requested WhatsApp Only", color: "bg-emerald-100 text-emerald-800" },
+                { t: "call_language_barrier", label: "Language Barrier", color: "bg-purple-100 text-purple-800" },
+                { t: "call_other", label: "Other", color: "bg-gray-100 text-gray-700" },
+              ].map((b) => (
+                <button
+                  key={b.t}
+                  disabled={busy || readOnly}
+                  onClick={() => {
+                    if (b.t === "call_back") {
+                      setShowCallback((s) => !s);
+                    } else {
+                      handleCallOutcome(b.t);
+                    }
+                  }}
+                  className={`rounded-full px-4 py-2 text-xs font-bold transition-opacity disabled:opacity-50 ${b.color}`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            {showCallback && (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="datetime-local"
+                  value={callbackTime}
+                  onChange={(e) => setCallbackTime(e.target.value)}
+                  className="flex-1 rounded-xl border border-blue-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
+                />
+                <Button
+                  disabled={busy || !callbackTime}
+                  onClick={() => {
+                    handleCallOutcome("call_back", { callbackTime: new Date(callbackTime).toISOString() });
+                    setShowCallback(false);
+                    setCallbackTime("");
+                  }}
+                >
+                  Confirm Call Back
+                </Button>
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-soft">
+              The CALL button dials the phone. Log the outcome here after the call.
+            </p>
+          </div>
+
+        {/* ===== Follow-up form ===== */}
+        {showFollowUp && (
+          <form onSubmit={handleFollowUp} id="follow-up-form" className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 scroll-mt-24">
+            <h3 className="text-sm font-bold text-primary">Schedule Follow-up</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Date & Time</label>
+                <input
+                  type="datetime-local"
+                  name="scheduledFor"
+                  required
+                  className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Purpose</label>
+                <input
+                  type="text"
+                  name="purpose"
+                  defaultValue="Follow-up - Property options"
+                  className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Note</label>
+              <textarea name="followNote" rows={2} className="w-full resize-none rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={busy}>Schedule</Button>
+              <Button variant="ghost" onClick={() => setShowFollowUp(false)}>Cancel</Button>
+            </div>
+          </form>
+        )}
+
+          {/* Follow-ups */}
+          {followUps.length > 0 && (
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold text-primary">Follow-ups</h3>
+              <div className="space-y-2">
+                {followUps.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
+                    <div className="text-sm">
+                      <div className="font-semibold text-navy">{f.purpose || "Follow-up"}</div>
+                      <div className="text-xs text-muted">{formatDateTime(f.scheduledFor)}</div>
+                      {f.notes && <div className="mt-1 text-xs text-soft">{f.notes}</div>}
+                    </div>
+                    <Badge
+                      color={
+                        f.status === "completed"
+                          ? "bg-green-100 text-green-800"
+                          : isPast(f.scheduledFor)
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-800"
+                      }
+                    >
+                      {f.status === "completed" ? "Done" : isPast(f.scheduledFor) ? "Overdue" : "Pending"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        {/* ===== Notes (highlighted) ===== */}
+        <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </span>
+            <h3 className="text-sm font-bold text-primary">Notes</h3>
+            {notesList.length > 0 && (
+              <Badge color="bg-amber-100 text-amber-800">{notesList.length}</Badge>
+            )}
+            <span className="ml-auto text-[10px] text-soft">Call updates & reminders</span>
+          </div>
+          {notesList.length === 0 ? (
+            <p className="rounded-xl bg-white/70 px-3 py-2 text-xs text-muted">No notes yet.</p>
+          ) : (
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-0.5">
+              {notesList.map((a) => (
+                <div key={a.id} className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-navy">{a.userName || ""}</span>
+                    <span className="text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
+                  </div>
+                  <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
                 </div>
               ))}
             </div>
           )}
+          {!readOnly && (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddNote();
+                }}
+                placeholder="Add a note..."
+                className="flex-1 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
+              />
+              <Button onClick={handleAddNote} disabled={busy || !note.trim()}>Add</Button>
+            </div>
+          )}
+        </div>
+
+          {/* Call history */}
+          {activities.some((a) => String(a.type).startsWith("call")) && (
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold text-primary">Call History</h3>
+              <div className="space-y-2">
+                {activities
+                  .filter((a) => String(a.type).startsWith("call"))
+                  .slice(0, 10)
+                  .map((a) => (
+                    <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
+                      <div className="min-w-0 text-sm">
+                        <span className="font-semibold text-navy">{ACTIVITY_LABELS[a.type] || a.type}</span>
+                        {a.notes && <span className="ml-2 text-xs text-muted">{a.notes}</span>}
+                      </div>
+                      <span className="shrink-0 text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Activity timeline */}
+          <div className="rounded-2xl border border-border bg-white p-4">
+            <h3 className="mb-3 text-sm font-bold text-primary">Activity</h3>
+            {activities.length === 0 ? (
+              <p className="text-center text-xs text-muted">No activity yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {activities.slice(0, 12).map((a) => (
+                  <div key={a.id} className="flex gap-3">
+                    <div className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-primary/40" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="font-semibold text-navy">
+                          {ACTIVITY_LABELS[a.type] || a.type}
+                        </span>
+                        <span className="text-[10px] text-soft">
+                          {a.userName} · {formatDateTime(a.createdAt)}
+                        </span>
+                      </div>
+                      {a.notes && <div className="mt-0.5 text-xs text-muted">{a.notes}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ===== Follow-up form ===== */}
-      {showFollowUp && (
-        <form onSubmit={handleFollowUp} id="follow-up-form" className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 scroll-mt-24">
-          <h3 className="text-sm font-bold text-primary">Schedule Follow-up</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted">Date & Time</label>
-              <input
-                type="datetime-local"
-                name="scheduledFor"
-                required
-                className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
-              />
+      {tab === "comms" && (
+        <div role="tabpanel" id="lead-tabpanel-comms" aria-labelledby="lead-tab-comms" className="space-y-6">
+          {/* Site Visits */}
+          {visits.length > 0 && (
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold text-primary">Site Visits</h3>
+              <div className="space-y-2">
+                {visits.map((v) => (
+                  <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
+                    <div className="text-sm">
+                      <div className="font-semibold text-navy">
+                        {v.projectId || ""} · {v.date || "TBD"} {v.time}
+                      </div>
+                      <div className="text-xs text-muted">SM: {v.smName || ""}</div>
+                      {(() => {
+                        const tags = parseShown(v.propertiesShown);
+                        const summary = tags.length > 0 ? shownSummary(tags) : v.propertyShown;
+                        return summary ? (
+                          <div className="mt-0.5 text-xs font-medium text-emerald-700">
+                            Shown: {summary}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                    <Badge color={visitStatusMeta(String(v.status)).cls}>
+                      {visitStatusMeta(String(v.status)).label}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted">Purpose</label>
-              <input
-                type="text"
-                name="purpose"
-                defaultValue="Follow-up - Property options"
-                className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none"
-              />
-            </div>
+          )}
+
+          <div id="message-center" className="scroll-mt-24">
+            {messageCenter ?? (
+              <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted">
+                No message templates configured yet.
+              </div>
+            )}
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-muted">Note</label>
-            <textarea name="followNote" rows={2} className="w-full resize-none rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm text-navy outline-none" />
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" disabled={busy}>Schedule</Button>
-            <Button variant="ghost" onClick={() => setShowFollowUp(false)}>Cancel</Button>
-          </div>
-        </form>
+        </div>
       )}
 
       {/* ===== Site visit popup (book / manage / mandatory tagging) ===== */}
@@ -1431,116 +1612,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen }: Prop
         />
       )}
 
-      {/* ===== Lower detail grid (2 columns) ===== */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {/* Call history */}
-        {activities.some((a) => String(a.type).startsWith("call")) && (
-          <div className="rounded-2xl border border-border bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold text-primary">Call History</h3>
-            <div className="space-y-2">
-              {activities
-                .filter((a) => String(a.type).startsWith("call"))
-                .slice(0, 10)
-                .map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
-                    <div className="min-w-0 text-sm">
-                      <span className="font-semibold text-navy">{ACTIVITY_LABELS[a.type] || a.type}</span>
-                      {a.notes && <span className="ml-2 text-xs text-muted">{a.notes}</span>}
-                    </div>
-                    <span className="shrink-0 text-[10px] text-soft">{formatDateTime(a.createdAt)}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Site Visits */}
-        {visits.length > 0 && (
-          <div className="rounded-2xl border border-border bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold text-primary">Site Visits</h3>
-            <div className="space-y-2">
-              {visits.map((v) => (
-                <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
-                  <div className="text-sm">
-                    <div className="font-semibold text-navy">
-                      {v.projectId || ""} · {v.date || "TBD"} {v.time}
-                    </div>
-                    <div className="text-xs text-muted">SM: {v.smName || ""}</div>
-                    {(() => {
-                      const tags = parseShown(v.propertiesShown);
-                      const summary = tags.length > 0 ? shownSummary(tags) : v.propertyShown;
-                      return summary ? (
-                        <div className="mt-0.5 text-xs font-medium text-emerald-700">
-                          Shown: {summary}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                  <Badge color={visitStatusMeta(String(v.status)).cls}>
-                    {visitStatusMeta(String(v.status)).label}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Follow-ups */}
-        {followUps.length > 0 && (
-          <div className="rounded-2xl border border-border bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold text-primary">Follow-ups</h3>
-            <div className="space-y-2">
-              {followUps.map((f) => (
-                <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl bg-background p-3">
-                  <div className="text-sm">
-                    <div className="font-semibold text-navy">{f.purpose || "Follow-up"}</div>
-                    <div className="text-xs text-muted">{formatDateTime(f.scheduledFor)}</div>
-                    {f.notes && <div className="mt-1 text-xs text-soft">{f.notes}</div>}
-                  </div>
-                  <Badge
-                    color={
-                      f.status === "completed"
-                        ? "bg-green-100 text-green-800"
-                        : isPast(f.scheduledFor)
-                          ? "bg-red-100 text-red-700"
-                          : "bg-amber-100 text-amber-800"
-                    }
-                  >
-                    {f.status === "completed" ? "Done" : isPast(f.scheduledFor) ? "Overdue" : "Pending"}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Activity timeline */}
-        <div className="rounded-2xl border border-border bg-white p-4">
-          <h3 className="mb-3 text-sm font-bold text-primary">Activity</h3>
-          {activities.length === 0 ? (
-            <p className="text-center text-xs text-muted">No activity yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {activities.slice(0, 12).map((a) => (
-                <div key={a.id} className="flex gap-3">
-                  <div className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-primary/40" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-semibold text-navy">
-                        {ACTIVITY_LABELS[a.type] || a.type}
-                      </span>
-                      <span className="text-[10px] text-soft">
-                        {a.userName} · {formatDateTime(a.createdAt)}
-                      </span>
-                    </div>
-                    {a.notes && <div className="mt-0.5 text-xs text-muted">{a.notes}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
     {/* ===== Lost reason picker ===== */}
       {showLostPicker && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
@@ -1975,6 +2046,9 @@ function RequirementEditor({
     otherPreferences: lead.otherPreferences || "",
     notes: lead.notes || "",
   });
+  // Progressive disclosure: the secondary qualifiers start hidden so the form
+  // is not a wall of inputs. Everything still saves together.
+  const [showMore, setShowMore] = useState(false);
 
   const input =
     "w-full rounded-xl border border-border bg-background/50 px-3 py-2.5 text-sm text-navy outline-none focus:border-primary";
@@ -1990,8 +2064,8 @@ function RequirementEditor({
   };
 
   return (
-    <form onSubmit={submit} className="mt-4 space-y-3 border-t border-border pt-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <form onSubmit={submit} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted">Location</label>
           <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className={input}>
@@ -2058,50 +2132,83 @@ function RequirementEditor({
           </div>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-muted">Purpose</label>
-          <select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={input}>
-            <option value="self_use">Self-use</option>
-            <option value="investment">Investment</option>
-            <option value="both">Both</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-muted">Timeline</label>
-          <select value={form.timeline} onChange={(e) => setForm({ ...form, timeline: e.target.value })} className={input}>
-            <option value="immediate">Immediate</option>
-            <option value="1_3_months">1–3 months</option>
-            <option value="3_6_months">3–6 months</option>
-            <option value="6_plus_months">6+ months</option>
-            <option value="exploring">Exploring</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-muted">Loan Required</label>
-          <select value={form.loanRequired} onChange={(e) => setForm({ ...form, loanRequired: e.target.value })} className={input}>
-            <option value="">Select</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </div>
-      </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold text-muted">Preferred Project</label>
-        <input value={form.preferredProject} onChange={(e) => setForm({ ...form, preferredProject: e.target.value })} className={input} placeholder="e.g. Pearl Gardens" />
+        <label className="mb-1 block text-xs font-semibold text-muted">Purpose</label>
+        <select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={input}>
+          <option value="self_use">Self-use</option>
+          <option value="investment">Investment</option>
+          <option value="both">Both</option>
+        </select>
       </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-muted">Family Requirements</label>
-        <input value={form.familyRequirements} onChange={(e) => setForm({ ...form, familyRequirements: e.target.value })} className={input} placeholder="e.g. 3 members, parents included" />
+
+      <div className="rounded-xl border border-border bg-background/40">
+        <button
+          type="button"
+          onClick={() => setShowMore((s) => !s)}
+          aria-expanded={showMore}
+          className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+        >
+          <span className="text-xs font-bold text-navy">
+            More Details
+            <span className="ml-2 font-normal text-muted">
+              Timeline, loan, project, family, preferences, notes
+            </span>
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-4 w-4 shrink-0 text-muted transition-transform ${showMore ? "rotate-180" : ""}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {showMore && (
+          <div className="space-y-3 border-t border-border px-3.5 pb-3.5 pt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Timeline</label>
+                <select value={form.timeline} onChange={(e) => setForm({ ...form, timeline: e.target.value })} className={input}>
+                  <option value="immediate">Immediate</option>
+                  <option value="1_3_months">1–3 months</option>
+                  <option value="3_6_months">3–6 months</option>
+                  <option value="6_plus_months">6+ months</option>
+                  <option value="exploring">Exploring</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Loan Required</label>
+                <select value={form.loanRequired} onChange={(e) => setForm({ ...form, loanRequired: e.target.value })} className={input}>
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Preferred Project</label>
+              <input value={form.preferredProject} onChange={(e) => setForm({ ...form, preferredProject: e.target.value })} className={input} placeholder="e.g. Pearl Gardens" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Family Requirements</label>
+              <input value={form.familyRequirements} onChange={(e) => setForm({ ...form, familyRequirements: e.target.value })} className={input} placeholder="e.g. 3 members, parents included" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Other Preferences</label>
+              <input value={form.otherPreferences} onChange={(e) => setForm({ ...form, otherPreferences: e.target.value })} className={input} placeholder="Floor, facing, amenities..." />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Notes</label>
+              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className={`${input} resize-none`} />
+            </div>
+          </div>
+        )}
       </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-muted">Other Preferences</label>
-        <input value={form.otherPreferences} onChange={(e) => setForm({ ...form, otherPreferences: e.target.value })} className={input} placeholder="Floor, facing, amenities..." />
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-muted">Notes</label>
-        <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className={`${input} resize-none`} />
-      </div>
+
       <div className="flex gap-2">
         <Button type="submit">Save</Button>
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>

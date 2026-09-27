@@ -19,7 +19,7 @@ export async function PATCH(
   const db = getDb();
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
 
-  if (!lead) {
+  if (!lead || lead.deletedAt) {
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
   if (!canAccessSales(user, lead)) {
@@ -123,6 +123,7 @@ export async function PATCH(
     db.update(schema.leads).set({
       status: "booked",
       nextAction: "Post-booking follow-up",
+      stageChangedAt: now,
       updatedAt: now,
     }).where(eq(schema.leads.id, lead.id)).run();
 
@@ -165,6 +166,7 @@ export async function PATCH(
       db.update(schema.leads).set({
         status: "negotiation",
         nextAction: "Recover lead: contact customer",
+        stageChangedAt: now,
         updatedAt: now,
       }).where(eq(schema.leads.id, lead.id)).run();
     }

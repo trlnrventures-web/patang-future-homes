@@ -7,33 +7,15 @@ import InboxSnapshot from "./InboxSnapshot";
 import AccentLegend from "./AccentLegend";
 import CallQueue from "./CallQueue";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
+import {
+  isInboxSort,
+  isInboxTab,
+  type InboxLead,
+  type InboxSort,
+  type InboxTab,
+} from "@/lib/crm/inbox-shared";
 import { slaStatusMeta, type SlaStatus, leadAccentCls } from "@/lib/crm/sla";
-type InboxLead = {
-  id: number;
-  name: string;
-  phone: string;
-  whatsappNumber: string | null;
-  source: string;
-  campaignName: string | null;
-  originalProject: string | null;
-  location: string | null;
-  bhk: string | null;
-  budget: string | null;
-  status: string;
-  concern: string | null;
-  createdAt: string;
-  nextFollowUp: string;
-  nextAction: string;
-  slaStatus: string;
-  priority: string;
-  leadAge: string;
-  leadAgeMinutes: number;
-  attemptCount: number;
-  assignedCallerName: string;
-  assignedSmName: string;
-  nextFollowUpIso: string | null;
-  hasOverdueFollowUp: boolean;
-};
+import type { LeadsListContext } from "./LeadsPageContent";
 
 const TABS: { key: string; label: string }[] = [
   { key: "new", label: "New" },
@@ -55,24 +37,6 @@ const SORT_OPTIONS = [
   { key: "overdue", label: "Most Overdue First" },
 ];
 
-function sortInboxLeads(list: InboxLead[], sort: string): InboxLead[] {
-  const arr = [...list];
-  const actionMs = (x: InboxLead) =>
-    x.nextFollowUpIso ? new Date(x.nextFollowUpIso).getTime() : Infinity;
-  if (sort === "oldest") {
-    return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-  if (sort === "overdue") {
-    return arr.sort((a, b) => {
-      if (!!a.hasOverdueFollowUp !== !!b.hasOverdueFollowUp) {
-        return a.hasOverdueFollowUp ? -1 : 1;
-      }
-      return actionMs(a) - actionMs(b);
-    });
-  }
-  return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
 const SOURCE_LABELS: Record<string, string> = {
   meta: "Meta Lead",
   website: "Website",
@@ -81,12 +45,16 @@ const SOURCE_LABELS: Record<string, string> = {
   other: "Lead",
 };
 
-export default function CallerInbox() {
+export default function CallerInbox({ listContext }: { listContext?: LeadsListContext }) {
   const [leads, setLeads] = useState<InboxLead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("new");
-  const [sort, setSort] = useState("newest");
-  const [query, setQuery] = useState("");
+  // The inbox tab is passed through the same `status`-shaped query the Leads list
+  // uses, so one nav context type covers both inboxes.
+  const [tab, setTab] = useState<InboxTab>(
+    isInboxTab(listContext?.status) ? listContext.status : "new"
+  );
+  const [sort, setSort] = useState<InboxSort>(isInboxSort(listContext?.sort) ? listContext.sort : "newest");
+  const [query, setQuery] = useState(listContext?.q ?? "");
   const [error, setError] = useState("");
   const [queueOpen, setQueueOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -95,6 +63,17 @@ export default function CallerInbox() {
   const loadSeq = useRef(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+
+  // Carried into every lead link so the detail page can offer Previous/Next Lead
+  // within this exact caller queue and a Back link that restores the tab/search/sort.
+  const hrefQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("inbox", "1");
+    if (tab !== "new") params.set("status", tab);
+    if (sort !== "newest") params.set("sort", sort);
+    if (query.trim()) params.set("q", query.trim());
+    return `?${params.toString()}`;
+  }, [tab, sort, query]);
 
   const toggleSelect = useCallback((id: number) => {
     setSelected((prev) => {
@@ -168,6 +147,7 @@ export default function CallerInbox() {
     try {
       const params = new URLSearchParams();
       params.set("tab", tab);
+      params.set("sort", sort);
       if (query.trim()) params.set("q", query.trim());
       const res = await fetch(`/crm/api/inbox?${params.toString()}`);
       if (!res.ok) throw new Error("failed");
@@ -182,7 +162,7 @@ export default function CallerInbox() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [tab, query]);
+  }, [tab, sort, query]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -194,7 +174,7 @@ export default function CallerInbox() {
     load();
   };
 
-  const sortedLeads = useMemo(() => sortInboxLeads(leads, sort), [leads, sort]);
+  const sortedLeads = leads;
 
   return (
     <div className="space-y-3 pb-24">
@@ -231,7 +211,7 @@ export default function CallerInbox() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => setTab(t.key as InboxTab)}
             className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
               tab === t.key
                 ? "bg-primary text-white"
@@ -247,7 +227,7 @@ export default function CallerInbox() {
         <div className="ml-auto">
           <select
             value={sort}
-            onChange={(e) => setSort(e.target.value)}
+            onChange={(e) => setSort(e.target.value as InboxSort)}
             className="cursor-pointer rounded-full border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy outline-none transition-colors hover:bg-primary/5"
             aria-label="Sort inbox leads"
           >
@@ -332,8 +312,9 @@ export default function CallerInbox() {
                   {lead.attemptCount > 0 && (
                     <span className="text-[10px] text-soft">Attempts: {lead.attemptCount}</span>
                   )}
-                </>
-              }
+                  </>
+                }
+              hrefQuery={hrefQuery}
             />
           ))}
         </div>
