@@ -52,6 +52,11 @@ data/crm.db-wal
 # local pre-import snapshots of the CRM database
 data/crm.db.backup-*
 data/crm.backup-*
+# newer snapshot naming, matching the deploy backups on the VPS
+data/crm.db.bak-*
+data/*.db.bak-*
+data/*.db-wal
+data/*.db-shm
 
 # cloudflare / opennext
 .open-next

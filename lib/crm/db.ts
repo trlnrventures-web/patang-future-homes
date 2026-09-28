@@ -320,6 +320,19 @@ function createTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_lead_mentions_user ON lead_mentions(user_id);
     CREATE INDEX IF NOT EXISTS idx_lead_mentions_lead ON lead_mentions(lead_id);
 
+    CREATE TABLE IF NOT EXISTS team_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      lead_id INTEGER,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (lead_id) REFERENCES leads(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_notes_created_at ON team_notes(created_at);
+    CREATE INDEX IF NOT EXISTS idx_team_notes_user ON team_notes(user_id);
+    CREATE INDEX IF NOT EXISTS idx_team_notes_lead ON team_notes(lead_id);
+
     CREATE TABLE IF NOT EXISTS incentive_payments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,

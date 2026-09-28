@@ -81,6 +81,24 @@ export const leadMentions = sqliteTable("lead_mentions", {
   createdAt: text("created_at").notNull().default(""),
 });
 
+/**
+ * The shared team feed behind the CRM's Notes tab. Deliberately its own table
+ * rather than `activities` rows of `type = 'note'`: activities are lead-timeline
+ * events that every report, leaderboard and incentive query counts, and they
+ * require a lead. A handover note is often about no lead at all, so the two
+ * cannot share storage without NULL lead ids leaking into those counts.
+ */
+export const teamNotes = sqliteTable("team_notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  // Optional: a note may be about a specific lead, or be general team info.
+  leadId: integer("lead_id").references(() => leads.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull().default(""),
+});
+
 export const loginAttempts = sqliteTable("login_attempts", {
   email: text("email").primaryKey(),
   failedCount: integer("failed_count").notNull().default(0),
