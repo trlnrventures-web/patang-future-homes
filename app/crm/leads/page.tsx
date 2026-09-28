@@ -51,16 +51,16 @@ export default async function LeadsPage({
         ? status
         : "all",
     quick: (QUICK_FILTERS as readonly string[]).includes(quick) ? quick : "",
-    // The board and the caller inbox order differently, so each gets its own
-    // default: the board surfaces the leads most stuck in their column, the
-    // inbox wants the newest work first.
+    // The board has no sort control and always walks the server default, so a
+    // missing or stale sort normalises to `newest` here. The caller inbox keeps
+    // its own default because it wants the newest work first.
     sort: fromInbox
       ? (INBOX_SORTS as readonly string[]).includes(sort)
         ? sort
         : "newest"
-      : BOARD_SORT_KEYS.includes(sort)
+      : BOARD_SORT_KEYS.includes(sort) && sort !== "longest_in_stage"
         ? sort
-        : "longest_in_stage",
+        : "newest",
     q: first(sp.q).slice(0, 100),
   };
 

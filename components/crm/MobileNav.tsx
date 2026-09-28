@@ -3,25 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const PRIMARY_ITEMS = [
-  { href: "/crm/dashboard", label: "Home", icon: "M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" },
-  { href: "/crm/leads", label: "Leads", icon: "M17 20h5v-2a3 3 0 0 0-5-2.11M9 20H4v-2a3 3 0 0 1 5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 16v-2a3 3 0 0 0-5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
-  { href: "/crm/attendance", label: "Attendance", icon: "M12 7v5l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
-];
-
-type MobileItem = { href: string; label: string; icon: string; roles?: string[] };
-
-const MORE_ITEMS: MobileItem[] = [
-  { href: "/crm/site-visits", label: "Site Visits", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" },
-  { href: "/crm/properties", label: "Properties", icon: "M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6", roles: ["admin", "sales_head", "sales_manager"] },
-  { href: "/crm/reports", label: "Daily Report", icon: "M8 13v5M12 9v9M16 5v13M3 3v18h18M3 5h14M17 5l3 3V3.5" },
-  { href: "/crm/attendance/report", label: "Attendance Report", icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" },
-  { href: "/crm/leaderboard", label: "Leaderboard", icon: "M8 21h8M12 17v4M17 3h4v4M7 7h10v4M17 11a5 5 0 0 1-10 0 5 5 0 0 1 10 0Z" },
-  { href: "/crm/incentives", label: "Incentives", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
-  { href: "/crm/salary", label: "Salary Reports", icon: "M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Z" },
-  { href: "/crm/change-password", label: "Account", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" },
-];
+import { NAV_PRIMARY_ITEMS, canSeeMore, moreItemsFor } from "@/lib/crm/nav-shared";
 
 const GRID_ICON =
   "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z";
@@ -46,9 +28,8 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const visibleMore = MORE_ITEMS.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole))
-  );
+  const showMore = canSeeMore(userRole);
+  const visibleMore = moreItemsFor(userRole);
 
   useEffect(() => {
     if (open) {
@@ -60,40 +41,43 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
   }, [open]);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const moreActive = visibleMore.some((m) => isActive(m.href));
+  const moreActive = showMore && visibleMore.some((m) => isActive(m.href));
 
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-white md:hidden">
-        {PRIMARY_ITEMS.map((item) => (
+        {NAV_PRIMARY_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium ${
+            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium ${
               isActive(item.href) ? "text-primary" : "text-muted"
             }`}
           >
             <Icon d={item.icon} />
-            {item.label}
+            {item.shortLabel || item.label}
           </Link>
         ))}
-        <button
-          onClick={() => setOpen((s) => !s)}
-          className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium ${
-            moreActive || open ? "text-primary" : "text-muted"
-          }`}
-        >
-          <Icon d={GRID_ICON} />
-          More
-        </button>
+        {showMore && (
+          <button
+            onClick={() => setOpen((s) => !s)}
+            aria-expanded={open}
+            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium ${
+              moreActive || open ? "text-primary" : "text-muted"
+            }`}
+          >
+            <Icon d={GRID_ICON} />
+            More
+          </button>
+        )}
       </nav>
 
-      {open && (
+      {open && showMore && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 pb-8">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-soft">
+            <p className="mb-2 text-sm font-bold uppercase tracking-wide text-soft">
               More
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -102,7 +86,7 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center gap-2.5 rounded-xl border px-3 py-3 text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-2.5 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
                     isActive(item.href)
                       ? "border-primary/30 bg-primary/5 text-primary"
                       : "border-border bg-white text-navy hover:bg-primary/5"

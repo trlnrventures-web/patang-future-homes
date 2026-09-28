@@ -36,6 +36,61 @@ export function funnelStageForStatus(status: string): FunnelStage | null {
   return LEAD_FUNNEL_STAGES.find((s) => s.matches.includes(status)) || null;
 }
 
+export type LeadColumn = {
+  key: string;
+  label: string;
+  /** The status a card is set to when it is dropped into this column. */
+  dropStatus: string;
+  /** Every status that belongs to this column. */
+  matches: string[];
+  /** Closed columns start collapsed at the far right of the board. */
+  closed?: boolean;
+};
+
+/**
+ * The nine board columns. The funnel above has eight stages because it treats
+ * "Visit Booked" and "Visit Confirmed" as separate steps; the board folds them
+ * into a single Site Visit column, and splits the top of the funnel so a caller
+ * can see at a glance which leads they have actually spoken to.
+ *
+ * `dropStatus` is the first stage of the group, so dropping a card into a
+ * grouped column always lands the lead on that group's entry status.
+ */
+export const LEAD_COLUMNS: LeadColumn[] = [
+  { key: "new", label: "New", dropStatus: "new", matches: ["new", "calling", "no_response"] },
+  { key: "contacted", label: "Contacted", dropStatus: "connected", matches: ["connected"] },
+  { key: "qualified", label: "Qualified", dropStatus: "qualified", matches: ["qualified"] },
+  { key: "follow_up", label: "Follow-up", dropStatus: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
+  { key: "site_visit", label: "Site Visit", dropStatus: "visit_proposed", matches: ["visit_proposed", "visit_booked", "visit_confirmed"] },
+  { key: "visit_done", label: "Visit Done", dropStatus: "visit_done", matches: ["visit_done"] },
+  { key: "negotiation", label: "Negotiation", dropStatus: "negotiation", matches: ["negotiation"] },
+  { key: "booked", label: "Booked", dropStatus: "booked", matches: ["booked"] },
+  { key: "lost", label: "Lost", dropStatus: "lost", matches: ["lost", "invalid", "dnc"], closed: true },
+];
+
+/** Which board column a status belongs to, or null for a status past the funnel. */
+export function columnForStatus(status: string): LeadColumn | null {
+  return LEAD_COLUMNS.find((c) => c.matches.includes(status)) || null;
+}
+
+/** Readable acquisition-source names, so a card never shows a raw slug. */
+export const LEAD_SOURCE_LABELS: Record<string, string> = {
+  meta: "Meta",
+  facebook: "Facebook",
+  google: "Google",
+  website: "Website",
+  walk_in: "Walk-in",
+  referral: "Referral",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  other: "Other",
+};
+
+export function sourceLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  return LEAD_SOURCE_LABELS[value] || value;
+}
+
 /** Per-column accent colour, so the eight columns read apart at a glance. */
 export const STAGE_ACCENTS: Record<
   string,
@@ -58,18 +113,26 @@ export const FALLBACK_ACCENT = {
   ring: "ring-gray-300",
 };
 
-/** Board quick filters. Kept in step with the server's QUICK_FILTERS. */
+/**
+ * Board quick filters. `my_leads` is resolved on the client from the signed-in
+ * user, so it is deliberately absent from the server's QUICK_FILTERS.
+ */
 export const BOARD_QUICK_FILTERS = [
   { key: "", label: "All" },
+  { key: "my_leads", label: "My Leads" },
   { key: "overdue", label: "Overdue" },
   { key: "hot", label: "Hot" },
-  { key: "unassigned", label: "Unassigned" },
-  { key: "visit_today", label: "Visit Today" },
 ] as const;
 
+/** Quick filter keys the board sends to the server (everything but `my_leads`). */
+export const BOARD_SERVER_QUICK_KEYS = BOARD_QUICK_FILTERS.map((o) => o.key as string).filter(
+  (k) => k !== "" && k !== "my_leads"
+);
+
 /**
- * `longest_in_stage` is sorted on the server so the board's column order is the
- * exact order Previous/Next Lead walks on the detail page.
+ * The board has no sort control: it always walks the server default (newest
+ * first). `longest_in_stage` is kept here only so older links carrying it still
+ * normalise to a valid sort on the server page.
  */
 export const BOARD_SORTS = [
   { key: "newest", label: "Newest First" },
@@ -119,10 +182,17 @@ export type BoardLead = {
   id: number;
   name: string;
   phone: string;
+  email?: string | null;
+  notes?: string | null;
+  assignedCallerId?: number | null;
+  assignedSmId?: number | null;
+  assignedCallerName?: string;
   bhk: string | null;
   budget: string | null;
+  location?: string | null;
   source: string;
   originalProject: string | null;
+  preferredProject?: string | null;
   status: string;
   createdAt: string;
   daysInStage: number;

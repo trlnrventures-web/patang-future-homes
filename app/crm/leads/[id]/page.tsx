@@ -5,14 +5,13 @@ import { getCurrentUser } from "@/lib/crm/data";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { suggestCategory, buildLeadContext } from "@/lib/crm/messages";
-import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, findLikelyDuplicates } from "@/lib/crm/leads";
+import { suggestCategory } from "@/lib/crm/messages";
+import { LEAD_STATUS_LABELS, findLikelyDuplicates } from "@/lib/crm/leads";
 import { queryLeadList, QUICK_FILTERS } from "@/lib/crm/lead-query";
 import { queryInboxLeads } from "@/lib/crm/inbox-query";
 import { INBOX_SORTS, isInboxTab } from "@/lib/crm/inbox-shared";
 import { BOARD_SORT_KEYS } from "@/lib/crm/board-shared";
 import { readProjectsFile } from "@/lib/crm/projects-store";
-import { Badge } from "@/components/crm/ui";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
 
@@ -130,10 +129,6 @@ const visits = db
 
   const suggestedCategory = suggestCategory(lead);
 
-  const context = buildLeadContext(lead, {
-    sm_name: lead.assignedSmId ? userMap.get(lead.assignedSmId)?.name || "" : "",
-  });
-
   const leadData: LeadDetailData = {
     lead: {
       ...lead,
@@ -243,18 +238,8 @@ const visits = db
             )}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        <div className="mt-2">
           <h1 className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">{lead.name}</h1>
-          <Badge
-            color={LEAD_STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-700"}
-          >
-            {LEAD_STATUS_LABELS[lead.status] || lead.status}
-          </Badge>
-          {context.original_project && (
-            <span className="text-xs text-soft">
-              Enquired: {context.original_project}
-            </span>
-          )}
         </div>
       </div>
 

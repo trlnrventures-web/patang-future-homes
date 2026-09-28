@@ -40,20 +40,11 @@ export default function LeadsPageContent({
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-primary">
-            {isCaller ? "Caller Inbox" : "Lead Board"}
-          </h1>
-          <p className="mt-0.5 text-sm text-muted">
-            {isCaller
-              ? "Handle new leads quickly. Prioritize what is overdue."
-              : "Drag a lead between columns to change its stage."}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-primary">{isCaller ? "Caller Inbox" : "Leads"}</h1>
         <button
           onClick={() => setShowNewLead(true)}
-          className="rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-secondary"
+          className="shrink-0 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-secondary"
         >
           + New Lead
         </button>
