@@ -4,22 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS } from "@/lib/crm/leads";
+import { autoFollowUpMs, istLocalInputToMs, istLocalInputValue, nextCallingDayStartMs } from "@/lib/crm/call-schedule";
 import type { CallQueueItem } from "@/app/crm/api/call-queue/route";
-
-const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
 const OUTCOMES: { key: string; label: string; cls: string; hint: string }[] = [
   { key: "connected", label: "Connected", cls: "bg-emerald-100 text-emerald-800", hint: "Follow-up suggested tomorrow" },
-  { key: "no_answer", label: "No Answer", cls: "bg-amber-100 text-amber-800", hint: "Today +3 hrs or tomorrow morning" },
-  { key: "busy", label: "Busy", cls: "bg-orange-100 text-orange-800", hint: "Follow-up after 1 hour" },
+  { key: "no_answer", label: "No Answer", cls: "bg-amber-100 text-amber-800", hint: "Next calling morning — edit to pick another day" },
+  { key: "busy", label: "Busy", cls: "bg-orange-100 text-orange-800", hint: "Next calling morning — edit to pick another day" },
   { key: "call_back", label: "Call Back", cls: "bg-sky-100 text-sky-800", hint: "Time told by the customer" },
   { key: "not_interested", label: "Not Interested", cls: "bg-indigo-100 text-indigo-800", hint: "Nurture follow-up in 30 days" },
   { key: "wrong_number", label: "Wrong Number", cls: "bg-red-100 text-red-700", hint: "Lead will be marked invalid" },
 ];
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
 
 function formatDateTime(iso: string): string {
   if (!iso) return "";
@@ -31,50 +26,33 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function toLocalInputMs(ms: number): string {
-  const ist = new Date(ms + IST_OFFSET_MS);
-  return `${ist.getUTCFullYear()}-${pad(ist.getUTCMonth() + 1)}-${pad(ist.getUTCDate())}T${pad(ist.getUTCHours())}:${pad(ist.getUTCMinutes())}`;
-}
-
-function localInputParts(value: string): { y: number; mo: number; d: number; h: number; mi: number } {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!m) return { y: 0, mo: 0, d: 0, h: 0, mi: 0 };
-  return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]), h: Number(m[4]), mi: Number(m[5]) };
-}
-
 function localInputToIso(value: string): string {
-  const p = localInputParts(value);
-  return new Date(Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi) - IST_OFFSET_MS).toISOString();
+  const ms = istLocalInputToMs(value);
+  return Number.isNaN(ms) ? "" : new Date(ms).toISOString();
 }
 
+/**
+ * Machine-picked follow-up times.
+ *
+ * Every suggestion is guaranteed to land on a *later* day than the call, so a
+ * lead worked today never re-enters today's queue. The field is prefilled, not
+ * locked: typing a time in by hand schedules exactly that moment, same day
+ * included.
+ */
 function suggestFollowUpMs(outcome: string): string {
   const now = Date.now();
   switch (outcome) {
     case "connected":
-      return toLocalInputMs(now + 24 * 3600 * 1000);
+      return istLocalInputValue(autoFollowUpMs(24 * 60, now));
     case "busy":
-      return toLocalInputMs(now + 3600 * 1000);
+    case "no_answer":
+      return istLocalInputValue(nextCallingDayStartMs(now));
+    case "call_back":
+      // Prefilled so the required field is never empty, but the caller is
+      // expected to replace it with the time the customer actually named.
+      return istLocalInputValue(nextCallingDayStartMs(now));
     case "not_interested":
-      return toLocalInputMs(now + 30 * 86400000);
-    case "no_answer": {
-      const candidate = now + 3 * 3600 * 1000;
-      const ist = new Date(candidate + IST_OFFSET_MS);
-      const hour = ist.getUTCHours();
-      if (hour >= 19 || hour < 8) {
-        const nextMorning = new Date(candidate + IST_OFFSET_MS);
-        const offset = new Date(
-          Date.UTC(
-            nextMorning.getUTCFullYear(),
-            nextMorning.getUTCMonth(),
-            nextMorning.getUTCDate() + 1,
-            9,
-            30
-          ) - IST_OFFSET_MS
-        );
-        return `${offset.getUTCFullYear()}-${pad(offset.getUTCMonth() + 1)}-${pad(offset.getUTCDate())}T09:30`;
-      }
-      return toLocalInputMs(candidate);
-    }
+      return istLocalInputValue(autoFollowUpMs(30 * 24 * 60, now));
     default:
       return "";
   }
@@ -126,20 +104,15 @@ export default function CallQueue({ onExit }: Props) {
       setOutcome(o);
       setNote("");
       setShowHistory(false);
-      setFollowUp(o.key === "call_back" ? "" : suggestFollowUpMs(o.key));
-      if (o.key === "call_back") {
-        const now = new Date(Date.now() + IST_OFFSET_MS);
-        setFollowUp(
-          `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}T${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}`
-        );
-      }
+      setFollowUp(suggestFollowUpMs(o.key));
     },
     []
   );
 
   const confirmOutcome = useCallback(async () => {
     if (!item || !outcome) return;
-    if (outcome.key === "call_back" && !followUp) {
+    const followUpIso = outcome.key === "wrong_number" ? "" : localInputToIso(followUp);
+    if (outcome.key === "call_back" && !followUpIso) {
       setApiError("A follow-up time is required for a call back.");
       return;
     }
@@ -148,11 +121,9 @@ export default function CallQueue({ onExit }: Props) {
     try {
       const payload: Record<string, unknown> = { type: outcome.key, notes: note };
       if (outcome.key === "call_back") {
-        payload.callbackTime = localInputToIso(followUp);
-      } else if (outcome.key === "wrong_number") {
-        // no follow-up
-      } else if (followUp) {
-        payload.scheduledFollowUp = localInputToIso(followUp);
+        payload.callbackTime = followUpIso;
+      } else if (followUpIso) {
+        payload.scheduledFollowUp = followUpIso;
       }
       const res = await fetch(`/crm/api/leads/${item.id}/activities`, {
         method: "POST",

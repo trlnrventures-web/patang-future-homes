@@ -1,4 +1,5 @@
 import { getSlaFirstResponseMin, getNoResponseSchedule } from "./settings";
+import { autoFollowUpMs } from "./call-schedule";
 import type { SlaStatus, PriorityLevel } from "./sla";
 
 export function minutesBetween(a: string, b: string): number {
@@ -66,11 +67,23 @@ export function getPriority(
   return "p8_idle";
 }
 
-export function nextNoResponseAttempt(attemptCount: number): string | null {
+/**
+ * Automatic no-response backoff: when to try `attemptCount` again.
+ *
+ * A lead that was just called must not re-enter today's call queue, so the
+ * configured gap is never allowed to land on the same IST day — it rolls
+ * forward to the next calling morning (09:30 IST). This matters for the first
+ * attempt in particular: the shipped schedule starts at 0 minutes, which would
+ * otherwise mark the lead overdue the instant it was logged.
+ *
+ * Returns null once the schedule runs out, which parks the lead in nurture
+ * rather than re-queueing it forever.
+ */
+export function nextNoResponseAttempt(attemptCount: number, now = Date.now()): string | null {
   const schedule = getNoResponseSchedule();
   const mins = schedule[attemptCount];
   if (mins == null) return null;
-  return new Date(Date.now() + mins * 60000).toISOString();
+  return new Date(autoFollowUpMs(mins, now)).toISOString();
 }
 
 export const TERMINAL_STATUSES = new Set(["invalid", "lost", "dnc", "booked"]);
