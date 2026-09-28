@@ -21,6 +21,16 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+function formatDateTime(iso: string): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function toLocalInputMs(ms: number): string {
   const ist = new Date(ms + IST_OFFSET_MS);
   return `${ist.getUTCFullYear()}-${pad(ist.getUTCMonth() + 1)}-${pad(ist.getUTCDate())}T${pad(ist.getUTCHours())}:${pad(ist.getUTCMinutes())}`;
@@ -82,6 +92,7 @@ export default function CallQueue({ onExit }: Props) {
   const [outcome, setOutcome] = useState<typeof OUTCOMES[number] | null>(null);
   const [followUp, setFollowUp] = useState("");
   const [note, setNote] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
 
@@ -114,6 +125,7 @@ export default function CallQueue({ onExit }: Props) {
       setApiError("");
       setOutcome(o);
       setNote("");
+      setShowHistory(false);
       setFollowUp(o.key === "call_back" ? "" : suggestFollowUpMs(o.key));
       if (o.key === "call_back") {
         const now = new Date(Date.now() + IST_OFFSET_MS);
@@ -265,10 +277,37 @@ export default function CallQueue({ onExit }: Props) {
                 </a>
               </div>
 
-              {item.lastNote && (
-                <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs text-navy">
-                  <span className="font-semibold">Last note: </span>
-                  {item.lastNote}
+              {item.pastNotes.length > 0 && (
+                <div className="mt-3 rounded-xl border border-border bg-background p-3 text-navy">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-semibold">Last note: </span>
+                    <span className="min-w-0 flex-1 text-xs">{item.lastNote}</span>
+                  </div>
+
+                  {item.pastNotes.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setShowHistory((s) => !s)}
+                        className="mt-2 text-[11px] font-bold uppercase tracking-wide text-primary"
+                      >
+                        {showHistory
+                          ? "Hide past conversation"
+                          : `Show past conversation (${item.pastNotes.length})`}
+                      </button>
+                      {showHistory && (
+                        <div className="mt-2 max-h-56 space-y-2 overflow-y-auto border-t border-border pt-2">
+                          {item.pastNotes.map((n) => (
+                            <div key={n.id}>
+                              <div className="text-[10px] font-semibold text-muted">
+                                {n.label} · {n.userName} · {formatDateTime(n.createdAt)}
+                              </div>
+                              <div className="text-xs text-navy">{n.notes}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>

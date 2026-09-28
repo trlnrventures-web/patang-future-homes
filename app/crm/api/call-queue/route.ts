@@ -5,7 +5,16 @@ import { eq, desc, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { formatLeadAge } from "@/lib/crm/sla";
 import { istToday, istDayRange } from "@/lib/crm/reports";
-import { bhkLabel, isInCallerScope } from "@/lib/crm/leads";
+import { ACTIVITY_LABELS, bhkLabel, CALLER_ACTIVITY_KEYS, isInCallerScope } from "@/lib/crm/leads";
+
+export type CallQueueNote = {
+  id: number;
+  type: string;
+  label: string;
+  notes: string;
+  createdAt: string;
+  userName: string;
+};
 
 export type CallQueueItem = {
   id: number;
@@ -17,9 +26,20 @@ export type CallQueueItem = {
   dueIso: string | null;
   requirementLines: string[];
   lastNote: string;
+  pastNotes: CallQueueNote[];
   leadAge: string;
   attemptCount: number;
 };
+
+const PAST_NOTE_TYPES = new Set<string>([
+  ...CALLER_ACTIVITY_KEYS,
+  "concern",
+  "objection_added",
+  "qualification",
+  "requirement_changed",
+]);
+
+const PAST_NOTE_LIMIT = 10;
 
 const TERMINAL = new Set(["invalid", "lost", "dnc", "booked"]);
 
@@ -116,36 +136,56 @@ export async function GET() {
     }
   }
 
-  const lastNoteByLead = new Map<number, string>();
-  const activities = db
-    .select()
-    .from(schema.activities)
-    .where(eq(schema.activities.userId, user.id))
-    .orderBy(desc(schema.activities.createdAt))
-    .all();
-  for (const a of activities) {
-    if (a.type === "note" && a.notes && !lastNoteByLead.has(a.leadId)) {
-      lastNoteByLead.set(a.leadId, a.notes);
-    }
+  const userNames = new Map<number, string>(
+    db
+      .select({ id: schema.users.id, name: schema.users.name })
+      .from(schema.users)
+      .all()
+      .map((u) => [u.id, u.name])
+  );
+
+  const pastNotesByLead = new Map<number, CallQueueNote[]>();
+  for (const l of active) {
+    const rows = db
+      .select()
+      .from(schema.activities)
+      .where(eq(schema.activities.leadId, l.id))
+      .orderBy(desc(schema.activities.createdAt))
+      .all()
+      .filter((a) => a.notes && a.notes.trim() && PAST_NOTE_TYPES.has(a.type))
+      .slice(0, PAST_NOTE_LIMIT)
+      .map<CallQueueNote>((a) => ({
+        id: a.id,
+        type: a.type,
+        label: ACTIVITY_LABELS[a.type] || a.type,
+        notes: a.notes || "",
+        createdAt: a.createdAt,
+        userName: userNames.get(a.userId) || "Unknown",
+      }));
+    if (rows.length > 0) pastNotesByLead.set(l.id, rows);
   }
 
   const queueItem = (
     l: (typeof schema.leads.$inferSelect),
     group: CallQueueItem["priorityGroup"],
     dueIso: string | null
-  ): CallQueueItem => ({
-    id: l.id,
-    name: l.name,
-    phone: l.phone,
-    whatsappNumber: l.whatsappNumber,
-    status: l.status,
-    priorityGroup: group,
-    dueIso,
-    requirementLines: requirementLines(l),
-    lastNote: lastNoteByLead.get(l.id) || "",
-    leadAge: formatLeadAge(l.createdAt),
-    attemptCount: l.attemptCount ?? 0,
-  });
+  ): CallQueueItem => {
+    const pastNotes = pastNotesByLead.get(l.id) || [];
+    return {
+      id: l.id,
+      name: l.name,
+      phone: l.phone,
+      whatsappNumber: l.whatsappNumber,
+      status: l.status,
+      priorityGroup: group,
+      dueIso,
+      requirementLines: requirementLines(l),
+      lastNote: pastNotes[0]?.notes || "",
+      pastNotes,
+      leadAge: formatLeadAge(l.createdAt),
+      attemptCount: l.attemptCount ?? 0,
+    };
+  };
 
   const overdue: CallQueueItem[] = [];
   const dueToday: CallQueueItem[] = [];
