@@ -424,9 +424,12 @@ function createTables(sqlite: Database.Database) {
       payment_status TEXT NOT NULL DEFAULT 'pending',
       payment_date TEXT,
       generated_by INTEGER,
+      released_at TEXT,
+      released_by INTEGER,
       created_at TEXT NOT NULL DEFAULT '',
       FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (generated_by) REFERENCES users(id)
+      FOREIGN KEY (generated_by) REFERENCES users(id),
+      FOREIGN KEY (released_by) REFERENCES users(id)
     );
     CREATE INDEX IF NOT EXISTS idx_salary_reports_user_month ON salary_reports(user_id, month);
 
@@ -491,6 +494,14 @@ function migrateSalaryReports(sqlite: Database.Database) {
   const have = new Set(cols.map((c) => c.name));
   if (!have.has("half_days")) {
     sqlite.exec("ALTER TABLE salary_reports ADD COLUMN half_days INTEGER NOT NULL DEFAULT 0");
+  }
+  // A salary report is invisible to the employee until released_at is set, so an
+  // admin can review the figures first without staff seeing them change.
+  if (!have.has("released_at")) {
+    sqlite.exec("ALTER TABLE salary_reports ADD COLUMN released_at TEXT");
+  }
+  if (!have.has("released_by")) {
+    sqlite.exec("ALTER TABLE salary_reports ADD COLUMN released_by INTEGER");
   }
 }
 

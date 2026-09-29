@@ -485,6 +485,8 @@ export const salaryReports = sqliteTable("salary_reports", {
     .default("pending"),
   paymentDate: text("payment_date"),
   generatedBy: integer("generated_by").references(() => users.id),
+  releasedAt: text("released_at"),
+  releasedBy: integer("released_by").references(() => users.id),
   createdAt: text("created_at").notNull().default(""),
 });
 
