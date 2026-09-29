@@ -208,6 +208,8 @@ export const activities = sqliteTable("activities", {
       "message_whatsapp_opened",
       "concern", "requirement_changed",
       "tag_generated", "tag_copied",
+      // Written by /crm/api/office-hours when a masked number is revealed.
+      "contact_reveal",
     ],
   }).notNull(),
   notes: text("notes"),

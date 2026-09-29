@@ -21,6 +21,8 @@ type SalaryReportRow = {
   netPaid: number;
   paymentStatus: string;
   paymentDate: string | null;
+  releasedAt: string | null;
+  releasedBy: number | null;
   createdAt: string;
 };
 
@@ -187,6 +189,49 @@ export default function SalaryReport({
     }
   };
 
+  /**
+   * Release is what makes a month visible to the employee, so it is a
+   * deliberate action with its own confirm step. Numbers are unlikely to be
+   * final on the day a report is generated, which is the whole reason this
+   * gate exists.
+   */
+  const setReleased = async (id: number, action: "release" | "unrelease", name: string) => {
+    if (
+      action === "release" &&
+      !window.confirm(
+        `Release this report to ${name}?\n\nThey will be able to see these figures in My Pay. Only release a month once the numbers are final.`
+      )
+    ) {
+      return;
+    }
+    if (action === "unrelease" && !window.confirm(`Hide this report from ${name} again?`)) {
+      return;
+    }
+    try {
+      const res = await fetch("/crm/api/salary", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        flash(json.error || "Failed");
+        return;
+      }
+      flash(action === "release" ? `Released to ${name}` : `Release withdrawn`);
+      loadReports();
+      if (slipReport && "id" in slipReport && slipReport.id === id) {
+        setSlipReport({
+          ...slipReport,
+          releasedAt: action === "release" ? new Date().toISOString() : null,
+          releasedBy: action === "release" ? currentUserId : null,
+        } as SalaryReportRow);
+      }
+    } catch {
+      flash("Failed to update");
+    }
+  };
+
   const formatRs = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   return (
@@ -255,6 +300,7 @@ export default function SalaryReport({
                     <th className="px-2 py-2 text-right">Net Paid</th>
                     <th className="px-2 py-2 text-center">Status</th>
                     <th className="px-2 py-2">Date</th>
+                    {isAdmin && <th className="px-2 py-2 text-center">Released</th>}
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
@@ -279,6 +325,27 @@ export default function SalaryReport({
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-xs text-muted">{r.paymentDate || "—"}</td>
+                      {isAdmin && (
+                        <td className="px-2 py-2.5 text-center">
+                          {r.releasedAt ? (
+                            <button
+                              onClick={() => setReleased(r.id, "unrelease", users.find((u) => u.id === r.userId)?.name || "employee")}
+                              title={`Released ${r.releasedAt.slice(0, 10)}. Click to withdraw.`}
+                              className="rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-semibold text-green-700 hover:bg-green-200"
+                            >
+                              Live
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setReleased(r.id, "release", users.find((u) => u.id === r.userId)?.name || "employee")}
+                              title="Not visible to the employee yet. Click to release."
+                              className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-muted hover:bg-gray-200"
+                            >
+                              Hidden
+                            </button>
+                          )}
+                        </td>
+                      )}
                       <td className="px-2 py-2.5">
                         <button
                           onClick={() => { setMonth(r.month); setUserId(r.userId); loadSlip(); }}
@@ -300,6 +367,12 @@ export default function SalaryReport({
           isAdmin={isAdmin}
           onMarkPaid={markPaid}
           onMarkPending={markPending}
+          onSetReleased={setReleased}
+          releaseName={
+            "userId" in slipReport
+              ? users.find((u) => u.id === slipReport.userId)?.name || "employee"
+              : "employee"
+          }
           formatRs={formatRs}
         />
       ) : (
@@ -327,12 +400,16 @@ function SalarySlip({
   isAdmin,
   onMarkPaid,
   onMarkPending,
+  onSetReleased,
+  releaseName,
   formatRs,
 }: {
   report: SalaryReportRow | ComputedReport;
   isAdmin: boolean;
   onMarkPaid: (id: number) => void;
   onMarkPending: (id: number) => void;
+  onSetReleased: (id: number, action: "release" | "unrelease", name: string) => void;
+  releaseName: string;
   formatRs: (n: number) => string;
 }) {
   const hasId = "id" in report;
@@ -346,7 +423,22 @@ function SalarySlip({
           <div className="text-sm text-muted">Month: {report.month}</div>
         </div>
         {hasId && isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {r.releasedAt ? (
+              <button
+                onClick={() => onSetReleased(r.id, "unrelease", releaseName)}
+                className="rounded-xl bg-gray-100 px-4 py-1.5 text-xs font-bold text-navy hover:bg-gray-200"
+              >
+                Withdraw Release
+              </button>
+            ) : (
+              <button
+                onClick={() => onSetReleased(r.id, "release", releaseName)}
+                className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-secondary"
+              >
+                Release to Employee
+              </button>
+            )}
             {r.paymentStatus === "pending" ? (
               <button
                 onClick={() => onMarkPaid(r.id)}
@@ -388,6 +480,11 @@ function SalarySlip({
             <>
               <SlipRow label="Payment Status" value={r.paymentStatus === "paid" ? "Paid" : "Pending"} color={r.paymentStatus === "paid" ? "text-green-700" : "text-amber-700"} />
               {r.paymentDate && <SlipRow label="Payment Date" value={r.paymentDate} />}
+              <SlipRow
+                label="Visible to Employee"
+                value={r.releasedAt ? `Yes (${r.releasedAt.slice(0, 10)})` : "Not yet released"}
+                color={r.releasedAt ? "text-green-700" : "text-amber-700"}
+              />
             </>
           )}
         </div>

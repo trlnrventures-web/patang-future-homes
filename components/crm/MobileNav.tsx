@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_PRIMARY_ITEMS, canSeeMore, moreItemsFor } from "@/lib/crm/nav-shared";
+import { primaryItemsFor, canSeeMore, moreItemsFor } from "@/lib/crm/nav-shared";
 
 const GRID_ICON =
   "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z";
@@ -76,7 +76,7 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
           keyboardUp ? "hidden" : ""
         }`}
       >
-        {NAV_PRIMARY_ITEMS.map((item) => (
+        {primaryItemsFor(userRole).map((item) => (
           <Link
             key={item.href}
             href={item.href}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_PRIMARY_ITEMS, canSeeMore, moreItemsFor, NavItem } from "@/lib/crm/nav-shared";
+import { primaryItemsFor, canSeeMore, moreItemsFor, NavItem } from "@/lib/crm/nav-shared";
 import LogoutButton from "./LogoutButton";
 
 const CHEVRON_ICON = "M9 6l6 6-6 6";
@@ -69,7 +69,7 @@ export default function CrmSidebar({
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {NAV_PRIMARY_ITEMS.map((item) => (
+        {primaryItemsFor(userRole).map((item) => (
           <Item key={item.href} {...item} />
         ))}
 

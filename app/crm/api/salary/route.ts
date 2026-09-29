@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, isNotNull } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import { writeAuditLog } from "@/lib/crm/audit";
 import {
@@ -190,14 +190,33 @@ export async function GET(request: NextRequest) {
       .get();
 
     if (existing) {
-      return NextResponse.json({ report: existing, computed: null });
+      // A month the admin has not released yet is invisible to the employee.
+      if (!userIsAdmin && !existing.releasedAt) {
+        return NextResponse.json({ report: null, computed: null, released: false });
+      }
+      return NextResponse.json({
+        report: existing,
+        computed: null,
+        released: Boolean(existing.releasedAt),
+      });
+    }
+
+    // `computed` is a live mid-month figure that will still change, so staff
+    // never see it. They get the snapshot once the month is released.
+    if (!userIsAdmin) {
+      return NextResponse.json({ report: null, computed: null, released: false });
     }
 
     const computed = await computeSalaryReport(targetUserId, month);
-    return NextResponse.json({ report: null, computed });
+    return NextResponse.json({ report: null, computed, released: false });
   }
 
   const conditions = userIsAdmin ? [] : [eq(schema.salaryReports.userId, user.id)];
+
+  // Non-admins only ever see released months.
+  if (!userIsAdmin) {
+    conditions.push(isNotNull(schema.salaryReports.releasedAt));
+  }
 
   if (yearParam) {
     const y = Number(yearParam);
@@ -311,6 +330,16 @@ export async function PATCH(request: NextRequest) {
     if (body.paymentStatus === "paid" && !report.paymentDate) {
       updates.paymentDate = new Date().toISOString().slice(0, 10);
     }
+    // Releasing is what makes the month visible to the employee. Re-releasing
+    // an already released month keeps the original released_at so the history
+    // of who published it, and when, stays intact.
+    if (body.action === "release") {
+      updates.releasedAt = report.releasedAt || new Date().toISOString();
+      updates.releasedBy = user.id;
+    } else if (body.action === "unrelease") {
+      updates.releasedAt = null;
+      updates.releasedBy = null;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
@@ -320,6 +349,24 @@ export async function PATCH(request: NextRequest) {
       .set(updates)
       .where(eq(schema.salaryReports.id, id))
       .run();
+
+    if (body.action === "release" || body.action === "unrelease") {
+      const targetName =
+        db.select().from(schema.users).where(eq(schema.users.id, report.userId)).get()?.name || "Unknown";
+      const released = body.action === "release";
+      writeAuditLog({
+        category: "incentive",
+        action: released ? "salary_report_released" : "salary_report_unreleased",
+        actorUserId: user.id,
+        targetUserId: report.userId,
+        entityType: "salary_report",
+        entityId: id,
+        summary: released
+          ? `Released ${report.month} salary report for ${targetName} (₹${report.netPaid.toLocaleString("en-IN")} net, incentive ₹${report.incentiveEarned.toLocaleString("en-IN")}).`
+          : `Withdrew release of ${report.month} salary report for ${targetName}.`,
+        details: { month: report.month, action: body.action },
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

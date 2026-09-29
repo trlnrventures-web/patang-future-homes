@@ -2,9 +2,10 @@
  * Navigation shared by the desktop sidebar and the mobile tab bar so the two
  * can never drift apart.
  *
- * The rule: the four destinations every salesperson needs stay visible to
- * everyone. Everything else is reporting or configuration, so it sits behind
- * More, which owner/admin only get. A caller signing in sees just the four.
+ * The rule: the destinations every salesperson needs stay visible to everyone,
+ * plus My Pay for the two roles that are actually paid. Everything else is
+ * reporting or configuration, so it sits behind More, which owner/admin only
+ * get. A caller signing in sees the four core tabs plus My Pay.
  */
 
 export type NavItem = {
@@ -21,6 +22,10 @@ export const NAV_PRIMARY_ITEMS: NavItem[] = [
   { href: "/crm/leads", label: "Leads", shortLabel: "Leads", icon: "M17 20h5v-2a3 3 0 0 0-5-2.11M9 20H4v-2a3 3 0 0 1 5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 16v-2a3 3 0 0 0-5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
   { href: "/crm/site-visits", label: "Site Visits", shortLabel: "Visits", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" },
   { href: "/crm/attendance", label: "Attendance", shortLabel: "Attendance", icon: "M12 7v5l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
+  // Own payslip, incentive and attendance history. Sales staff are the only
+  // roles with a pay record, so this is hidden from admin/marketing, who use
+  // the oversight pages under More instead.
+  { href: "/crm/my-pay", label: "My Pay", shortLabel: "My Pay", icon: "M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4Zm5-4h2", roles: ["sales_manager", "caller"] },
 ];
 
 export const NAV_MORE_ITEMS: NavItem[] = [
@@ -36,6 +41,16 @@ export const NAV_MORE_ITEMS: NavItem[] = [
   { href: "/crm/settings/office-hours", label: "Office Hours", icon: "M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
   { href: "/crm/settings/team", label: "Team Members", icon: "M17 20h5v-2a3 3 0 0 0-5-2.11M9 20H4v-2a3 3 0 0 1 5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 16v-2a3 3 0 0 0-5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
 ];
+
+/**
+ * Primary items for a role. An item without `roles` is visible to everyone;
+ * one with `roles` is filtered to the listed roles.
+ */
+export function primaryItemsFor(userRole?: string): NavItem[] {
+  return NAV_PRIMARY_ITEMS.filter(
+    (item) => !item.roles || (userRole ? item.roles.includes(userRole) : false)
+  );
+}
 
 /** Owner/admin are the only roles that get a More section at all. */
 export function canSeeMore(userRole?: string): boolean {
