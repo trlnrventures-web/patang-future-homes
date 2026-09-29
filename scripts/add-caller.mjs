@@ -1,4 +1,4 @@
-// Adds a new caller account to the CRM. The CRM has no create-user API or UI
+// Adds a new teammate account to the CRM. The CRM has no create-user API or UI
 // (app/crm/api/team/route.ts is GET + PATCH only, and the only user inserts are
 // the seeds in lib/crm/db.ts), so a new teammate is created with this script.
 //
@@ -11,6 +11,9 @@
 //   node scripts/add-caller.mjs
 //
 // Optional:
+//   ROLE           one of the schema.users.role values. Defaults to "caller";
+//                  pass sales_manager for a team lead, sales_head for an
+//                  owner-level head of sales, admin or marketing as needed.
 //   TEMP_PASSWORD  initial password. Omit to have one generated and printed.
 //                  Either way the account is created with must_change_password=1,
 //                  so proxy.ts forces a change on first login.
@@ -25,7 +28,7 @@
 //
 // Idempotent: if a user with the same email or name already exists the script
 // reports the existing account and exits 0 without writing. No leads are
-// touched - the new caller starts with an empty queue.
+// touched - the new account starts with an empty queue.
 
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
@@ -41,6 +44,12 @@ const PHONE = (process.env.PHONE || "").trim() || null;
 const WEEK_OFF = (process.env.WEEK_OFF || "").trim() || null;
 const TEMP_PASSWORD = process.env.TEMP_PASSWORD || null;
 const BASE_SALARY = process.env.BASE_SALARY ? Number(process.env.BASE_SALARY) : null;
+const ROLE = (process.env.ROLE || "caller").trim().toLowerCase();
+
+// Must match the users.role enum in lib/crm/schema.ts. Inserting anything else
+// would fail at runtime in the nav and permission checks rather than at write
+// time, because SQLite does not enforce the enum.
+const ROLES = ["admin", "sales_head", "sales_manager", "caller", "marketing"];
 
 // Must match lib/crm/attendance.ts DAY_NAMES - app/crm/api/team/route.ts:70
 // rejects anything else when an admin edits the week-off later.
@@ -62,6 +71,7 @@ function fail(message) {
 if (!NAME) fail("NAME is required, e.g. NAME=\"Sohan Rajput\"");
 if (!EMAIL) fail("EMAIL is required, e.g. EMAIL=\"sohan@patangfuturehomes.com\"");
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(EMAIL)) fail(`EMAIL "${EMAIL}" is not a valid address`);
+if (!ROLES.includes(ROLE)) fail(`ROLE must be one of ${ROLES.join(", ")} (got "${ROLE}")`);
 if (WEEK_OFF && !DAY_NAMES.includes(WEEK_OFF)) {
   fail(`WEEK_OFF must be one of ${DAY_NAMES.join(", ")} (got "${WEEK_OFF}")`);
 }
@@ -107,11 +117,11 @@ const unassigned = db
   .get().n;
 
 console.log(`database   : ${DB_PATH}`);
-console.log(`new caller : ${NAME} <${EMAIL}>${PHONE ? ` · ${PHONE}` : ""}`);
+console.log(`new ${ROLE.padEnd(13)}: ${NAME} <${EMAIL}>${PHONE ? ` · ${PHONE}` : ""}`);
 console.log(`week off   : ${WEEK_OFF || "(unset - the app falls back to its default, Tuesday)"}`);
 console.log(`base salary: ${BASE_SALARY ?? "(unset)"}`);
 console.log(`password   : ${TEMP_PASSWORD ? "from TEMP_PASSWORD" : "generated below"}`);
-console.log(`callers    : ${activeCallersBefore.length} active before -> ${activeCallersBefore.length + 1} after`);
+console.log(`callers    : ${activeCallersBefore.length} active before -> ${ROLE === "caller" ? activeCallersBefore.length + 1 : activeCallersBefore.length} after`);
 console.log(`queue      : starts empty; ${unassigned} lead(s) are currently unassigned and stay that way`);
 
 if (DRY_RUN) {
@@ -131,14 +141,15 @@ if (existsSync(BACKUP_PATH)) {
 const hash = bcrypt.hashSync(password, 10);
 const now = new Date().toISOString();
 
+// The role is bound, never interpolated into the SQL string.
 const insert = hasMustChange
   ? `insert into users (name, email, password_hash, role, phone, active, week_off_day, base_salary, must_change_password, created_at)
-     values (?, ?, ?, 'caller', ?, 1, ?, ?, 1, ?)`
+     values (?, ?, ?, ?, ?, 1, ?, ?, 1, ?)`
   : `insert into users (name, email, password_hash, role, phone, active, week_off_day, base_salary, created_at)
-     values (?, ?, ?, 'caller', ?, 1, ?, ?, ?)`;
+     values (?, ?, ?, ?, ?, 1, ?, ?, ?)`;
 
 const run = db.transaction(() =>
-  db.prepare(insert).run(NAME, EMAIL, hash, PHONE, WEEK_OFF, BASE_SALARY, ...(hasMustChange ? [now] : []))
+  db.prepare(insert).run(NAME, EMAIL, hash, ROLE, PHONE, WEEK_OFF, BASE_SALARY, ...(hasMustChange ? [now] : []))
 );
 const { lastInsertRowid } = run();
 
@@ -150,17 +161,26 @@ const activeCallersAfter = db
   .get().n;
 
 console.log(`\ncreated: id ${check.id} · ${check.name} <${check.email}> · role ${check.role} · active ${check.active}`);
-console.log(`active callers: ${activeCallersBefore.length} -> ${activeCallersAfter}`);
+console.log(`base salary: ${check.base_salary ?? "NULL"}`);
+console.log(`must change password on first login: ${check.must_change_password ?? "column absent"}`);
 console.log(`leads assigned to ${check.name}: 0 (queue starts empty)`);
 
 if (!TEMP_PASSWORD) {
   console.log(`\ntemporary password (printed once, not stored in plain text):\n  ${password}`);
-  console.log("share it over a channel the new caller can read privately.");
+  console.log("share it over a channel the new teammate can read privately.");
 }
-console.log(
-  "\nnote: resolveDefaultCallerId (lib/crm/leads.ts:102) hands the next website enquiry\n" +
-    "to the active caller with the fewest open leads, so new leads will start going to\n" +
-    "this account immediately. Restart the app if callers do not appear in the roster."
-);
+if (ROLE === "caller") {
+  console.log(
+    "\nnote: resolveDefaultCallerId (lib/crm/leads.ts:102) hands the next website enquiry\n" +
+      "to the active caller with the fewest open leads, so new leads will start going to\n" +
+      "this account immediately. Restart the app if callers do not appear in the roster."
+  );
+} else {
+  console.log(
+    `\nnote: role is ${ROLE}, not caller, so resolveDefaultCallerId will not route new\n` +
+      "website enquiries to this account. They see My Pay in the nav; no base salary is\n" +
+      "set yet, so their salary figures will read zero until one is added."
+  );
+}
 
 db.close();
