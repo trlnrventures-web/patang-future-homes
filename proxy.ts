@@ -22,9 +22,17 @@ export async function proxy(request: NextRequest) {
     if (pathname === "/") {
       return NextResponse.redirect(new URL("/crm/dashboard", request.url));
     }
-    if (pathname.startsWith("/crm") || pathname === "/api/inquiries") {
-      // fall through to auth handling below
-    } else {
+    // The PWA manifest has to be served from the CRM host too. Its start_url is
+    // "/", which on this host already resolves to /crm/dashboard, so the one
+    // shared manifest is correct here - but the blanket redirect below would
+    // otherwise hand the CRM the marketing site's manifest and make the app
+    // uninstallable. Static brand assets are already exempt from this proxy by
+    // the extension filter in the matcher.
+    const isCrmPath =
+      pathname.startsWith("/crm") ||
+      pathname === "/api/inquiries" ||
+      pathname === "/manifest.webmanifest";
+    if (!isCrmPath) {
       return NextResponse.redirect(new URL(MAIN_URL + pathname, request.url));
     }
   }
