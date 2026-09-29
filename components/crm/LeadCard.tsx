@@ -48,6 +48,8 @@ export default function LeadCard({
 }: Props) {
   const router = useRouter();
   const overdue = !!lead.hasOverdueFollowUp && !!lead.nextFollowUpDisplay;
+  // Server-decided; when true the phone field holds a masked string, not a number.
+  const hidden = !!(lead as { contactHidden?: boolean }).contactHidden;
 
   const open = () => router.push(`/crm/leads/${lead.id}${hrefQuery}`);
   const stop = (e: React.MouseEvent) => {
@@ -129,28 +131,53 @@ export default function LeadCard({
           ) : null}
           <div className="flex min-w-0 items-center gap-1 text-soft">
             {footerNote}
-            {lead.phone && <span className="truncate">· {lead.phone}</span>}
+            {lead.phone && (
+              <span className={`truncate ${hidden ? "text-amber-700" : ""}`}>· {lead.phone}</span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1" onClick={stop}>
-          <a
-            href={`tel:+${lead.phone.replace(/\D/g, "")}`}
-            title="Call lead"
-            onClick={stop}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
-          >
-            <PhoneIcon />
-          </a>
-          <a
-            href={`https://wa.me/${formatPhoneForWhatsApp(lead.whatsappNumber || lead.phone)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open WhatsApp"
-            onClick={stop}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-[#25D366]/10 hover:text-[#1fb858]"
-          >
-            <WhatsAppIcon />
-          </a>
+          {/* Outside office hours the API sends a masked number, so there is
+              nothing real to dial. Disabled, with a tooltip explaining why. */}
+          {hidden ? (
+            <>
+              <span
+                title="Available during office hours"
+                aria-label="Call unavailable outside office hours"
+                className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-lg border border-dashed border-amber-300 bg-amber-50 text-amber-700"
+              >
+                <PhoneIcon />
+              </span>
+              <span
+                title="Available during office hours"
+                aria-label="WhatsApp unavailable outside office hours"
+                className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-lg border border-dashed border-amber-300 bg-amber-50 text-amber-700"
+              >
+                <WhatsAppIcon />
+              </span>
+            </>
+          ) : (
+            <>
+              <a
+                href={`tel:+${lead.phone.replace(/\D/g, "")}`}
+                title="Call lead"
+                onClick={stop}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
+              >
+                <PhoneIcon />
+              </a>
+              <a
+                href={`https://wa.me/${formatPhoneForWhatsApp(lead.whatsappNumber || lead.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open WhatsApp"
+                onClick={stop}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-[#25D366]/10 hover:text-[#1fb858]"
+              >
+                <WhatsAppIcon />
+              </a>
+            </>
+          )}
           <Link
             href={`/crm/leads/${lead.id}${hrefQuery}`}
             title="Open lead"

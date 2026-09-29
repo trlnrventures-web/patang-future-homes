@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import {
@@ -598,7 +598,15 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
   const phone = (lead.whatsappNumber || lead.phone || "").replace(/\D/g, "");
   const waNumber = formatPhoneForWhatsApp(phone);
-  const notesList = activities.filter((a) => a.type === "note");
+  // Newest first. Sorted on a copy so the underlying activity order is untouched.
+  const notesList = useMemo(
+    () =>
+      activities
+        .filter((a) => a.type === "note")
+        .slice()
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+    [activities]
+  );
   const callHistory = activities.filter((a) => String(a.type).startsWith("call"));
   const latestVisit =
     visits
@@ -624,44 +632,34 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
   const callOutcomeButton =
     "rounded-xl border px-3 py-2 text-sm font-semibold transition-colors";
-  const primaryActions = (
-    <div className="flex gap-2">
-      <a
-        href={`tel:+${phone}`}
-        onClick={() => setShowCallResult(true)}
-        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-secondary"
-      >
-        <PhoneIcon />
-        Call
-      </a>
-      <a
-        href={`https://wa.me/${waNumber}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-3 py-2.5 text-sm font-bold text-white shadow-sm shadow-[#25D366]/30 transition-colors hover:bg-[#1DA851]"
-      >
-        <WhatsAppIcon />
-        WhatsApp
-      </a>
-      {!readOnly && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={openVisit}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-white px-3 py-2.5 text-sm font-bold text-navy transition-colors hover:bg-primary/5 disabled:opacity-50"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          Site Visit
-        </button>
-      )}
-    </div>
-  );
+
+  // `contactHidden` is decided server-side; the lead payload already holds the
+  // masked string when it is true, so the tap-to-dial links must be disabled.
+  const contactsHidden = !!(lead as { contactHidden?: boolean }).contactHidden;
+
+  const actionProps = {
+    phone,
+    waNumber,
+    onCall: () => setShowCallResult(true),
+    onVisit: openVisit,
+    readOnly,
+    busy,
+    contactsHidden,
+  };
+
+  /** Left card: a fixed 320px column, so ~90px per column once the gaps are in.
+      Three labels do not fit there, so it always takes the stacked fallback. */
+  const cardActions = <LeadActions layout="card" {...actionProps} />;
+
+  /** Mobile bar: full width, so three equal columns from 360px up. Below that
+      the labels would wrap, so it stacks rather than shrinking. */
+  const mobileActions = <LeadActions layout="bar" {...actionProps} />;
 
   return (
-    <div className="pb-32 lg:pb-6">
+    // The mobile action bar is one 48px row from 360px up, but three stacked
+    // rows below that (176px), on top of the 60px bottom nav. Reserve room so
+    // the last card is never hidden behind it.
+    <div className="pb-[240px] min-[360px]:pb-32 lg:pb-6">
       {toast && (
         <div className="fixed left-1/2 top-16 z-[100] -translate-x-1/2 rounded-xl bg-navy px-2.5 py-2.5 text-sm font-medium text-white shadow-2xl">
           {toast}
@@ -672,7 +670,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       <div
         role="group"
         aria-label="Lead stage"
-        className="-mx-4 flex gap-1.5 overflow-x-auto border-b border-border px-4 pb-2.5 md:mx-0 md:px-0 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 mt-6 flex gap-2 overflow-x-auto border-b border-border px-4 pb-3 md:mx-0 md:px-0 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {LEAD_COLUMNS.map((column) => {
           const isCurrent = currentColumn?.key === column.key;
@@ -697,44 +695,62 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       </div>
 
       {lead.reactivatedAt && (
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-4 text-sm text-muted">
           Reactivated on {reactivationDateLabel(lead.reactivatedAt)}
           {lead.reactivatedFrom ? `, previously ${reactivationPreviousLabel(lead.reactivatedFrom)}` : ""}
         </p>
       )}
 
       {readOnly && (
-        <div className="mt-3 rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
+        <div className="mt-4 rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
           Handed off to {lead.assignedSmName || "the sales team"} — this lead is now managed by the
           sales team. You can still view the full history here, but editing is disabled.
         </div>
       )}
 
-      <div className="mt-4 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-5">
+      <div className="mt-6 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-6">
         {/* ===== Left: identity card ===== */}
         <div className="rounded-xl border border-border bg-white p-4">
           {project && (
             <p className="text-base font-bold text-navy">{project}</p>
           )}
-          <a
-            href={`tel:+${phone}`}
-            className={`${project ? "mt-1.5" : ""} block truncate text-sm font-semibold text-primary hover:underline`}
-          >
-            {lead.phone || "—"}
-          </a>
-          {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
-            <p className="mt-1 truncate text-sm text-navy">WA: {lead.whatsappNumber}</p>
+          {contactsHidden ? (
+            <>
+              <p
+                className={`${project ? "mt-1.5" : ""} truncate text-sm font-semibold text-amber-800`}
+              >
+                {lead.phone || "—"}
+              </p>
+              {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
+                <p className="mt-1 truncate text-sm text-amber-800">WA: {lead.whatsappNumber}</p>
+              )}
+            </>
+          ) : (
+            <>
+              <a
+                href={`tel:+${phone}`}
+                className={`${project ? "mt-1.5" : ""} block truncate text-sm font-semibold text-primary hover:underline`}
+              >
+                {lead.phone || "—"}
+              </a>
+              {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
+                <p className="mt-1 truncate text-sm text-navy">WA: {lead.whatsappNumber}</p>
+              )}
+            </>
           )}
-          {lead.email && (
-            <a
-              href={`mailto:${lead.email}`}
-              className="mt-1 block truncate text-sm text-navy hover:underline"
-            >
-              {lead.email}
-            </a>
-          )}
+          {lead.email &&
+            (contactsHidden ? (
+              <p className="mt-1 truncate text-sm text-amber-800">{lead.email}</p>
+            ) : (
+              <a
+                href={`mailto:${lead.email}`}
+                className="mt-1 block truncate text-sm text-navy hover:underline"
+              >
+                {lead.email}
+              </a>
+            ))}
 
-          <dl className="mt-3 space-y-1.5 border-t border-border pt-3">
+          <dl className="mt-4 space-y-2 border-t border-border pt-4">
             <DetailRow label="Source" value={sourceLabel(lead.source)} />
             <DetailRow label="Caller" value={lead.assignedCallerName || "Unassigned"} />
             <DetailRow label="SM" value={lead.assignedSmName || "Unassigned"} />
@@ -743,16 +759,18 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
             <DetailRow label="BHK" value={bhkLabel(lead.bhk)} />
           </dl>
 
-          <div className="mt-4 hidden lg:block">{primaryActions}</div>
+          <div className="mt-4 hidden lg:block">{cardActions}</div>
 
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => setShowEdit(true)}
-              className="mt-2.5 w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-primary/5"
-            >
-              Edit Details
-            </button>
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowEdit(true)}
+                className="text-sm font-semibold text-primary hover:underline"
+              >
+                Edit Details
+              </button>
+            </div>
           )}
 
           {/* Assignment is an owner/admin control. */}
@@ -885,7 +903,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
           <div
             role="tablist"
             aria-label="Lead detail sections"
-            className="flex gap-1 overflow-x-auto border-b border-border [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex gap-2 overflow-x-auto border-b border-border [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {DETAIL_TABS.map((t) => {
               const count =
@@ -905,7 +923,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                   aria-selected={tab === t.key}
                   aria-controls={`lead-tabpanel-${t.key}`}
                   onClick={() => setTab(t.key)}
-                  className={`-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-bold transition-colors ${
+                  className={`-mb-px shrink-0 border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
                     tab === t.key
                       ? "border-primary text-primary"
                       : "border-transparent text-muted hover:border-border hover:text-navy"
@@ -913,7 +931,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                 >
                   {t.label}
                   {count > 0 && (
-                    <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-sm font-semibold text-muted">
+                    <span className="ml-2 rounded-full bg-gray-100 px-2 text-sm font-semibold leading-6 text-muted">
                       {count}
                     </span>
                   )}
@@ -923,38 +941,45 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
           </div>
 
           {tab === "notes" && (
-            <div role="tabpanel" id="lead-tabpanel-notes" aria-labelledby="lead-tab-notes" className="mt-4 space-y-2.5">
-              {notesList.length === 0 ? (
-                <p className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
-                  No notes yet.
-                </p>
-              ) : (
-                notesList.map((a) => (
-                  <div key={a.id} className="rounded-xl border border-border bg-white px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-navy">{a.userName || ""}</span>
-                      <span className="text-sm text-soft">{formatDateTime(a.createdAt)}</span>
-                    </div>
-                    <p className="mt-0.5 text-sm text-navy">{a.notes}</p>
-                  </div>
-                ))
-              )}
+            <div role="tabpanel" id="lead-tabpanel-notes" aria-labelledby="lead-tab-notes" className="mt-4">
+              {/* Composer sits on top, as in Bigin. The 16px card padding keeps
+                  the focus outline (offset 2px) clear of the note cards. */}
               {!readOnly && (
-                <div className="flex gap-2">
-                  <input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddNote();
-                    }}
-                    placeholder="Add a note..."
-                    className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-primary"
-                  />
-                  <Button onClick={handleAddNote} disabled={busy || !note.trim()}>
-                    Add
-                  </Button>
+                <div className="rounded-xl border border-border bg-white p-4">
+                  <div className="flex gap-3">
+                    <input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddNote();
+                      }}
+                      placeholder="Add a note..."
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-navy focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    />
+                    <Button onClick={handleAddNote} disabled={busy || !note.trim()} className="shrink-0">
+                      Add
+                    </Button>
+                  </div>
                 </div>
               )}
+
+              <div className="mt-4 space-y-3">
+                {notesList.length === 0 ? (
+                  <p className="rounded-xl border border-border bg-white p-4 text-sm text-muted">
+                    No notes yet.
+                  </p>
+                ) : (
+                  notesList.map((a) => (
+                    <div key={a.id} className="rounded-xl border border-border bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-navy">{a.userName || ""}</span>
+                        <span className="text-sm text-soft">{formatDateTime(a.createdAt)}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-navy">{a.notes}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -1358,7 +1383,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
       {/* ===== Mobile: the three actions stay pinned to the bottom ===== */}
       <div className="fixed inset-x-0 bottom-[3.75rem] z-30 border-t border-border bg-white/95 p-2 backdrop-blur lg:hidden">
-        {primaryActions}
+        {mobileActions}
       </div>
 
       {/* ===== Call result popup ===== */}
@@ -1571,6 +1596,112 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-3">
       <dt className="shrink-0 text-sm text-muted">{label}</dt>
       <dd className="min-w-0 truncate text-sm font-semibold text-navy">{value}</dd>
+    </div>
+  );
+}
+
+// One button style for all three lead actions, so height, radius, padding and
+// text treatment cannot drift apart between the left card and the mobile bar.
+// `whitespace-nowrap` with `min-w-0` keeps "Site Visit" on one line, and the
+// grid columns stay equal regardless: the label never sets the width.
+// Horizontal padding and the icon gap are deliberately tight. "Site Visit" at
+// 14px needs about 103px per column, and the narrowest three-column case is
+// 360px (109px), so this leaves real slack instead of a few pixels.
+const ACTION_BTN =
+  "flex h-12 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-1.5 text-sm font-bold transition-colors disabled:opacity-50";
+const ACTION_ICON = "h-[18px] w-[18px] shrink-0";
+
+/**
+ * Call / WhatsApp / Site Visit. `layout` picks the container so each placement
+ * gets the right column count: the fixed 320px card stacks, the full width
+ * mobile bar goes across once there is room. With Site Visit hidden (read
+ * only) the remaining two buttons split the row instead of leaving a gap.
+ */
+function LeadActions({
+  layout,
+  phone,
+  waNumber,
+  onCall,
+  onVisit,
+  readOnly,
+  busy,
+  contactsHidden = false,
+}: {
+  layout: "card" | "bar";
+  phone: string;
+  waNumber: string;
+  onCall: () => void;
+  onVisit: () => void;
+  readOnly: boolean;
+  busy: boolean;
+  /** Set by the API when contact details are masked outside office hours. */
+  contactsHidden?: boolean;
+}) {
+  const container = readOnly
+    ? "grid grid-cols-2 gap-2"
+    : layout === "card"
+      ? "grid grid-cols-1 gap-2"
+      : "grid grid-cols-1 gap-2 min-[360px]:grid-cols-3";
+
+  // While masked there is no real number to dial, so the tap-to-dial targets are
+  // replaced by a disabled control rather than silently dialling "98XX...".
+  const hiddenBtn = `${ACTION_BTN} cursor-not-allowed border border-dashed border-amber-300 bg-amber-50 text-amber-800 opacity-90`;
+
+  return (
+    <div className={container}>
+      {contactsHidden ? (
+        <button type="button" disabled title="Available during office hours" className={hiddenBtn}>
+          <PhoneIcon className={ACTION_ICON} />
+          Call
+        </button>
+      ) : (
+        <a
+          href={`tel:+${phone}`}
+          onClick={onCall}
+          className={`${ACTION_BTN} bg-primary text-white shadow-sm shadow-primary/20 hover:bg-secondary`}
+        >
+          <PhoneIcon className={ACTION_ICON} />
+          Call
+        </a>
+      )}
+      {contactsHidden ? (
+        <button type="button" disabled title="Available during office hours" className={hiddenBtn}>
+          <WhatsAppIcon className={ACTION_ICON} />
+          WhatsApp
+        </button>
+      ) : (
+        <a
+          href={`https://wa.me/${waNumber}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${ACTION_BTN} bg-[#25D366] text-white shadow-sm shadow-[#25D366]/30 hover:bg-[#1DA851]`}
+        >
+          <WhatsAppIcon className={ACTION_ICON} />
+          WhatsApp
+        </a>
+      )}
+      {!readOnly && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onVisit}
+          className={`${ACTION_BTN} border border-border bg-white text-navy hover:bg-primary/5`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={ACTION_ICON}
+          >
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          Site Visit
+        </button>
+      )}
     </div>
   );
 }

@@ -4,6 +4,11 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { readProjectsFile } from "@/lib/crm/projects-store";
+import {
+  contactMaskFor,
+  describeMasking,
+  maskPhone,
+} from "@/lib/crm/office-hours";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +45,10 @@ export async function GET() {
     return false;
   });
 
+  // The calendar shows a lead's number too, so it gets the same server-side
+  // mask rather than being left as a bypass around the leads endpoints.
+  const decision = contactMaskFor(user.role);
+
   const visits = scoped
     .map((v) => {
       const lead = leadMap.get(v.leadId);
@@ -47,7 +56,9 @@ export async function GET() {
         id: v.id,
         leadId: v.leadId,
         customerName: lead?.name || "",
-        phone: lead?.whatsappNumber || lead?.phone || "",
+        phone: decision.mask
+          ? maskPhone(lead?.whatsappNumber || lead?.phone)
+          : lead?.whatsappNumber || lead?.phone || "",
         leadStatus: lead?.status || "",
         projectId: v.projectId,
         projectName: v.projectId ? projectMap[v.projectId] || v.projectId : "",
@@ -62,7 +73,15 @@ export async function GET() {
     })
     .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
 
-  return NextResponse.json({ visits, role: user.role });
+  return NextResponse.json({
+    visits: visits.map((v) => ({ ...v, contactHidden: decision.mask })),
+    role: user.role,
+    contactMasking: {
+      active: decision.mask,
+      withinOfficeHours: decision.withinHours,
+      banner: describeMasking(decision),
+    },
+  });
 }
 
 export async function DELETE(request: NextRequest) {

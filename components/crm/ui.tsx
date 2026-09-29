@@ -203,9 +203,9 @@ export function WhatsAppOpenButton({
   );
 }
 
-export function WhatsAppIcon() {
+export function WhatsAppIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path d="M20.52 3.48a11.87 11.87 0 0 0-18.4 13.63L.72 23.28a.75.75 0 0 0 .93.93l6.17-1.4a11.87 11.87 0 0 0 12.7-19.33ZM12 21.75a9.8 9.8 0 0 1-5-1.37.75.75 0 0 0-.63-.08l-4.6 1.04 1.1-4.54a.75.75 0 0 0-.1-.65A9.38 9.38 0 1 1 12 21.75Zm5.2-6.55c-.29-.15-1.7-.84-1.96-.94s-.45-.15-.64.14-.74.94-.9 1.13-.33.21-.62.07a7.8 7.8 0 0 1-2.3-1.42 8.6 8.6 0 0 1-1.59-1.98c-.17-.29 0-.44.12-.58s.28-.33.42-.5a1.9 1.9 0 0 0 .28-.47.5.5 0 0 0 0-.48c-.07-.14-.64-1.54-.87-2.11s-.46-.48-.64-.49h-.58a1.1 1.1 0 0 0-.8.38 3.36 3.36 0 0 0-1.04 2.49 5.83 5.83 0 0 0 1.23 3.1 13.3 13.3 0 0 0 5.09 4.47c.71.31 1.26.49 1.7.63a4.1 4.1 0 0 0 1.88.12 3.08 3.08 0 0 0 2.02-1.42 2.48 2.48 0 0 0 .17-1.43c-.08-.11-.28-.18-.58-.33Z" />
     </svg>
   );
@@ -246,9 +246,9 @@ export function ChevronIcon() {
   );
 }
 
-export function PhoneIcon() {
+export function PhoneIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
     </svg>
   );

@@ -9,6 +9,11 @@ import {
   resolveDefaultSmId,
   findLikelyDuplicates,
 } from "@/lib/crm/leads";
+import {
+  contactMaskFor,
+  describeMasking,
+  maskLeadContacts,
+} from "@/lib/crm/office-hours";
 
 export async function GET(
   _request: NextRequest,
@@ -79,9 +84,13 @@ export async function GET(
     smName: userMap.get(v.smId)?.name || "",
   }));
 
+  // Same server-side mask as the list endpoints, so the detail page cannot be
+  // used to read a full number outside office hours.
+  const decision = contactMaskFor(user.role);
+
   return NextResponse.json({
     lead: {
-      ...lead,
+      ...maskLeadContacts(lead, decision),
       assignedCallerName: lead.assignedCallerId
         ? userMap.get(lead.assignedCallerId)?.name || ""
         : "",
@@ -95,6 +104,11 @@ export async function GET(
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     latestFeedback,
     duplicates: isAdmin(user) ? findLikelyDuplicates(db, lead) : [],
+    contactMasking: {
+      active: decision.mask,
+      withinOfficeHours: decision.withinHours,
+      banner: describeMasking(decision),
+    },
   });
 }
 

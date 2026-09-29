@@ -28,8 +28,34 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // A fixed bottom bar sits under the on-screen keyboard on iOS and Android
+  // when any input is focused (search, notes, filter fields). Tracking focusin
+  // on the document covers every input on every screen without each one having
+  // to opt in, so the bar hides itself and cannot be covered.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+
   const showMore = canSeeMore(userRole);
   const visibleMore = moreItemsFor(userRole);
+
+  useEffect(() => {
+    const isTextEntry = (el: Element | null) =>
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      (el instanceof HTMLElement && el.isContentEditable);
+
+    const sync = (e: FocusEvent) => {
+      const target = e.target as Element | null;
+      setKeyboardUp(isTextEntry(target));
+    };
+    const clear = () => setKeyboardUp(false);
+
+    document.addEventListener("focusin", sync);
+    document.addEventListener("focusout", clear);
+    return () => {
+      document.removeEventListener("focusin", sync);
+      document.removeEventListener("focusout", clear);
+    };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -45,7 +71,11 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-white md:hidden">
+      <nav
+        className={`fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-white md:hidden ${
+          keyboardUp ? "hidden" : ""
+        }`}
+      >
         {NAV_PRIMARY_ITEMS.map((item) => (
           <Link
             key={item.href}
@@ -72,7 +102,7 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
         )}
       </nav>
 
-      {open && showMore && (
+      {open && showMore && !keyboardUp && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 pb-8">

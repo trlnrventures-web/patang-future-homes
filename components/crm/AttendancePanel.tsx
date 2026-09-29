@@ -205,7 +205,10 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
   const row = data.row;
 
   return (
-    <div className="space-y-5">
+    /* pb-16 on mobile keeps the final card clear of the fixed bottom tab bar
+       even when scrolled all the way down (16px gap under the 60px nav). The
+       page layout adds its own padding on desktop, so this is mobile-only. */
+    <div className="space-y-5 pb-16 md:pb-0">
       {notice && (
         <div className="fixed left-1/2 top-16 z-[100] -translate-x-1/2 rounded-xl bg-navy px-4 py-2.5 text-sm font-medium text-white shadow-2xl">
           {notice}
@@ -333,7 +336,11 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
       )}
 
       {/* This week + leave balance */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* This Week and Leave Balance. md:up keeps them side by side; below that
+          they stack. gap-3 (not gap-4) keeps the two cards visually tight on a
+          phone, and the container reserves bottom padding so the last card
+          clears the fixed tab bar. */}
+      <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-border bg-white p-5">
           <div className="mb-3 text-sm font-bold text-primary">This Week</div>
           <div className="grid grid-cols-7 gap-1.5">

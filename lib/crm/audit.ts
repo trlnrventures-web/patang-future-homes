@@ -2,7 +2,18 @@ import { and, desc, eq, gte, lte, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
 
-export type AuditCategory = "incentive" | "attendance" | "leave" | "holiday";
+/**
+ * `settings` and `contact_access` were added for office-hours masking: a config
+ * change and a full-number reveal both need a traceable trail, and neither fits
+ * the HR-oriented categories above.
+ */
+export type AuditCategory =
+  | "incentive"
+  | "attendance"
+  | "leave"
+  | "holiday"
+  | "settings"
+  | "contact_access";
 
 export type AuditEntryInput = {
   category: AuditCategory;

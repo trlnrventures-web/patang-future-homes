@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/crm/auth";
 import { resolveDefaultCallerId } from "@/lib/crm/leads";
 import { queryLeadList } from "@/lib/crm/lead-query";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
+import { contactMaskFor, describeMasking, maskLeadList } from "@/lib/crm/office-hours";
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
@@ -26,16 +27,41 @@ export async function GET(request: NextRequest) {
     sort: searchParams.get("sort") || undefined,
   });
 
+  // Masking happens here, on the way out, so the real number is never sent to a
+  // staff browser at all - not hidden by CSS, and not recoverable from the
+  // network tab or the page source.
+  const decision = contactMaskFor(user.role);
   const total = all.length;
 
   // The board renders every lead of the current filter in one pass so a card can
   // be dragged between columns; the list view stays paginated.
   if (view === "board") {
-    return NextResponse.json({ leads: all, total, view: "board" });
+    return NextResponse.json({
+      leads: maskLeadList(all, decision),
+      total,
+      view: "board",
+      contactMasking: maskPayload(decision),
+    });
   }
 
   const leads = all.slice((page - 1) * pageSize, page * pageSize);
-  return NextResponse.json({ leads, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
+  return NextResponse.json({
+    leads: maskLeadList(leads, decision),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    contactMasking: maskPayload(decision),
+  });
+}
+
+/** The banner state, so the UI never has to guess why a number looks odd. */
+function maskPayload(decision: ReturnType<typeof contactMaskFor>) {
+  return {
+    active: decision.mask,
+    withinOfficeHours: decision.withinHours,
+    banner: describeMasking(decision),
+  };
 }
 
 export async function POST(request: NextRequest) {
