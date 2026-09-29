@@ -59,13 +59,13 @@ export default function CrmSidebar({
   return (
     <div className="flex h-full flex-col border-r border-border bg-white">
       <div className="px-4 py-4">
-        <div className="inline-block rounded-xl bg-navy p-2.5">
-          <img
-            src="/brand/PFH_512_white_nobg_horizontal.png"
-            alt="Patang CRM"
-            className="h-8 w-auto"
-          />
-        </div>
+        {/* Purple logo sits directly on the white sidebar: the purple variant
+            is unreadable on navy/purple, so the old dark tile is gone. */}
+        <img
+          src="/brand/PFH_512_nobg_horizontal.png"
+          alt="Patang Future Homes"
+          className="h-8 w-auto"
+        />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">

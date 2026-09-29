@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       locale: "en_IN",
       images: [
         {
-          url: "/og-image.jpg",
+          url: "/brand/og-image.png",
           width: 1200,
           height: 630,
           alt: "Patang Future Homes",
@@ -92,7 +92,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: page.metaTitle,
       description: page.metaDescription,
-      images: ["/og-image.jpg"],
+      images: ["/brand/og-image.png"],
     },
   };
 }

@@ -9,6 +9,19 @@ export const metadata: Metadata = {
   },
   description:
     "Discover premium residential and commercial properties in Vasai West. Shops, flats, and bungalows by Patang Future Homes, your trusted real estate partner.",
+  icons: {
+    icon: [
+      { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Patang Future Homes",
+    statusBarStyle: "black-translucent",
+  },
   openGraph: {
     type: "website",
     locale: "en_IN",
@@ -18,7 +31,7 @@ export const metadata: Metadata = {
       "Discover premium residential and commercial properties in Vasai West. Shops, flats, and bungalows by Patang Future Homes.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/brand/og-image.png",
         width: 1200,
         height: 630,
         alt: "Patang Future Homes",
@@ -30,7 +43,7 @@ export const metadata: Metadata = {
     title: "Patang Future Homes | Premium Properties in Vasai West",
     description:
       "Discover premium residential and commercial properties in Vasai West.",
-    images: ["/og-image.jpg"],
+    images: ["/brand/og-image.png"],
   },
   keywords: [
     "properties in Vasai West",

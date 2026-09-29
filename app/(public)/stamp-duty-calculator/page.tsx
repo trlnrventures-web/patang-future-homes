@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "/stamp-duty-calculator",
       images: [
         {
-          url: "/og-image.jpg",
+          url: "/brand/og-image.png",
           width: 1200,
           height: 630,
           alt: "Stamp duty calculator by Patang Future Homes",

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     url: "/",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/brand/og-image.png",
         width: 1200,
         height: 630,
         alt: "Patang Future Homes, premium properties in Vasai",
