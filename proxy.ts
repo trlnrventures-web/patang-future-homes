@@ -17,11 +17,21 @@ const PUBLIC_PATHS = [
 // reset-password is unauthenticated by necessity: the caller is holding a
 // token from their mailbox, not a session. It is protected by that token's
 // expiry and single-use rule instead.
+// These are reachable without a CRM session, but they are not open: each one
+// authenticates itself in the handler. The call-event webhook holds no session
+// because the caller is a telephony provider, so it proves itself with an HMAC
+// over the raw body instead; the sweep is driven by a cron that holds the same
+// shared secret as a bearer token. Both refuse with 503 while the secret is
+// unset, so an unconfigured server accepts nothing. The GET on the same
+// call-events path still requires a session, since that is the missed-call
+// listing and the proxy allowlist is per-path, not per-method.
 const PUBLIC_API_PATHS = [
   "/crm/api/auth/login",
   "/crm/api/auth/logout",
   "/crm/api/auth/forgot-password",
   "/crm/api/auth/reset-password",
+  "/crm/api/call-events",
+  "/crm/api/call-sessions/sweep",
 ];
 const FORCE_CHANGE_PASSWORD_PATH = "/crm/change-password";
 
