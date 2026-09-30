@@ -1,5 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { eq } from "drizzle-orm";
+import { getDb } from "./db";
+import * as schema from "./schema";
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "patang-future-homes-crm-secret-key-2024"
@@ -14,6 +17,47 @@ export type AuthUser = {
   role: string;
   mustChangePassword?: boolean;
 };
+
+/**
+ * Read access to the whole lead book, for staff who do follow-up on leads that
+ * an SM owns. Resolved from the database rather than the JWT so that granting or
+ * revoking it takes effect on the next request instead of waiting for the 7-day
+ * token to expire.
+ *
+ * Admins and sales heads already see everything, so they short-circuit here.
+ */
+let seeAllLeadsCache: { at: number; ids: Set<number> } | null = null;
+
+function usersWithAllLeadAccess(): Set<number> {
+  const now = Date.now();
+  if (seeAllLeadsCache && now - seeAllLeadsCache.at < 30_000) {
+    return seeAllLeadsCache.ids;
+  }
+  const rows = getDb()
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.seeAllLeads, true))
+    .all();
+  const ids = new Set(rows.map((r) => r.id));
+  seeAllLeadsCache = { at: now, ids };
+  return ids;
+}
+
+export function seesAllLeads(user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  if (user.role !== "caller" && user.role !== "sales_manager") return false;
+  try {
+    return usersWithAllLeadAccess().has(user.id);
+  } catch {
+    return false;
+  }
+}
+
+/** Drop the cached grant list so a permission change applies to the next request. */
+export function invalidateLeadAccessCache(): void {
+  seeAllLeadsCache = null;
+}
 
 function isSecureEnv(): boolean {
   return process.env.NODE_ENV !== "development";

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { getAuthUser } from "@/lib/crm/auth";
+import { getAuthUser, seesAllLeads } from "@/lib/crm/auth";
 import { matchProperties } from "@/lib/crm/matching";
 import { getMatchingWeights } from "@/lib/crm/settings";
 
@@ -22,10 +22,10 @@ export async function GET(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  if (user.role === "caller" && lead.assignedCallerId !== user.id) {
+  if (user.role === "caller" && lead.assignedCallerId !== user.id && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id) {
+  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

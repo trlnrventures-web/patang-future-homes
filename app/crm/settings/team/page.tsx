@@ -20,7 +20,8 @@ export default async function TeamSettingsPage() {
       <div>
         <h1 className="text-xl font-bold text-primary">Team Members</h1>
         <p className="mt-0.5 text-sm text-muted">
-          Manage team salaries, week-off days, and active status. Salary changes only affect future months.
+          Manage team salaries, week-off days, full lead visibility, and active
+          status. Salary changes only affect future months.
         </p>
       </div>
       <TeamManager />

@@ -516,6 +516,9 @@ function migrateUsers(sqlite: Database.Database) {
   if (!have.has("password_reset_used_at")) {
     sqlite.exec("ALTER TABLE users ADD COLUMN password_reset_used_at TEXT");
   }
+  if (!have.has("see_all_leads")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN see_all_leads INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 /**

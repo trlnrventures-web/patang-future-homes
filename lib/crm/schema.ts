@@ -19,6 +19,12 @@ export const users = sqliteTable("users", {
   lastLoginAt: text("last_login_at"),
   weekOffDay: text("week_off_day"),
   baseSalary: integer("base_salary"),
+  // Opt-in read access to the whole lead book, for staff who work follow-up on
+  // leads an SM owns. It widens visibility only: it never grants assignment,
+  // deletion or any other write, and it leaves lead ownership untouched.
+  seeAllLeads: integer("see_all_leads", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull().default(""),
   // Email password reset. Only the SHA-256 of the emailed token is stored, so a
   // database leak does not hand out working reset links. `usedAt` is what makes

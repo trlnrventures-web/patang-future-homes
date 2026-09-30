@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
-import { isAdmin, type AuthUser } from "./auth";
+import { isAdmin, seesAllLeads, type AuthUser } from "./auth";
 
 /** Longest note the composer will accept, in characters. */
 export const NOTE_MAX_LENGTH = 2000;
@@ -88,7 +88,7 @@ export function resolveLeadId(
   if (user.role === "sales_manager" && lead.assignedSmId === user.id) {
     return { leadId: lead.id };
   }
-  if (user.role === "caller" && lead.assignedCallerId === user.id) {
+  if (user.role === "caller" && (lead.assignedCallerId === user.id || seesAllLeads(user))) {
     return { leadId: lead.id };
   }
   return { leadId: null, error: "You can only link a lead assigned to you" };

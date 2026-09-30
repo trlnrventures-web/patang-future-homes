@@ -12,6 +12,7 @@ type TeamUser = {
   active: boolean;
   weekOffDay: string;
   baseSalary: number | null;
+  seeAllLeads: boolean;
 };
 
 type EditState = {
@@ -19,6 +20,7 @@ type EditState = {
   weekOffDay: string;
   email: string;
   phone: string;
+  seeAllLeads: boolean;
 };
 
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -31,11 +33,15 @@ const ROLE_LABELS: Record<string, string> = {
   marketing: "Marketing",
 };
 
+/** Only these roles have a lead scope that "see all leads" can widen. */
+const SCOPED_ROLES = new Set(["caller", "sales_manager"]);
+
 const EMPTY_EDIT: EditState = {
   baseSalary: "",
   weekOffDay: "Tuesday",
   email: "",
   phone: "",
+  seeAllLeads: false,
 };
 
 export default function TeamManager() {
@@ -63,6 +69,7 @@ export default function TeamManager() {
             weekOffDay: u.weekOffDay || "Tuesday",
             email: u.email || "",
             phone: u.phone || "",
+            seeAllLeads: !!u.seeAllLeads,
           };
         }
         setEdits(initial);
@@ -93,6 +100,9 @@ export default function TeamManager() {
       };
       body.baseSalary = edit.baseSalary !== "" ? Number(edit.baseSalary) : null;
       body.weekOffDay = edit.weekOffDay;
+      if (SCOPED_ROLES.has(users.find((u) => u.id === userId)?.role || "")) {
+        body.seeAllLeads = edit.seeAllLeads;
+      }
 
       const res = await fetch("/crm/api/team", {
         method: "PATCH",
@@ -110,7 +120,7 @@ export default function TeamManager() {
     }
   };
 
-  const updateEdit = (userId: number, field: keyof EditState, value: string) => {
+  const updateEdit = <K extends keyof EditState>(userId: number, field: K, value: EditState[K]) => {
     setEdits((prev) => ({
       ...prev,
       [userId]: { ...(prev[userId] ?? EMPTY_EDIT), [field]: value },
@@ -143,6 +153,7 @@ export default function TeamManager() {
                 <th className="px-2 py-2">Phone (login)</th>
                 <th className="px-2 py-2">Role</th>
                 <th className="px-2 py-2">Week Off</th>
+                <th className="px-2 py-2">All Leads</th>
                 <th className="px-2 py-2 text-right">Base Monthly Salary</th>
                 <th className="px-2 py-2 text-right">Action</th>
               </tr>
@@ -153,13 +164,15 @@ export default function TeamManager() {
                 const salaryChanged =
                   edit.baseSalary !== (u.baseSalary != null ? String(u.baseSalary) : "");
                 const weekOffChanged = edit.weekOffDay !== u.weekOffDay;
+                const canSeeAll = SCOPED_ROLES.has(u.role);
+                const seeAllChanged = canSeeAll && edit.seeAllLeads !== !!u.seeAllLeads;
                 // Compared after normalization, otherwise trailing spaces or a
                 // +91 prefix leave the row permanently showing as unsaved.
                 const emailChanged = normalizeEmail(edit.email) !== (u.email ?? "");
                 const phoneChanged =
                   (normalizePhone(edit.phone) ?? "") !== (u.phone ?? "");
                 const hasChanges =
-                  salaryChanged || weekOffChanged || emailChanged || phoneChanged;
+                  salaryChanged || weekOffChanged || emailChanged || phoneChanged || seeAllChanged;
 
                 return (
                   <tr key={u.id} className="border-b border-border/50 last:border-0">
@@ -204,6 +217,24 @@ export default function TeamManager() {
                           <option key={d} value={d}>{d}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-2 py-2.5">
+                      {canSeeAll ? (
+                        <label
+                          className="flex items-center gap-1.5 text-[11px] text-muted"
+                          title="Read access to every lead, including leads another sales manager owns"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={edit.seeAllLeads}
+                            onChange={(e) => updateEdit(u.id, "seeAllLeads", e.target.checked)}
+                            className={`h-3.5 w-3.5 rounded border-border accent-primary ${seeAllChanged ? "ring-2 ring-primary/40" : ""}`}
+                          />
+                          {edit.seeAllLeads ? "On" : "Off"}
+                        </label>
+                      ) : (
+                        <span className="text-[11px] text-muted/60">n/a</span>
+                      )}
                     </td>
                     <td className="px-2 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">

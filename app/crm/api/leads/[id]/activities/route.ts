@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, and } from "drizzle-orm";
-import { getAuthUser } from "@/lib/crm/auth";
+import { getAuthUser, seesAllLeads } from "@/lib/crm/auth";
 import { computeSlaStatus, nextNoResponseAttempt } from "@/lib/crm/sla-compute";
 
 export async function POST(
@@ -23,11 +23,11 @@ export async function POST(
 
   // Role access check
   if (user.role === "caller" && lead.assignedCallerId !== user.id && lead.assignedCallerId !== null) {
-    if (lead.assignedCallerId !== user.id) {
+    if (lead.assignedCallerId !== user.id && !seesAllLeads(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
-  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id) {
+  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, inArray } from "drizzle-orm";
-import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
 import { resolveDefaultSmId } from "@/lib/crm/leads";
 
 export async function POST(request: NextRequest) {
@@ -38,13 +38,14 @@ export async function POST(request: NextRequest) {
 
   // Callers/SMs may not assign or delete; restrict selection to their scope.
   if (user.role === "caller") {
+    const allLeads = seesAllLeads(user);
     const allowed = new Set(
       db
         .select()
         .from(schema.leads)
         .where(inArray(schema.leads.id, leadIds))
         .all()
-        .filter((l) => !l.deletedAt && l.assignedCallerId === user.id)
+        .filter((l) => !l.deletedAt && (allLeads || l.assignedCallerId === user.id))
         .map((l) => l.id)
     );
     const scoped = targetLeads.filter((l) => allowed.has(l.id));
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
     targetLeads.splice(0, targetLeads.length, ...scoped);
   } else if (user.role === "sales_manager") {
-    const scoped = targetLeads.filter((l) => l.assignedSmId === user.id);
+    const scoped = seesAllLeads(user) ? targetLeads : targetLeads.filter((l) => l.assignedSmId === user.id);
     if (scoped.length === 0) {
       return NextResponse.json({ error: "No leads assigned to you" }, { status: 403 });
     }
@@ -153,10 +154,12 @@ export async function GET(request: NextRequest) {
     .filter((l) => !l.deletedAt);
 
   if (user.role === "caller") {
-    const scoped = leads.filter((l) => l.assignedCallerId === user.id || !l.assignedSmId);
+    const scoped = seesAllLeads(user)
+      ? leads
+      : leads.filter((l) => l.assignedCallerId === user.id || !l.assignedSmId);
     leads.splice(0, leads.length, ...scoped);
   } else if (user.role === "sales_manager") {
-    const scoped = leads.filter((l) => l.assignedSmId === user.id);
+    const scoped = seesAllLeads(user) ? leads : leads.filter((l) => l.assignedSmId === user.id);
     leads.splice(0, leads.length, ...scoped);
   }
 

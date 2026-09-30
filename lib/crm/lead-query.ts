@@ -8,7 +8,7 @@ import {
   type CrmDb,
 } from "./leads";
 import { computeSlaStatus, isLeadActionOverdue } from "./sla-compute";
-import type { AuthUser } from "./auth";
+import { seesAllLeads, type AuthUser } from "./auth";
 
 export const QUICK_FILTERS = ["overdue", "hot", "unassigned", "visit_today"] as const;
 
@@ -54,11 +54,12 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
   // Role-based filtering
   // Caller: primary focus is every unassigned/qualification-stage lead. A search
   // query or an explicit status filter bypasses the scope so they can still find
-  // handed-off leads (including lost ones).
+  // handed-off leads (including lost ones). A caller flagged see_all_leads skips
+  // the scope entirely and sees the whole book.
   if (user.role === "caller") {
-    rows = q || status ? rows : rows.filter(isInCallerScope);
+    rows = q || status || seesAllLeads(user) ? rows : rows.filter(isInCallerScope);
   } else if (user.role === "sales_manager") {
-    rows = rows.filter((l) => l.assignedSmId === user.id);
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
   }
 
   if (QUICK_FILTERS.includes(quick as (typeof QUICK_FILTERS)[number]) && quick) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
 import {
   isInCallerScope,
   resolveDefaultCallerId,
@@ -131,7 +131,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  if (user.role === "caller" && !isInCallerScope(existing)) {
+  if (user.role === "caller" && !isInCallerScope(existing) && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -1,7 +1,7 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
 import { eq } from "drizzle-orm";
-import type { AuthUser } from "./auth";
+import { seesAllLeads, type AuthUser } from "./auth";
 import { LEAD_STATUS_LABELS } from "./leads";
 
 export function getUserById(id: number) {
@@ -46,9 +46,9 @@ export function getLeadsForUser(user: AuthUser, status?: string) {
   const db = getDb();
   let rows = db.select().from(schema.leads).all().filter((l) => !l.deletedAt);
   if (user.role === "caller") {
-    rows = rows.filter((l) => l.assignedCallerId === user.id);
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedCallerId === user.id);
   } else if (user.role === "sales_manager") {
-    rows = rows.filter((l) => l.assignedSmId === user.id);
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
   }
   if (status) {
     rows = rows.filter((l) => l.status === status);

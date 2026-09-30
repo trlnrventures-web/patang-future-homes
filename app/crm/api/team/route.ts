@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { getAuthUser, isAdmin } from "@/lib/crm/auth";
+import { getAuthUser, invalidateLeadAccessCache, isAdmin } from "@/lib/crm/auth";
 import { writeAuditLog } from "@/lib/crm/audit";
 import { DEFAULT_WEEK_OFF_DAY } from "@/lib/crm/attendance";
 import {
@@ -31,6 +31,7 @@ export async function GET() {
       active: schema.users.active,
       weekOffDay: schema.users.weekOffDay,
       baseSalary: schema.users.baseSalary,
+      seeAllLeads: schema.users.seeAllLeads,
     })
     .from(schema.users)
     .all()
@@ -141,6 +142,20 @@ export async function PATCH(request: NextRequest) {
       updates.active = Boolean(body.active);
     }
 
+    // Read access to the whole lead book. Sales-only: it is a scoping override
+    // for staff who work follow-up, so there is nothing to widen for admin,
+    // sales_head or marketing, and they already see everything anyway.
+    if (body.seeAllLeads !== undefined) {
+      const flag = Boolean(body.seeAllLeads);
+      if (flag && !["caller", "sales_manager"].includes(target.role)) {
+        return NextResponse.json(
+          { error: "Only callers and sales managers can be given full lead visibility" },
+          { status: 400 }
+        );
+      }
+      updates.seeAllLeads = flag;
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
     }
@@ -149,6 +164,10 @@ export async function PATCH(request: NextRequest) {
       .set(updates)
       .where(eq(schema.users.id, targetUserId))
       .run();
+
+    if (body.seeAllLeads !== undefined) {
+      invalidateLeadAccessCache();
+    }
 
     const changes = Object.keys(updates)
       .map((k) => `${k}: ${updates[k]}`)

@@ -3,7 +3,7 @@ import * as schema from "./schema";
 import { getPriority, isLeadActionOverdue, computeSlaStatus } from "./sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "./sla";
 import { buildEarliestFollowUpMap, isInCallerScope, type CrmDb } from "./leads";
-import type { AuthUser } from "./auth";
+import { seesAllLeads, type AuthUser } from "./auth";
 import {
   isInboxSort,
   isInboxTab,
@@ -120,13 +120,13 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
   if (user.role === "caller") {
     // Callers keep visibility of leads they handled even after they are handed
     // off to a sales manager (read-only), alongside their active qualification
-    // pipeline.
+    // pipeline. A caller flagged see_all_leads sees the whole book.
     rows =
-      q || tab === "lost"
+      q || tab === "lost" || seesAllLeads(user)
         ? rows
         : rows.filter((l) => isInCallerScope(l) || l.assignedCallerId === user.id);
   } else if (user.role === "sales_manager") {
-    rows = rows.filter((l) => l.assignedSmId === user.id);
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
   }
 
   if (q) {
