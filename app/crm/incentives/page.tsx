@@ -7,7 +7,7 @@ import {
   getIncentiveLiabilitySummary,
   getIncentiveParticipants,
   currentMonthKey,
-  INCENTIVE_LADDERS,
+  getIncentiveLadders,
   type BookingIncentiveRow,
 } from "@/lib/crm/incentives";
 import { queryAuditLog } from "@/lib/crm/audit";
@@ -321,7 +321,7 @@ export default async function IncentivesPage({
           person owns in a month shows the same figure: crossing a threshold
           revalues the whole month, earlier bookings included. */}
       <div className="grid gap-3 sm:grid-cols-2">
-        {Object.values(INCENTIVE_LADDERS).map((ladder) => (
+        {Object.values(getIncentiveLadders()).map((ladder) => (
           <Card key={ladder.key} className="p-4">
             <div className="text-sm font-bold text-primary">{ladder.label} ladder</div>
             <div className="mt-2 space-y-1">

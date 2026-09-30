@@ -3,20 +3,30 @@ import { getDb } from "./db";
 import * as schema from "./schema";
 import { writeAuditLog, getUserName } from "./audit";
 import { getProject } from "../projects";
+import { getSetting, updateSetting } from "./settings";
 
 export const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
 export type LadderTier = { threshold: number; rate: number };
 
+/** Which side of a booking a ladder pays out. Also the key it is stored under. */
+export type LadderKey = "sm" | "caller";
+
 export type IncentiveLadder = {
-  key: "sm" | "caller";
+  key: LadderKey;
   label: string;
   tiers: LadderTier[];
   capped: boolean;
 };
 
-// ---- Single source of truth for incentive tiers ----
-export const SM_INCENTIVE_LADDER: IncentiveLadder = {
+// ---- Defaults ----
+//
+// These are the fallback, not the live configuration. An admin can change the
+// tiers from Settings > Incentive Rates, which stores them in `crm_settings`
+// under `incentive_ladders`; `getIncentiveLadders()` prefers that and only
+// falls back here. Keeping the shipped numbers in one place means a fresh
+// install with no setting row behaves exactly as it did before.
+export const DEFAULT_SM_INCENTIVE_LADDER: IncentiveLadder = {
   key: "sm",
   label: "Sales Manager",
   capped: true,
@@ -29,7 +39,7 @@ export const SM_INCENTIVE_LADDER: IncentiveLadder = {
   ],
 };
 
-export const CALLER_INCENTIVE_LADDER: IncentiveLadder = {
+export const DEFAULT_CALLER_INCENTIVE_LADDER: IncentiveLadder = {
   key: "caller",
   label: "Caller",
   capped: true,
@@ -40,10 +50,125 @@ export const CALLER_INCENTIVE_LADDER: IncentiveLadder = {
   ],
 };
 
-export const INCENTIVE_LADDERS: Record<"sm" | "caller", IncentiveLadder> = {
-  sm: SM_INCENTIVE_LADDER,
-  caller: CALLER_INCENTIVE_LADDER,
+export const DEFAULT_INCENTIVE_LADDERS: Record<LadderKey, IncentiveLadder> = {
+  sm: DEFAULT_SM_INCENTIVE_LADDER,
+  caller: DEFAULT_CALLER_INCENTIVE_LADDER,
 };
+
+/** Human name per role, so the editor and the audit log agree on wording. */
+export const LADDER_LABELS: Record<LadderKey, string> = {
+  sm: "Sales Manager",
+  caller: "Caller",
+};
+
+export const LADDER_KEYS: LadderKey[] = ["sm", "caller"];
+
+const LADDER_SETTING_KEY = "incentive_ladders";
+
+/**
+ * Coerce one stored ladder, falling back to the default whenever the value is
+ * not a usable tier list. Bad config must never be able to make a rate `NaN` or
+ * silently pay everyone nothing, so anything unparseable is discarded wholesale
+ * rather than patched up.
+ */
+function parseLadder(raw: unknown, key: LadderKey): IncentiveLadder {
+  const fallback = DEFAULT_INCENTIVE_LADDERS[key];
+  if (!raw || typeof raw !== "object") return fallback;
+
+  const obj = raw as Partial<IncentiveLadder>;
+  const tiers: LadderTier[] = [];
+  const seen = new Set<number>();
+
+  if (Array.isArray(obj.tiers)) {
+    for (const t of obj.tiers) {
+      const threshold = Number((t as LadderTier)?.threshold);
+      const rate = Number((t as LadderTier)?.rate);
+      if (!Number.isInteger(threshold) || threshold < 1) continue;
+      if (!Number.isFinite(rate) || rate < 0) continue;
+      if (seen.has(threshold)) continue;
+      seen.add(threshold);
+      tiers.push({ threshold, rate });
+    }
+  }
+
+  // An empty list would mean "nobody ever earns anything", which is never what
+  // an admin meant, so treat it as unset.
+  if (tiers.length === 0) return fallback;
+
+  // `rateForCount` scans from the top down, so ascending order is what makes
+  // "the highest tier reached" resolve correctly.
+  tiers.sort((a, b) => a.threshold - b.threshold);
+
+  return {
+    key,
+    label: typeof obj.label === "string" && obj.label.trim() ? obj.label.trim() : fallback.label,
+    tiers,
+    capped: obj.capped !== false,
+  };
+}
+
+export function parseIncentiveLadders(raw: string | null | undefined): Record<LadderKey, IncentiveLadder> {
+  let parsed: unknown = null;
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+  }
+  const obj = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
+  return {
+    sm: parseLadder(obj.sm, "sm"),
+    caller: parseLadder(obj.caller, "caller"),
+  };
+}
+
+/** The live ladders. One DB read, so callers should fetch once and pass down. */
+export function getIncentiveLadders(): Record<LadderKey, IncentiveLadder> {
+  return parseIncentiveLadders(getSetting(LADDER_SETTING_KEY));
+}
+
+export function serializeIncentiveLadders(ladders: Record<LadderKey, IncentiveLadder>): string {
+  const out: Record<string, unknown> = {};
+  for (const key of LADDER_KEYS) {
+    const l = parseLadder(ladders[key], key);
+    out[key] = { label: l.label, capped: l.capped, tiers: l.tiers };
+  }
+  return JSON.stringify(out);
+}
+
+/**
+ * Persist the ladders and record who changed them. The audit entry carries the
+ * before and after figures because an incentive ladder feeds salary, so a rate
+ * change is a payroll-affecting event and has to be reconstructible later.
+ */
+export function saveIncentiveLadders(
+  next: Record<LadderKey, IncentiveLadder>,
+  byUserId: number
+): Record<LadderKey, IncentiveLadder> {
+  const previous = getIncentiveLadders();
+  const sanitized = {
+    sm: parseLadder(next.sm, "sm"),
+    caller: parseLadder(next.caller, "caller"),
+  };
+  updateSetting(LADDER_SETTING_KEY, serializeIncentiveLadders(sanitized));
+  writeAuditLog({
+    category: "incentive",
+    action: "incentive_ladders_updated",
+    actorUserId: byUserId,
+    entityType: "settings",
+    entityId: LADDER_SETTING_KEY,
+    summary: `Incentive rates updated - SM: ${sanitized.sm.tiers.map((t) => `${t.threshold}+ = Rs${t.rate}`).join(", ")}; Caller: ${sanitized.caller.tiers.map((t) => `${t.threshold}+ = Rs${t.rate}`).join(", ")}.`,
+    details: {
+      previous: {
+        sm: previous.sm.tiers,
+        caller: previous.caller.tiers,
+      },
+      next: { sm: sanitized.sm.tiers, caller: sanitized.caller.tiers },
+    },
+  });
+  return sanitized;
+}
 
 /** Rate per unit once a tier is crossed (applies retroactively to ALL units that month). */
 export function rateForCount(ladder: IncentiveLadder, count: number): number {
@@ -55,20 +180,20 @@ export function rateForCount(ladder: IncentiveLadder, count: number): number {
   return 0;
 }
 
-export function smRate(count: number): number {
-  return rateForCount(SM_INCENTIVE_LADDER, count);
+export function smRate(count: number, ladder?: IncentiveLadder): number {
+  return rateForCount(ladder ?? getIncentiveLadders().sm, count);
 }
 
-export function callerRate(count: number): number {
-  return rateForCount(CALLER_INCENTIVE_LADDER, count);
+export function callerRate(count: number, ladder?: IncentiveLadder): number {
+  return rateForCount(ladder ?? getIncentiveLadders().caller, count);
 }
 
-export function smIncentiveTotal(count: number): number {
-  return count * smRate(count);
+export function smIncentiveTotal(count: number, ladder?: IncentiveLadder): number {
+  return count * smRate(count, ladder);
 }
 
-export function callerIncentiveTotal(count: number): number {
-  return count * callerRate(count);
+export function callerIncentiveTotal(count: number, ladder?: IncentiveLadder): number {
+  return count * callerRate(count, ladder);
 }
 
 function formatRs(n: number): string {
@@ -94,12 +219,12 @@ export function unlockNextHint(ladder: IncentiveLadder, count: number, unitLabel
   return `${count} ${unitLabel}${count === 1 ? "" : "s"} this month, ${formatRs(rate)} each. ${needed} more ${unitLabel}${plural} unlock${needed === 1 ? "s" : ""} ${formatRs(next.rate)} each for all ${next.threshold}.`;
 }
 
-export function smHint(count: number): string {
-  return unlockNextHint(SM_INCENTIVE_LADDER, count);
+export function smHint(count: number, ladder?: IncentiveLadder): string {
+  return unlockNextHint(ladder ?? getIncentiveLadders().sm, count);
 }
 
-export function callerHint(count: number): string {
-  return unlockNextHint(CALLER_INCENTIVE_LADDER, count, "unit");
+export function callerHint(count: number, ladder?: IncentiveLadder): string {
+  return unlockNextHint(ladder ?? getIncentiveLadders().caller, count, "unit");
 }
 
 // ---- Month helpers (IST calendar month) ----
@@ -203,6 +328,8 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
   const user = db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
   if (!user) return null;
 
+  const ladders = getIncentiveLadders();
+
   const paid = db
     .select()
     .from(schema.incentivePayments)
@@ -211,8 +338,8 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
 
   if (user.role === "sales_manager") {
     const count = confirmedBookingsForMonth(month).filter((b) => b.smId === userId).length;
-    const rate = smRate(count);
-    const total = smIncentiveTotal(count);
+    const rate = smRate(count, ladders.sm);
+    const total = smIncentiveTotal(count, ladders.sm);
     return {
       userId,
       name: user.name,
@@ -220,8 +347,8 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
       count,
       rate,
       total,
-      hint: smHint(count),
-      ladder: SM_INCENTIVE_LADDER,
+      hint: smHint(count, ladders.sm),
+      ladder: ladders.sm,
       paid: paid ? { amount: paid.amount, paidAt: paid.paidAt || null } : null,
       outstanding: paid ? Math.max(0, total - paid.amount) : total,
     };
@@ -229,8 +356,8 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
 
   if (user.role === "caller") {
     const count = confirmedBookingsForMonth(month).filter((b) => b.callerId === userId).length;
-    const rate = callerRate(count);
-    const total = callerIncentiveTotal(count);
+    const rate = callerRate(count, ladders.caller);
+    const total = callerIncentiveTotal(count, ladders.caller);
     return {
       userId,
       name: user.name,
@@ -238,8 +365,8 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
       count,
       rate,
       total,
-      hint: callerHint(count),
-      ladder: CALLER_INCENTIVE_LADDER,
+      hint: callerHint(count, ladders.caller),
+      ladder: ladders.caller,
       paid: paid ? { amount: paid.amount, paidAt: paid.paidAt || null } : null,
       outstanding: paid ? Math.max(0, total - paid.amount) : total,
     };
@@ -252,6 +379,7 @@ export function getUserIncentiveForMonth(userId: number, month: string): Incenti
 export function getMonthlyIncentives(month: string, now: Date = new Date()): IncentiveEntry[] {
   const db = getDb();
   const rows = confirmedBookingsForMonth(month, now);
+  const ladders = getIncentiveLadders();
 
   const smCounts = new Map<number, number>();
   for (const b of rows) {
@@ -280,8 +408,8 @@ export function getMonthlyIncentives(month: string, now: Date = new Date()): Inc
     const paid = payments.find((p) => p.userId === uid);
     if (u.role === "sales_manager") {
       const count = smCounts.get(uid) ?? 0;
-      const rate = smRate(count);
-      const total = smIncentiveTotal(count);
+      const rate = smRate(count, ladders.sm);
+      const total = smIncentiveTotal(count, ladders.sm);
       entries.push({
         userId: uid,
         name: u.name,
@@ -289,15 +417,15 @@ export function getMonthlyIncentives(month: string, now: Date = new Date()): Inc
         count,
         rate,
         total,
-        hint: smHint(count),
-        ladder: SM_INCENTIVE_LADDER,
+        hint: smHint(count, ladders.sm),
+        ladder: ladders.sm,
         paid: paid ? { amount: paid.amount, paidAt: paid.paidAt || null } : null,
         outstanding: paid ? Math.max(0, total - paid.amount) : total,
       });
     } else if (u.role === "caller") {
       const count = callerCounts.get(uid) ?? 0;
-      const rate = callerRate(count);
-      const total = callerIncentiveTotal(count);
+      const rate = callerRate(count, ladders.caller);
+      const total = callerIncentiveTotal(count, ladders.caller);
       entries.push({
         userId: uid,
         name: u.name,
@@ -305,8 +433,8 @@ export function getMonthlyIncentives(month: string, now: Date = new Date()): Inc
         count,
         rate,
         total,
-        hint: callerHint(count),
-        ladder: CALLER_INCENTIVE_LADDER,
+        hint: callerHint(count, ladders.caller),
+        ladder: ladders.caller,
         paid: paid ? { amount: paid.amount, paidAt: paid.paidAt || null } : null,
         outstanding: paid ? Math.max(0, total - paid.amount) : total,
       });
@@ -505,6 +633,7 @@ function confirmedBookingRecords() {
 export function getBookingIncentiveRows(filters: BookingIncentiveFilters = {}): BookingIncentiveRow[] {
   const db = getDb();
   const records = confirmedBookingRecords();
+  const ladders = getIncentiveLadders();
 
   // How many bookings each person earned this month, across all months' records
   // restricted to the one being viewed. The ladder rate is per month, so the
@@ -543,7 +672,7 @@ export function getBookingIncentiveRows(filters: BookingIncentiveFilters = {}): 
 
       const ladderKey = role === "caller" ? "caller" : "sm";
       const count = countByUser.get(`${rec.month}:${ladderKey}:${uid}`) ?? 1;
-      const rate = rateForCount(INCENTIVE_LADDERS[ladderKey], count);
+      const rate = rateForCount(ladders[ladderKey], count);
 
       const payment = paidByBooking.get(`${rec.id}:${uid}:${role}`);
       const paid = !!payment;
