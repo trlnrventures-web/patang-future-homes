@@ -17,6 +17,8 @@ import {
 } from "@/lib/crm/leads";
 import { LEAD_COLUMNS, columnForStatus, sourceLabel } from "@/lib/crm/board-shared";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
+import { formatCallDuration } from "@/lib/crm/call-sessions-shared";
+import { useCallSession } from "./useCallSession";
 import { matchLevelMeta, type PropertyMatch } from "@/lib/crm/matching";
 import { SUB_LOCATIONS, priceValidityInfo } from "@/lib/projects";
 import SiteVisitModal, {
@@ -97,6 +99,13 @@ function reactivationDateLabel(iso: string | null | undefined): string {
   }
 }
 
+/** The attempt attached to a call activity, when one was timed. */
+type CallLogView = {
+  direction?: string | null;
+  durationSeconds: number | null;
+  recordingUrl?: string | null;
+};
+
 type Props = {
   data: LeadDetailData;
   currentUser: { id: number; role: string; name: string };
@@ -145,6 +154,9 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const [callNote, setCallNote] = useState("");
   const [callNextDate, setCallNextDate] = useState("");
   const [showMoreOutcomes, setShowMoreOutcomes] = useState(false);
+
+  // Opened by the Call tap, closed by the outcome save.
+  const call = useCallSession(lead.id, "lead_detail");
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
   const callerUsers = data.users.filter((u) => u.role === "caller");
@@ -421,7 +433,13 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
     if (!callOutcome) return;
     setBusy(true);
     try {
-      const base = { type: callOutcome, notes: callNote.trim() };
+      const base = {
+        type: callOutcome,
+        notes: callNote.trim(),
+        // Present only when a Call tap opened a session. Without it the route
+        // still records the attempt, just with no timing.
+        ...(call.sessionId ? { callSessionId: call.sessionId } : {}),
+      };
       if (callOutcome === "call_back") {
         await postActivity(
           callNextDate
@@ -440,6 +458,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
         );
       }
       showToast(ACTIVITY_LABELS[callOutcome] || "Call logged");
+      call.clear();
       setShowCallResult(false);
       setCallOutcome("");
       setCallNote("");
@@ -644,7 +663,10 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const actionProps = {
     phone,
     waNumber,
-    onCall: () => setShowCallResult(true),
+    onCall: () => {
+      void call.begin("phone", phone);
+      setShowCallResult(true);
+    },
     onVisit: openVisit,
     readOnly,
     busy,
@@ -1097,20 +1119,43 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                 <div>
                   <h3 className="text-sm font-bold text-navy">Call History</h3>
                   <div className="mt-2.5 space-y-2">
-                    {callHistory.slice(0, 10).map((a) => (
-                      <div
-                        key={a.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <span className="font-semibold text-navy">
-                            {ACTIVITY_LABELS[a.type] || a.type}
-                          </span>
-                          {a.notes && <span className="ml-2 text-muted">{a.notes}</span>}
+                    {callHistory.slice(0, 10).map((a) => {
+                      const log = (a as { callLog?: CallLogView | null }).callLog;
+                      return (
+                        <div
+                          key={a.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3"
+                        >
+                          <div className="min-w-0 text-sm">
+                            <span className="font-semibold text-navy">
+                              {ACTIVITY_LABELS[a.type] || a.type}
+                            </span>
+                            {log?.direction === "inbound" && (
+                              <span className="ml-2 rounded-md bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+                                Incoming
+                              </span>
+                            )}
+                            {log && (
+                              <span className="ml-2 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                                {formatCallDuration(log.durationSeconds)}
+                              </span>
+                            )}
+                            {log?.recordingUrl && (
+                              <a
+                                href={log.recordingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-xs font-semibold text-primary hover:underline"
+                              >
+                                Recording
+                              </a>
+                            )}
+                            {a.notes && <span className="ml-2 text-muted">{a.notes}</span>}
+                          </div>
+                          <span className="shrink-0 text-sm text-soft">{formatDateTime(a.createdAt)}</span>
                         </div>
-                        <span className="shrink-0 text-sm text-soft">{formatDateTime(a.createdAt)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

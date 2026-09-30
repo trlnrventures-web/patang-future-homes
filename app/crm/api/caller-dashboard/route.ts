@@ -7,6 +7,7 @@ import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
 import { getDailyMetricsForEmployee, istToday, istDayRange, type DailyMetrics } from "@/lib/crm/reports";
 import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
+import { closeStaleCallSessions } from "@/lib/crm/call-sessions";
 
 export type DashboardLeadCard = {
   id: number;
@@ -149,6 +150,13 @@ export async function GET() {
   const now = new Date();
   const date = istToday();
   const { from, to } = istDayRange(date);
+
+  // A caller who never returns to the dashboard would otherwise leave their
+  // dialled-but-never-resolved attempts open forever, which is exactly the
+  // "call was never logged" case the log exists to prevent. Only rows older
+  // than ten minutes are swept, so this cannot race the outcome save for the
+  // call the caller is on right now.
+  closeStaleCallSessions(db);
 
   const terminal = new Set(["invalid", "lost", "dnc", "booked"]);
 

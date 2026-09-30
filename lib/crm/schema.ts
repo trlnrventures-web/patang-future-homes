@@ -214,7 +214,7 @@ export const activities = sqliteTable("activities", {
       "call", "call_connected", "call_no_answer", "call_busy",
       "call_wrong_number", "call_back", "call_not_interested", "call_other",
       "call_switched_off", "call_number_invalid", "call_whatsapp_only",
-      "call_language_barrier", "whatsapp", "note",
+      "call_language_barrier", "call_incoming", "call_missed", "whatsapp", "note",
       "status_change", "qualification", "assignment", "follow_up",
       "visit_proposed", "visit_booked", "visit_confirmed", "visit_done",
       "visit_no_show", "visit_cancelled", "post_visit_feedback",
@@ -231,6 +231,85 @@ export const activities = sqliteTable("activities", {
   }).notNull(),
   notes: text("notes"),
   metadata: text("metadata"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+/**
+ * One row per dial attempt. There is no telephony provider wired up, so a
+ * session is opened by the UI the moment the caller taps Call and closed when
+ * the outcome is saved. Duration is measured server side between the two
+ * timestamps, never reported by the client, so a stalled tab cannot invent
+ * talk time.
+ */
+export const callSessions = sqliteTable("call_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  /** The activity this attempt resolved into, when an outcome was logged. */
+  activityId: integer("activity_id").references(() => activities.id),
+  number: text("number"),
+  channel: text("channel", { enum: ["phone", "whatsapp"] })
+    .notNull()
+    .default("phone"),
+  /**
+   * Who placed the call. Inbound only exists once something outside the browser
+   * can observe the phone's call log — a telephony webhook or a native app.
+   */
+  direction: text("direction", { enum: ["outbound", "inbound"] })
+    .notNull()
+    .default("outbound"),
+  /** Where the caller dialled from, so the log can be read back per screen. */
+  source: text("source", {
+    enum: ["call_queue", "lead_detail", "lead_card", "dashboard", "manual", "webhook", "native_app"],
+  })
+    .notNull()
+    .default("call_queue"),
+  /** Which integration produced the row, when it did not come from our own UI. */
+  provider: text("provider"),
+  /** The provider's own id for this call, kept for tracing back to their logs. */
+  providerCallId: text("provider_call_id"),
+  /**
+   * `provider:providerCallId`, unique when present. Webhooks retry, and a
+   * retried delivery must not become a second call in the log, so the whole
+   * write is keyed on this instead of on the call id alone.
+   */
+  dedupeKey: text("dedupe_key"),
+  status: text("status", {
+    enum: ["in_progress", "ringing", "completed", "missed", "abandoned"],
+  })
+    .notNull()
+    .default("in_progress"),
+  /** The call_* activity type the attempt resolved to. */
+  outcome: text("outcome"),
+  startedAt: text("started_at").notNull().default(""),
+  answeredAt: text("answered_at"),
+  endedAt: text("ended_at"),
+  durationSeconds: integer("duration_seconds"),
+  /** Where the recording lives, once the provider has finished processing it. */
+  recordingUrl: text("recording_url"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+/**
+ * A device that has opted into call notifications. One row per browser
+ * profile, so the same user on a phone and a laptop holds two rows and can
+ * disable either.
+ */
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  /** Cleared rather than deleted when the push service rejects the endpoint. */
+  disabledAt: text("disabled_at"),
   createdAt: text("created_at").notNull().default(""),
 });
 

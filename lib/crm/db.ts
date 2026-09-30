@@ -117,6 +117,43 @@ function createTables(sqlite: Database.Database) {
       created_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS call_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      activity_id INTEGER,
+      number TEXT,
+      channel TEXT NOT NULL DEFAULT 'phone',
+      direction TEXT NOT NULL DEFAULT 'outbound',
+      source TEXT NOT NULL DEFAULT 'call_queue',
+      provider TEXT,
+      provider_call_id TEXT,
+      dedupe_key TEXT,
+      status TEXT NOT NULL DEFAULT 'in_progress',
+      outcome TEXT,
+      started_at TEXT NOT NULL DEFAULT '',
+      answered_at TEXT,
+      ended_at TEXT,
+      duration_seconds INTEGER,
+      recording_url TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (lead_id) REFERENCES leads(id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (activity_id) REFERENCES activities(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      disabled_at TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS follow_ups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lead_id INTEGER NOT NULL,
@@ -461,6 +498,12 @@ function createTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_leads_caller ON leads(assigned_caller_id);
     CREATE INDEX IF NOT EXISTS idx_leads_sm ON leads(assigned_sm_id);
     CREATE INDEX IF NOT EXISTS idx_activities_lead ON activities(lead_id);
+    -- The call_sessions indexes are created by migrateCallSessions instead of
+    -- here: one of them is on a column that does not exist in the shape this
+    -- table first shipped with, and a failing statement aborts the whole exec
+    -- above, taking the database with it.
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions(endpoint);
     CREATE INDEX IF NOT EXISTS idx_message_logs_lead ON message_logs(lead_id);
     CREATE INDEX IF NOT EXISTS idx_follow_ups_lead ON follow_ups(lead_id);
     CREATE INDEX IF NOT EXISTS idx_site_visits_lead ON site_visits(lead_id);
@@ -487,6 +530,99 @@ function createTables(sqlite: Database.Database) {
   migrateSalaryReports(sqlite);
   migrateIncentives(sqlite);
   migrateOfficeHoursDefaults(sqlite);
+  migrateCallSessions(sqlite);
+  migratePushSubscriptions(sqlite);
+}
+
+/**
+ * `call_sessions` first shipped with only the columns the in-app dialer needed.
+ * The inbound/recording columns arrived later and were added here rather than
+ * by editing the CREATE TABLE, because a deployment may already have booted
+ * the old shape. New columns are nullable or defaulted, so an existing row
+ * keeps working and reads as outbound with no recording.
+ */
+function migrateCallSessions(sqlite: Database.Database) {
+  if (!sqlite.prepare("PRAGMA table_info(call_sessions)").all().length) return;
+  const cols = sqlite.prepare("PRAGMA table_info(call_sessions)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  const additions: Array<[string, string]> = [
+    ["direction", "TEXT NOT NULL DEFAULT 'outbound'"],
+    ["provider", "TEXT"],
+    ["provider_call_id", "TEXT"],
+    ["dedupe_key", "TEXT"],
+    ["answered_at", "TEXT"],
+    ["recording_url", "TEXT"],
+  ];
+  for (const [name, decl] of additions) {
+    if (!have.has(name)) {
+      sqlite.exec(`ALTER TABLE call_sessions ADD COLUMN ${name} ${decl}`);
+    }
+  }
+
+  // Only safe once every column above exists, which is why these are not part
+  // of the bulk DDL block: `CREATE INDEX` on a missing column throws, and that
+  // would abort the whole statement batch the first time an older database is
+  // opened.
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS idx_call_sessions_lead ON call_sessions(lead_id);
+    CREATE INDEX IF NOT EXISTS idx_call_sessions_activity ON call_sessions(activity_id);
+    CREATE INDEX IF NOT EXISTS idx_call_sessions_user_status ON call_sessions(user_id, status);
+  `);
+
+  migrateCallSessionsDedupeIndex(sqlite);
+}
+
+/**
+ * The dedupe key has to be unique for the index to do any work: without it, two
+ * concurrent deliveries of the same webhook both pass the "already recorded?"
+ * check and the caller gets billed for one call twice.
+ *
+ * `CREATE UNIQUE INDEX IF NOT EXISTS` above is a silent no-op when an index of
+ * the same name already exists, and an earlier build created this one
+ * non-unique — so the index is inspected and rebuilt rather than assumed. Any
+ * duplicates that build left behind are collapsed to the earliest row, which is
+ * the one whose activity was created first and therefore already referenced.
+ */
+function migrateCallSessionsDedupeIndex(sqlite: Database.Database) {
+  const idx = sqlite
+    .prepare("PRAGMA index_list(call_sessions)")
+    .all() as { name: string; unique: number }[];
+  const existing = idx.find((i) => i.name === "idx_call_sessions_dedupe");
+  if (existing && !existing.unique) {
+    sqlite.exec("DROP INDEX idx_call_sessions_dedupe");
+  }
+
+  // Collapsed to the earliest row, which is the one whose activity was created
+  // first and is therefore the one already referenced.
+  //
+  // The outer `dedupe_key IS NOT NULL` is essential, not defensive. Attempts
+  // dialled from the app have no provider and no dedupe key, so the subquery
+  // below returns nothing for them — and `id NOT IN (empty set)` is true for
+  // every row, which would silently delete the entire in-app call history on
+  // every deploy. The null check is what keeps those rows.
+  sqlite.exec(`
+    DELETE FROM call_sessions
+    WHERE dedupe_key IS NOT NULL
+      AND id NOT IN (
+        SELECT MIN(id) FROM call_sessions
+        WHERE dedupe_key IS NOT NULL
+        GROUP BY dedupe_key
+      )
+  `);
+
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_call_sessions_dedupe ON call_sessions(dedupe_key)
+      WHERE dedupe_key IS NOT NULL
+  `);
+}
+
+function migratePushSubscriptions(sqlite: Database.Database) {
+  if (!sqlite.prepare("PRAGMA table_info(push_subscriptions)").all().length) return;
+  const cols = sqlite.prepare("PRAGMA table_info(push_subscriptions)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("disabled_at")) {
+    sqlite.exec("ALTER TABLE push_subscriptions ADD COLUMN disabled_at TEXT");
+  }
 }
 
 function migrateUsers(sqlite: Database.Database) {

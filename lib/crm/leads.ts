@@ -271,6 +271,8 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   call_number_invalid: "Number invalid",
   call_whatsapp_only: "Requested WhatsApp only",
   call_language_barrier: "Language barrier",
+  call_incoming: "Incoming call",
+  call_missed: "Missed call",
   whatsapp: "WhatsApp",
   note: "Note added",
   status_change: "Status changed",

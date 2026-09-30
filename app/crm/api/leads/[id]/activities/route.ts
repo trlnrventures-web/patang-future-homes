@@ -4,6 +4,8 @@ import * as schema from "@/lib/crm/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthUser, seesAllLeads } from "@/lib/crm/auth";
 import { computeSlaStatus, nextNoResponseAttempt } from "@/lib/crm/sla-compute";
+import { isCallAttemptType } from "@/lib/crm/call-sessions-shared";
+import { closeCallSession, recordUntimedCallAttempt } from "@/lib/crm/call-sessions";
 
 export async function POST(
   request: NextRequest,
@@ -105,19 +107,9 @@ export async function POST(
     };
     let newStatus: string | undefined = statusMap[body.type];
 
-    const isCallAttempt =
-      body.type === "call_connected" ||
-      body.type === "call_no_answer" ||
-      body.type === "call_busy" ||
-      body.type === "call_wrong_number" ||
-      body.type === "call_not_interested" ||
-      body.type === "call_switched_off" ||
-      body.type === "call_number_invalid" ||
-      body.type === "call_whatsapp_only" ||
-      body.type === "call_language_barrier" ||
-      (body.type === "call" && body.outcome);
+    const isCallAttempt = isCallAttemptType(body.type, body.outcome);
 
-    // ---- Call attempt accounting (never fabricates duration) ----
+    // ---- Call attempt accounting ----
     if (isCallAttempt) {
       const prevAttempts = lead.attemptCount ?? 0;
       leadUpdates.attemptCount = prevAttempts + 1;
@@ -128,6 +120,33 @@ export async function POST(
       } else if (!lead.firstCallAt) {
         leadUpdates.firstCallAt = now;
         leadUpdates.slaStatus = computeSlaStatus(lead.createdAt, now);
+      }
+    }
+
+    // ---- Call log: close the attempt that was opened when Call was tapped ----
+    // The duration is measured server side from the two timestamps on the
+    // session, so a stalled or tampered request cannot inflate talk time. An
+    // outcome logged without a tap still gets a row, carrying no timing rather
+    // than a made-up one.
+    if (isCallAttempt) {
+      const sessionId = Number(body.callSessionId);
+      const closed = sessionId
+        ? closeCallSession(db, {
+            sessionId,
+            leadId: lead.id,
+            activityId: activity.id,
+            userId: user.id,
+            outcome: String(body.type),
+          })
+        : null;
+      if (!closed) {
+        recordUntimedCallAttempt(db, {
+          leadId: lead.id,
+          userId: user.id,
+          activityId: activity.id,
+          outcome: String(body.type),
+          channel: body.channel === "whatsapp" ? "whatsapp" : "phone",
+        });
       }
     }
 

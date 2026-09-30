@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, PhoneIcon, WhatsAppIcon } from "./ui";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
+import { formatCallDuration } from "@/lib/crm/call-sessions-shared";
+import { useCallSession } from "./useCallSession";
 import {
   autoFollowUpMs,
   istLocalInputToMs,
@@ -24,6 +26,13 @@ type ContactMasking = {
 type Outcome = {
   key: string;
   label: string;
+  /**
+   * The activity type the activities route understands. The queue's short
+   * `key` exists only to drive this screen's own flow; writing it straight to
+   * the API would produce a `connected` activity that no lead-status rule
+   * recognises, so the attempt would never be counted.
+   */
+  activityType: string;
   tone: Tone;
   /** Show the note box in the single step under the buttons. */
   note: boolean;
@@ -39,6 +48,7 @@ type Outcome = {
 const OUTCOMES: Outcome[] = [
   {
     key: "connected",
+    activityType: "call_connected",
     label: "Connected",
     tone: "green",
     note: true,
@@ -49,6 +59,7 @@ const OUTCOMES: Outcome[] = [
   },
   {
     key: "no_answer",
+    activityType: "call_no_answer",
     label: "No Answer",
     tone: "neutral",
     note: false,
@@ -59,6 +70,7 @@ const OUTCOMES: Outcome[] = [
   },
   {
     key: "busy",
+    activityType: "call_busy",
     label: "Busy",
     tone: "neutral",
     note: false,
@@ -69,6 +81,7 @@ const OUTCOMES: Outcome[] = [
   },
   {
     key: "call_back",
+    activityType: "call_back",
     label: "Call Back",
     tone: "neutral",
     note: false,
@@ -79,6 +92,7 @@ const OUTCOMES: Outcome[] = [
   },
   {
     key: "not_interested",
+    activityType: "call_not_interested",
     label: "Not Interested",
     tone: "grey",
     note: true,
@@ -89,6 +103,7 @@ const OUTCOMES: Outcome[] = [
   },
   {
     key: "wrong_number",
+    activityType: "call_wrong_number",
     label: "Wrong Number",
     tone: "grey",
     note: true,
@@ -200,6 +215,11 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
 
   const item = queue[idx];
 
+  // One timed attempt per queue card: opened by the Call tap, closed by the
+  // outcome save. Re-anchors itself when the queue advances.
+  const { sessionId: callSessionId, elapsed: callElapsed, running: callRunning, begin: beginCall, clear: clearCall } =
+    useCallSession(item?.id ?? null, "call_queue");
+
   const openOutcome = useCallback((o: Outcome) => {
     setApiError("");
     setOutcome(o);
@@ -224,7 +244,11 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
     setSubmitting(true);
     setApiError("");
     try {
-      const payload: Record<string, unknown> = { type: outcome.key, notes: note };
+      const payload: Record<string, unknown> = {
+        type: outcome.activityType,
+        notes: note,
+      };
+      if (callSessionId) payload.callSessionId = callSessionId;
       if (outcome.schedulesFollowUp) {
         if (outcome.key === "call_back") {
           payload.callbackTime = followUpIso;
@@ -241,6 +265,7 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "failed");
       }
+      clearCall();
       resetStep();
       setIdx((i) => i + 1);
     } catch (e) {
@@ -248,7 +273,7 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
     } finally {
       setSubmitting(false);
     }
-  }, [item, outcome, followUp, note, resetStep]);
+  }, [item, outcome, followUp, note, resetStep, callSessionId, clearCall]);
 
   const saveAndNext = useCallback(() => {
     if (submitting) return;
@@ -293,6 +318,7 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
   const progress = queue.length ? (done / queue.length) * 100 : 0;
 
   const skip = () => {
+    clearCall();
     resetStep();
     setIdx((i) => i + 1);
   };
@@ -425,6 +451,7 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
                   <>
                     <a
                       href={`tel:+${phone}`}
+                      onClick={() => void beginCall("phone", phone)}
                       className="inline-flex h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary text-base font-bold text-white transition-colors hover:bg-secondary"
                     >
                       <PhoneIcon className="h-5 w-5 shrink-0" />
@@ -434,6 +461,7 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
                       href={`https://wa.me/${waNumber}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => void beginCall("whatsapp", phone)}
                       className="inline-flex h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#25D366] text-base font-bold text-white transition-colors hover:bg-[#1DA851]"
                     >
                       <WhatsAppIcon className="h-5 w-5 shrink-0" />
@@ -442,6 +470,15 @@ const [masking, setMasking] = useState<ContactMasking | null>(null);
                   </>
                 )}
               </div>
+
+              {/* Live attempt timer. Present only once a session has opened, so
+                  it never implies a call is being recorded before one was. */}
+              {callRunning && (
+                <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-primary">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                  Logging call · {formatCallDuration(callElapsed)}
+                </p>
+              )}
 
               <div className="mt-3 flex items-center justify-between">
                 <button

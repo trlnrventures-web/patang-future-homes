@@ -6,6 +6,7 @@ import {
   formatReportDate,
   buildMyReportText,
   buildTeamReportText,
+  humanDuration,
 } from "@/lib/crm/report-text";
 import type { DailyMetrics, TeamReport } from "@/lib/crm/reports";
 
@@ -95,6 +96,39 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
   const openWhatsApp = (text: string) => {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
+
+  // Talk time is a duration, not a count, so it is kept out of `metricList` —
+  // that list is summed into "total activity", and adding seconds to counts of
+  // leads and visits would produce a meaningless headline number.
+  const callTime: { label: string; value: string }[] =
+    view === "team" && team
+      ? team.totals.timedCalls
+        ? [
+            { label: "Talk Time", value: humanDuration(team.totals.talkSeconds) },
+            { label: "Avg Call", value: humanDuration(team.totals.avgTalkSeconds) },
+            { label: "Connect Rate", value: `${team.totals.connectRatePct}%` },
+          ]
+        : []
+      : my.metrics.timedCalls
+        ? [
+            { label: "Talk Time", value: humanDuration(my.metrics.talkSeconds) },
+            { label: "Avg Call", value: humanDuration(my.metrics.avgTalkSeconds) },
+            { label: "Connect Rate", value: `${my.metrics.connectRatePct}%` },
+          ]
+        : [];
+
+  const inbound: { label: string; value: number | undefined }[] =
+    view === "team" && team
+      ? [
+          { label: "Incoming Calls", value: team.totals.inboundCalls },
+          { label: "Missed Calls", value: team.totals.missedCalls },
+        ]
+      : my.metrics.inboundCalls || my.metrics.missedCalls
+        ? [
+            { label: "Incoming Calls", value: my.metrics.inboundCalls },
+            { label: "Missed Calls", value: my.metrics.missedCalls },
+          ]
+        : [];
 
   const metricList: { label: string; value: number | undefined; color?: string }[] =
     view === "team" && team
@@ -224,6 +258,28 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
         </div>
       )}
 
+      {/* Call time is shown as its own strip: it only appears on a day that has
+          a measured attempt, and it reads as a duration rather than a count. */}
+      {(callTime.length > 0 || inbound.length > 0) && (
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <h2 className="mb-2 text-sm font-bold text-primary">Call Activity</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {callTime.map((m) => (
+              <div key={m.label} className="rounded-xl bg-primary/5 px-3 py-2">
+                <div className="text-lg font-bold text-navy">{m.value}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-muted">{m.label}</div>
+              </div>
+            ))}
+            {inbound.map((m) => (
+              <div key={m.label} className="rounded-xl bg-primary/5 px-3 py-2">
+                <div className="text-lg font-bold text-navy">{m.value ?? 0}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-muted">{m.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Team breakdown */}
       {view === "team" && team && !loading && (
         <div className="space-y-4">
@@ -238,6 +294,8 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
                       <th className="px-2 py-1.5">Leads</th>
                       <th className="px-2 py-1.5">Calls</th>
                       <th className="px-2 py-1.5">Connected</th>
+                      <th className="px-2 py-1.5">Talk Time</th>
+                      <th className="px-2 py-1.5">Avg</th>
                       <th className="px-2 py-1.5">Qualified</th>
                       <th className="px-2 py-1.5">Assigned</th>
                     </tr>
@@ -249,6 +307,12 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
                         <td className="px-2 py-2">{c.metrics.newLeads}</td>
                         <td className="px-2 py-2">{c.metrics.calls}</td>
                         <td className="px-2 py-2">{c.metrics.connected}</td>
+                        <td className="px-2 py-2">
+                          {c.metrics.timedCalls ? humanDuration(c.metrics.talkSeconds) : "—"}
+                        </td>
+                        <td className="px-2 py-2">
+                          {c.metrics.timedCalls ? humanDuration(c.metrics.avgTalkSeconds) : "—"}
+                        </td>
                         <td className="px-2 py-2">{c.metrics.qualified}</td>
                         <td className="px-2 py-2">{c.metrics.assigned}</td>
                       </tr>
@@ -269,6 +333,7 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
                       <th className="py-1.5 pr-2">Name</th>
                       <th className="px-2 py-1.5">Assigned</th>
                       <th className="px-2 py-1.5">Calls</th>
+                      <th className="px-2 py-1.5">Talk Time</th>
                       <th className="px-2 py-1.5">Visits</th>
                       <th className="px-2 py-1.5">Visits Done</th>
                       <th className="px-2 py-1.5">Negotiations</th>
@@ -281,6 +346,9 @@ export default function DailyReport({ initialMy, initialTeam, isAdmin }: Props) 
                         <td className="py-2 pr-2 font-semibold text-navy">{s.name}</td>
                         <td className="px-2 py-2">{s.metrics.assigned}</td>
                         <td className="px-2 py-2">{s.metrics.calls}</td>
+                        <td className="px-2 py-2">
+                          {s.metrics.timedCalls ? humanDuration(s.metrics.talkSeconds) : "—"}
+                        </td>
                         <td className="px-2 py-2">{s.metrics.visitsBooked}</td>
                         <td className="px-2 py-2">{s.metrics.visitsCompleted}</td>
                         <td className="px-2 py-2">{s.metrics.negotiations}</td>

@@ -7,6 +7,7 @@ import { sourceLabel } from "@/lib/crm/board-shared";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
 import { formatReportDate } from "@/lib/crm/report-text";
 import CallQueue from "./CallQueue";
+import CallAlertToggle from "./CallAlertToggle";
 import type { CallQueueItem } from "@/app/crm/api/call-queue/route";
 
 type Card = {
@@ -40,6 +41,15 @@ type Counts = {
 };
 
 type TileKey = "callNow" | "followUpsToday" | "overdue";
+
+type MissedCall = {
+  id: number;
+  leadId: number;
+  leadName: string;
+  number: string | null;
+  startedAt: string;
+  provider: string | null;
+};
 
 const ROWS_BEFORE_EXPANDING = 10;
 
@@ -86,6 +96,10 @@ export default function CallerDashboard({ name }: { name: string }) {
   const [qualityQuery, setQualityQuery] = useState("");
   const [qualityExpanded, setQualityExpanded] = useState(false);
   const [showQualityQueue, setShowQualityQueue] = useState(false);
+
+  // Inbound calls the lead made that were not answered. Only ever populated by
+  // an outside integration — nothing here can create one.
+  const [missed, setMissed] = useState<MissedCall[]>([]);
 
   // Resolved on mount rather than during render, so the server HTML and the
   // first client render agree even when they straddle an IST hour boundary.
@@ -141,8 +155,27 @@ export default function CallerDashboard({ name }: { name: string }) {
     };
   }, []);
 
-  const match = useCallback((c: Card) => {
-    const q = query.trim().toLowerCase();
+  // Missed inbound calls. A failure here is silent: with no integration
+  // connected the endpoint legitimately has nothing to return, and an error
+  // banner for that would be noise on every dashboard load.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/crm/api/call-events");
+        if (!res.ok) throw new Error("failed");
+        const data = await res.json();
+        if (!cancelled) setMissed(data.missed || []);
+      } catch {
+        if (!cancelled) setMissed([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const match = useCallback((c: Card) => {    const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
       c.name.toLowerCase().includes(q) ||
@@ -278,6 +311,58 @@ export default function CallerDashboard({ name }: { name: string }) {
               Full Inbox
             </Link>
           </div>
+        </div>
+
+        {/* Missed inbound calls. Hidden entirely when there are none, so the
+            dashboard does not grow an empty section for the common case. */}
+        {missed.length > 0 && (
+          <section className="mt-6 rounded-xl border border-border bg-white p-4 sm:p-5">
+            <div className="mb-3 flex items-baseline gap-2">
+              <h2 className="text-base font-bold text-navy">Missed Calls</h2>
+              <span className="text-sm text-muted">{missed.length}</span>
+            </div>
+            <ul className="space-y-2">
+              {missed.slice(0, 5).map((m) => (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-navy">{m.leadName}</p>
+                    <p className="text-xs text-muted">
+                      {m.number || "No number"} · {new Date(m.startedAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {m.number && (
+                      <a
+                        href={`tel:${m.number}`}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-white"
+                      >
+                        <PhoneIcon className="h-4 w-4" />
+                        Call back
+                      </a>
+                    )}
+                    <Link
+                      href={`/crm/leads/${m.leadId}`}
+                      className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs font-semibold text-navy transition-colors hover:border-primary/40"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Alerts are opt-in and only appear where the browser supports them, so
+            this renders nothing at all on most desk browsers. */}
+        <div className="mt-4 border-t border-border pt-4">
+          <CallAlertToggle compact />
         </div>
       </div>
 

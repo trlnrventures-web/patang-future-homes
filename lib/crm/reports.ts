@@ -1,7 +1,13 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
-import { eq, and, gte, lt, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lt, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 
+/**
+ * Every activity that represents a call attempt. `call_incoming` and
+ * `call_missed` are included so a call the lead placed counts towards the day's
+ * call volume; the outbound/inbound split is reported separately rather than
+ * being inferred from the total.
+ */
 const CALL_TYPES = [
   "call",
   "call_connected",
@@ -11,7 +17,66 @@ const CALL_TYPES = [
   "call_back",
   "call_not_interested",
   "call_other",
+  "call_incoming",
+  "call_missed",
 ] as const;
+
+/**
+ * Attempts that reached a person. An answered inbound call counts as connected:
+ * the lead got through, and reporting it as a miss would understate the day for
+ * whoever picked up. `call_incoming` is only ever written for a non-missed
+ * inbound call, so no extra filtering is needed.
+ */
+const CONNECTED_TYPES = ["call_connected", "call_incoming"] as const;
+
+/**
+ * Talk time is summed from `call_sessions` rather than from activity rows,
+ * because only the session knows how long the call actually ran. Counting
+ * activity rows would report every attempt as taking the same time, which is
+ * worse than reporting nothing.
+ */
+function callTimeForEmployee(
+  employeeId: number,
+  from: string,
+  to: string
+): { talkSeconds: number; timedCalls: number } {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(schema.callSessions)
+    .where(
+      and(
+        eq(schema.callSessions.userId, employeeId),
+        isNotNull(schema.callSessions.durationSeconds),
+        gte(schema.callSessions.startedAt, from),
+        lt(schema.callSessions.startedAt, to)
+      )
+    )
+    .all();
+  return {
+    talkSeconds: rows.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0),
+    timedCalls: rows.length,
+  };
+}
+
+function talkTimeForAll(from: string, to: string): { talkSeconds: number; timedCalls: number } {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(schema.callSessions)
+    .where(
+      and(
+        isNotNull(schema.callSessions.durationSeconds),
+        gte(schema.callSessions.startedAt, from),
+        lt(schema.callSessions.startedAt, to)
+      )
+    )
+    .all();
+  return {
+    talkSeconds: rows.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0),
+    timedCalls: rows.length,
+  };
+}
 
 const VISIT_COMPLETION_TYPES = ["visit_done", "post_visit_feedback"] as const;
 
@@ -29,6 +94,20 @@ export type DailyMetrics = {
   visitsCompleted: number;
   negotiations: number;
   bookings: number;
+  /** Total seconds actually spent talking, summed from timed attempts. */
+  talkSeconds: number;
+  /** Attempts that carry a measured duration. */
+  timedCalls: number;
+  /** Average talk time over those attempts, in seconds. 0 when none. */
+  avgTalkSeconds: number;
+  /**
+   * Connected calls as a percentage of attempts, 0-100. Null is not used: a
+   * day with no calls reads as 0%, which is what a manager expects to see.
+   */
+  connectRatePct: number;
+  /** Calls that came in from the lead rather than being placed by the team. */
+  inboundCalls: number;
+  missedCalls: number;
 };
 
 export const EMPTY_METRICS: DailyMetrics = {
@@ -43,7 +122,31 @@ export const EMPTY_METRICS: DailyMetrics = {
   visitsCompleted: 0,
   negotiations: 0,
   bookings: 0,
+  talkSeconds: 0,
+  timedCalls: 0,
+  avgTalkSeconds: 0,
+  connectRatePct: 0,
+  inboundCalls: 0,
+  missedCalls: 0,
 };
+
+/**
+ * Fills the call-time and connect-rate fields from a day's raw counts. Shared by
+ * the per-employee and whole-team paths so both define "connect rate" the same
+ * way — a discrepancy between the two views would be read as a bug.
+ */
+export function withCallDerivedMetrics(
+  metrics: DailyMetrics,
+  talk: { talkSeconds: number; timedCalls: number }
+): DailyMetrics {
+  metrics.talkSeconds = talk.talkSeconds;
+  metrics.timedCalls = talk.timedCalls;
+  metrics.avgTalkSeconds =
+    talk.timedCalls > 0 ? Math.round(talk.talkSeconds / talk.timedCalls) : 0;
+  // "Connected" is already counted above, so the rate is against total attempts.
+  metrics.connectRatePct = metrics.calls > 0 ? Math.round((metrics.connected / metrics.calls) * 100) : 0;
+  return metrics;
+}
 
 // Reporting timezone is fixed to India (Asia/Kolkata, UTC+05:30) for the whole organization.
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
@@ -111,8 +214,15 @@ export function getDailyMetricsForEmployee(
 
   // ---- Shared (call + qualification + follow-up) ----
   metrics.calls = CALL_TYPES.reduce((sum, t) => sum + countActivitiesForTypes(t, employee.id, from, to), 0);
-  metrics.connected = countActivitiesForTypes("call_connected", employee.id, from, to);
+  metrics.connected = CONNECTED_TYPES.reduce(
+    (sum, t) => sum + countActivitiesForTypes(t, employee.id, from, to),
+    0
+  );
   metrics.qualified = countActivitiesForTypes("qualification", employee.id, from, to);
+  withCallDerivedMetrics(metrics, callTimeForEmployee(employee.id, from, to));
+  const inbound = inboundCountsForEmployee(employee.id, from, to);
+  metrics.inboundCalls = inbound.inbound;
+  metrics.missedCalls = inbound.missed;
 
   metrics.followUpsCompleted = db
     .select()
@@ -230,6 +340,31 @@ export function getDailyMetricsForEmployee(
   return metrics;
 }
 
+/** Inbound and missed counts for one employee, from the session log. */
+function inboundCountsForEmployee(
+  employeeId: number,
+  from: string,
+  to: string
+): { inbound: number; missed: number } {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(schema.callSessions)
+    .where(
+      and(
+        eq(schema.callSessions.userId, employeeId),
+        eq(schema.callSessions.direction, "inbound"),
+        gte(schema.callSessions.startedAt, from),
+        lt(schema.callSessions.startedAt, to)
+      )
+    )
+    .all();
+  return {
+    inbound: rows.length,
+    missed: rows.filter((r) => r.status === "missed").length,
+  };
+}
+
 export type TeamReport = {
   date: string;
   totals: DailyMetrics;
@@ -265,8 +400,23 @@ export function getTeamReport(date: string): TeamReport {
     .where(and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
     .all().length;
   totals.calls = CALL_TYPES.reduce((sum, t) => sum + activityCount(t), 0);
-  totals.connected = activityCount("call_connected");
+  totals.connected = CONNECTED_TYPES.reduce((sum, t) => sum + activityCount(t), 0);
   totals.qualified = activityCount("qualification");
+  withCallDerivedMetrics(totals, talkTimeForAll(from, to));
+
+  const inboundRows = db
+    .select()
+    .from(schema.callSessions)
+    .where(
+      and(
+        eq(schema.callSessions.direction, "inbound"),
+        gte(schema.callSessions.startedAt, from),
+        lt(schema.callSessions.startedAt, to)
+      )
+    )
+    .all();
+  totals.inboundCalls = inboundRows.length;
+  totals.missedCalls = inboundRows.filter((r) => r.status === "missed").length;
 
   totals.followUpsCompleted = db
     .select()

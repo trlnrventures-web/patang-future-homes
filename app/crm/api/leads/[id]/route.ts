@@ -14,6 +14,7 @@ import {
   describeMasking,
   maskLeadContacts,
 } from "@/lib/crm/office-hours";
+import { closeStaleCallSessions, loadCallSessionsForLead } from "@/lib/crm/call-sessions";
 
 export async function GET(
   _request: NextRequest,
@@ -56,6 +57,11 @@ export async function GET(
     .orderBy(schema.followUps.scheduledFor)
     .all();
 
+  // A resolved attempt may still be sitting open if the caller never logged an
+  // outcome. Closing it here is what makes the timeline complete rather than
+  // dependent on the caller coming back to their dashboard.
+  closeStaleCallSessions(db);
+
   const visits = db
     .select()
     .from(schema.siteVisits)
@@ -74,9 +80,18 @@ export async function GET(
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  // Timed attempts, so the call-history timeline can show how long each one
+  // actually ran. Keyed by activity id rather than joined inline because most
+  // activities are not calls.
+  const sessionByActivity = new Map<number, (typeof schema.callSessions.$inferSelect)>();
+  for (const s of loadCallSessionsForLead(db, lead.id)) {
+    if (s.activityId != null) sessionByActivity.set(s.activityId, s);
+  }
+
   const enrichActivities = activities.map((a) => ({
     ...a,
     userName: userMap.get(a.userId)?.name || "",
+    callLog: sessionByActivity.get(a.id) ?? null,
   }));
 
   const enrichVisits = visits.map((v) => ({
