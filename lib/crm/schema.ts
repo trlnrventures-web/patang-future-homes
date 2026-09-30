@@ -20,6 +20,12 @@ export const users = sqliteTable("users", {
   weekOffDay: text("week_off_day"),
   baseSalary: integer("base_salary"),
   createdAt: text("created_at").notNull().default(""),
+  // Email password reset. Only the SHA-256 of the emailed token is stored, so a
+  // database leak does not hand out working reset links. `usedAt` is what makes
+  // a link single-use: the token is burned whether or not the reset succeeds.
+  passwordResetTokenHash: text("password_reset_token_hash"),
+  passwordResetExpiresAt: text("password_reset_expires_at"),
+  passwordResetUsedAt: text("password_reset_used_at"),
 });
 
 export const attendance = sqliteTable("attendance", {
@@ -100,7 +106,12 @@ export const teamNotes = sqliteTable("team_notes", {
 });
 
 export const loginAttempts = sqliteTable("login_attempts", {
-  email: text("email").primaryKey(),
+  // The key a user types at the login screen is either their email or their
+  // phone, so one bucket per account has to be able to hold either form. For a
+  // known account this holds that account's canonical email (resolved from
+  // whichever identifier was typed), which keeps phone and email attempts
+  // sharing a single 5-attempt budget instead of doubling it.
+  identifier: text("identifier").primaryKey(),
   failedCount: integer("failed_count").notNull().default(0),
   lockedUntil: text("locked_until"),
   updatedAt: text("updated_at"),
@@ -145,8 +156,8 @@ export const leads = sqliteTable("leads", {
   notes: text("notes"),
   status: text("status", {
     enum: [
-      "new", "calling", "connected", "qualified", "assigned",
-      "follow_up", "visit_proposed", "visit_booked", "visit_confirmed",
+      "new", "calling", "connected", "initial_contact", "qualified", "assigned",
+      "follow_up", "plan_hold", "visit_proposed", "visit_booked", "visit_confirmed",
       "visit_done", "negotiation", "booked", "nurture", "lost",
       "invalid", "dnc", "no_response",
     ],
@@ -446,6 +457,12 @@ export const incentivePayments = sqliteTable("incentive_payments", {
   month: text("month").notNull(),
   role: text("role").notNull(),
   amount: integer("amount").notNull(),
+  /**
+   * The booking this payment settles. NULL is a legacy month-total row written
+   * before incentives were tracked per booking; those still mark the whole month
+   * paid, so old history keeps reading correctly.
+   */
+  bookingId: integer("booking_id").references(() => bookings.id),
   paidBy: integer("paid_by").references(() => users.id),
   paidAt: text("paid_at").notNull().default(""),
   createdAt: text("created_at").notNull().default(""),
@@ -459,6 +476,25 @@ export const weekOffDecisions = sqliteTable("week_off_decisions", {
   date: text("date").notNull(),
   decision: text("decision", { enum: ["taken_off", "worked"] }).notNull(),
   leaveBanked: integer("leave_banked", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+/**
+ * Consumption of a banked credit. The credit itself is the `week_off_decisions`
+ * row with `leave_banked = 1` - its `date` is the earned date, so a credit has
+ * no separate ledger to drift out of sync. This table only answers "has this
+ * credit been spent", which the decisions table could not.
+ */
+export const leaveCreditUsages = sqliteTable("leave_credit_usages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  creditId: integer("credit_id")
+    .notNull()
+    .references(() => weekOffDecisions.id),
+  usedOn: text("used_on").notNull(),
+  leaveRequestId: integer("leave_request_id").references(() => leaveRequests.id),
   createdAt: text("created_at").notNull().default(""),
 });
 

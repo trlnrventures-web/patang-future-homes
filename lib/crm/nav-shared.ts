@@ -26,6 +26,10 @@ export const NAV_PRIMARY_ITEMS: NavItem[] = [
   // roles with a pay record, so this is hidden from admin/marketing, who use
   // the oversight pages under More instead.
   { href: "/crm/my-pay", label: "My Pay", shortLabel: "My Pay", icon: "M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4Zm5-4h2", roles: ["sales_manager", "caller"] },
+  // The same incentives page admin uses, but the API pins staff to their own
+  // rows. Without this the page sat under More, which owner/admin alone can
+  // open, so a caller or SM had no route to their own incentives at all.
+  { href: "/crm/incentives", label: "My Incentives", shortLabel: "Incentives", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6", roles: ["sales_manager", "caller"] },
 ];
 
 export const NAV_MORE_ITEMS: NavItem[] = [

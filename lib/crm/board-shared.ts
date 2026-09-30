@@ -22,8 +22,10 @@ export type FunnelStage = {
  */
 export const LEAD_FUNNEL_STAGES: FunnelStage[] = [
   { key: "new", label: "New", status: "new", matches: ["new", "calling", "connected", "no_response"] },
+  { key: "initial_contact", label: "Initial Contact", status: "initial_contact", matches: ["initial_contact"] },
   { key: "qualified", label: "Qualified", status: "qualified", matches: ["qualified"] },
   { key: "follow_up", label: "Follow-up", status: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
+  { key: "plan_hold", label: "Plan Hold", status: "plan_hold", matches: ["plan_hold"] },
   { key: "visit_booked", label: "Visit Booked", status: "visit_booked", matches: ["visit_proposed", "visit_booked"] },
   { key: "visit_confirmed", label: "Visit Confirmed", status: "visit_confirmed", matches: ["visit_confirmed"] },
   { key: "visit_done", label: "Visit Done", status: "visit_done", matches: ["visit_done"] },
@@ -48,7 +50,7 @@ export type LeadColumn = {
 };
 
 /**
- * The nine board columns. The funnel above has eight stages because it treats
+ * The eleven board columns. The funnel above has ten stages because it treats
  * "Visit Booked" and "Visit Confirmed" as separate steps; the board folds them
  * into a single Site Visit column, and splits the top of the funnel so a caller
  * can see at a glance which leads they have actually spoken to.
@@ -59,8 +61,10 @@ export type LeadColumn = {
 export const LEAD_COLUMNS: LeadColumn[] = [
   { key: "new", label: "New", dropStatus: "new", matches: ["new", "calling", "no_response"] },
   { key: "contacted", label: "Contacted", dropStatus: "connected", matches: ["connected"] },
+  { key: "initial_contact", label: "Initial Contact", dropStatus: "initial_contact", matches: ["initial_contact"] },
   { key: "qualified", label: "Qualified", dropStatus: "qualified", matches: ["qualified"] },
   { key: "follow_up", label: "Follow-up", dropStatus: "follow_up", matches: ["assigned", "follow_up", "nurture"] },
+  { key: "plan_hold", label: "Plan Hold", dropStatus: "plan_hold", matches: ["plan_hold"] },
   { key: "site_visit", label: "Site Visit", dropStatus: "visit_proposed", matches: ["visit_proposed", "visit_booked", "visit_confirmed"] },
   { key: "visit_done", label: "Visit Done", dropStatus: "visit_done", matches: ["visit_done"] },
   { key: "negotiation", label: "Negotiation", dropStatus: "negotiation", matches: ["negotiation"] },
@@ -91,14 +95,16 @@ export function sourceLabel(value: string | null | undefined): string {
   return LEAD_SOURCE_LABELS[value] || value;
 }
 
-/** Per-column accent colour, so the eight columns read apart at a glance. */
+/** Per-column accent colour, so the eleven columns read apart at a glance. */
 export const STAGE_ACCENTS: Record<
   string,
   { bar: string; text: string; soft: string; ring: string }
 > = {
   new: { bar: "bg-sky-500", text: "text-sky-700", soft: "bg-sky-50", ring: "ring-sky-300" },
+  initial_contact: { bar: "bg-blue-500", text: "text-blue-700", soft: "bg-blue-50", ring: "ring-blue-300" },
   qualified: { bar: "bg-emerald-500", text: "text-emerald-700", soft: "bg-emerald-50", ring: "ring-emerald-300" },
   follow_up: { bar: "bg-amber-500", text: "text-amber-700", soft: "bg-amber-50", ring: "ring-amber-300" },
+  plan_hold: { bar: "bg-stone-500", text: "text-stone-700", soft: "bg-stone-50", ring: "ring-stone-300" },
   visit_booked: { bar: "bg-cyan-500", text: "text-cyan-700", soft: "bg-cyan-50", ring: "ring-cyan-300" },
   visit_confirmed: { bar: "bg-teal-500", text: "text-teal-700", soft: "bg-teal-50", ring: "ring-teal-300" },
   visit_done: { bar: "bg-indigo-500", text: "text-indigo-700", soft: "bg-indigo-50", ring: "ring-indigo-300" },
@@ -150,10 +156,12 @@ export const BOARD_STATUS_FILTERS = [
   "calling",
   "connected",
   "no_response",
+  "initial_contact",
   "qualified",
   "assigned",
   "follow_up",
   "nurture",
+  "plan_hold",
   "visit_proposed",
   "visit_booked",
   "visit_confirmed",

@@ -47,7 +47,7 @@ export async function GET() {
 
   // The calendar shows a lead's number too, so it gets the same server-side
   // mask rather than being left as a bypass around the leads endpoints.
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
 
   const visits = scoped
     .map((v) => {

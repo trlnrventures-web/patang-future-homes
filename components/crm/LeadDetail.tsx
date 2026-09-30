@@ -149,7 +149,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
   const callerUsers = data.users.filter((u) => u.role === "caller");
   const isCaller = currentUser.role === "caller";
-  // Assignment is an owner/admin control; callers never see it.
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
   // Callers keep visibility of a lead after it is handed off to an SM, but the
   // sales team owns it from then on — so the view becomes read-only for them.
@@ -159,6 +158,12 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       status: String(lead.status),
       assignedSmId: (lead.assignedSmId as number | null) ?? null,
     });
+  // Handing a lead to an SM is how a caller finishes qualifying it, so a caller
+  // who still owns the lead may do that much. Reassigning a caller, auto-assign
+  // and delete stay owner/admin controls, and an SM keeps today's behaviour —
+  // only an admin may move a lead sideways.
+  const canAssignSm = isAdmin || (isCaller && !readOnly);
+  const canManageAssignment = isAdmin;
   const router = useRouter();
 
   const showToast = useCallback((msg: string) => {
@@ -209,18 +214,17 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   }, [lead.id]);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetch("/crm/api/team/assignees")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (d) {
-            setSms(Object.fromEntries(d.sms.map((s: any) => [s.id, s])));
-            setCallers(Object.fromEntries(d.callers.map((c: any) => [c.id, c])));
-          }
-        })
-        .catch(() => {});
-    }
-  }, [isAdmin]);
+    if (!canAssignSm && !canManageAssignment) return;
+    fetch("/crm/api/team/assignees")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setSms(Object.fromEntries(d.sms.map((s: any) => [s.id, s])));
+          setCallers(Object.fromEntries(d.callers.map((c: any) => [c.id, c])));
+        }
+      })
+      .catch(() => {});
+  }, [canAssignSm, canManageAssignment]);
 
   const refreshMatches = useCallback(async () => {
     try {
@@ -252,7 +256,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
     activities.length > 1 ||
     followUps.length > 0 ||
     visits.length > 0 ||
-    !["new", "calling", "connected", "no_response"].includes(lead.status);
+    !["new", "calling", "connected", "initial_contact", "no_response"].includes(lead.status);
 
   const handleRecordConcern = async (concern: string) => {
     setBusy(true);
@@ -666,7 +670,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
         </div>
       )}
 
-      {/* ===== Clickable stage bar: one control for all nine columns ===== */}
+      {/* ===== Clickable stage bar: one control for all eleven columns ===== */}
       <div
         role="group"
         aria-label="Lead stage"
@@ -773,8 +777,9 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
             </div>
           )}
 
-          {/* Assignment is an owner/admin control. */}
-          {isAdmin && !readOnly && (
+          {/* Handing off to an SM is a caller action too; caller reassignment,
+              auto-assign and delete stay owner/admin controls. */}
+          {(canAssignSm || canManageAssignment) && (
             <div className="mt-2.5">
               <button
                 type="button"
@@ -786,54 +791,56 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               </button>
               {showAssign && (
                 <div className="mt-2.5 space-y-3 border-t border-border pt-3">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-navy">Caller</span>
-                      {lead.assignedCallerName && (
-                        <button
-                          type="button"
-                          onClick={() => handleClearAssignment("caller")}
-                          disabled={busy}
-                          className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+                  {canManageAssignment && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-navy">Caller</span>
+                        {lead.assignedCallerName && (
+                          <button
+                            type="button"
+                            onClick={() => handleClearAssignment("caller")}
+                            disabled={busy}
+                            className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex gap-2">
+                        <select
+                          value={selectedCaller}
+                          onChange={(e) =>
+                            setSelectedCaller(e.target.value ? Number(e.target.value) : "")
+                          }
+                          className="min-w-0 flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-navy outline-none focus:border-primary"
                         >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex gap-2">
-                      <select
-                        value={selectedCaller}
-                        onChange={(e) =>
-                          setSelectedCaller(e.target.value ? Number(e.target.value) : "")
-                        }
-                        className="min-w-0 flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-navy outline-none focus:border-primary"
-                      >
-                        <option value="">
-                          {lead.assignedCallerName || "Select caller..."}
-                        </option>
-                        {callerUsers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
+                          <option value="">
+                            {lead.assignedCallerName || "Select caller..."}
                           </option>
-                        ))}
-                      </select>
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          selectedCaller !== "" && handleAssignCaller(selectedCaller as number)
-                        }
-                        disabled={busy || selectedCaller === ""}
-                      >
-                        Assign
-                      </Button>
+                          {callerUsers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            selectedCaller !== "" && handleAssignCaller(selectedCaller as number)
+                          }
+                          disabled={busy || selectedCaller === ""}
+                        >
+                          Assign
+                        </Button>
+                      </div>
+                      {selectedCaller && <WorkloadTiles w={callers[selectedCaller]} />}
                     </div>
-                    {selectedCaller && <WorkloadTiles w={callers[selectedCaller]} />}
-                  </div>
+                  )}
 
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-navy">Sales Manager</span>
-                      {lead.assignedSmName && (
+                      {lead.assignedSmName && canManageAssignment && (
                         <button
                           type="button"
                           onClick={() => handleClearAssignment("sm")}
@@ -868,30 +875,34 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                     {selectedSm && <WorkloadTiles w={sms[selectedSm]} />}
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleAssignCaller("auto")}
-                      disabled={busy || callerUsers.length === 0}
-                    >
-                      Auto Caller
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleAssignSm("auto")}
-                      disabled={busy || smUsers.length === 0}
-                    >
-                      Auto SM
-                    </Button>
-                  </div>
+                  {canManageAssignment && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleAssignCaller("auto")}
+                        disabled={busy || callerUsers.length === 0}
+                      >
+                        Auto Caller
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleAssignSm("auto")}
+                        disabled={busy || smUsers.length === 0}
+                      >
+                        Auto SM
+                      </Button>
+                    </div>
+                  )}
 
-                  <div className="flex gap-2 border-t border-border pt-3">
-                    <Button size="sm" variant="ghost" onClick={() => setShowDelete(true)}>
-                      Delete Lead
-                    </Button>
-                  </div>
+                  {canManageAssignment && (
+                    <div className="flex gap-2 border-t border-border pt-3">
+                      <Button size="sm" variant="ghost" onClick={() => setShowDelete(true)}>
+                        Delete Lead
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

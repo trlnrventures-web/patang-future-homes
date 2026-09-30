@@ -199,12 +199,16 @@ function statusDotCls(status?: string): string {
     case "calling":
     case "connected":
       return "bg-amber-500";
+    case "initial_contact":
+      return "bg-blue-500";
     case "qualified":
       return "bg-emerald-500";
     case "assigned":
       return "bg-violet-500";
     case "follow_up":
       return "bg-yellow-500";
+    case "plan_hold":
+      return "bg-stone-400";
     case "visit_proposed":
       return "bg-cyan-500";
     case "visit_booked":

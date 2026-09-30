@@ -9,6 +9,8 @@ import {
   contactMaskFor,
   describeMasking,
   getOfficeHours,
+  isWeekOffDayName,
+  isWeekOffToday,
   serializeOfficeHours,
   type OfficeHours,
 } from "@/lib/crm/office-hours";
@@ -21,13 +23,16 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
   const hours = getOfficeHours();
   return NextResponse.json({
     withinOfficeHours: decision.withinHours,
     maskActive: decision.mask,
     banner: describeMasking(decision),
     canSeeFullNumbers: !decision.mask,
+    maskReason: decision.reason,
+    isWeekOff: isWeekOffToday(hours, new Date()),
+    workingWeekOff: decision.weekOffWorkedIn,
     defaults: DEFAULT_OFFICE_HOURS,
     // The full window is staff-visible so the banner can explain itself, but
     // only admin/owner can change it.
@@ -56,6 +61,7 @@ export async function PATCH(request: NextRequest) {
       startMin: body.startMin != null ? Number(body.startMin) : current.startMin,
       endMin: body.endMin != null ? Number(body.endMin) : current.endMin,
       enabled: body.enabled != null ? Boolean(body.enabled) : current.enabled,
+      weekOffDay: isWeekOffDayName(body.weekOffDay) ? body.weekOffDay : current.weekOffDay,
       timezone: DEFAULT_OFFICE_HOURS.timezone,
     };
 

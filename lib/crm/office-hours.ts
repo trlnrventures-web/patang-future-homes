@@ -11,6 +11,10 @@
  */
 
 import { getSetting } from "./settings";
+import { getDb } from "./db";
+import * as schema from "./schema";
+import { and, eq } from "drizzle-orm";
+import { istToday } from "./attendance";
 
 export type OfficeHours = {
   /** 0 = Sunday ... 6 = Saturday. */
@@ -21,14 +25,40 @@ export type OfficeHours = {
   enabled: boolean;
   /** IANA zone; the CRM is India-only today, so this is fixed at IST. */
   timezone: string;
+  /**
+   * The office-wide week-off day. Contacts stay masked for the whole day
+   * regardless of the working window, unless the person is checked in. This is
+   * a single office rule and is deliberately not the per-user `week_off_day`,
+   * which is one person's roster arrangement.
+   */
+  weekOffDay: string;
 };
 
+export const OFFICE_WEEK_OFF_DAY = "Tuesday";
+
+const WEEK_DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export function isWeekOffDayName(name: string | null | undefined): boolean {
+  return WEEK_DAY_NAMES.includes((name || "") as (typeof WEEK_DAY_NAMES)[number]);
+}
+
 export const DEFAULT_OFFICE_HOURS: OfficeHours = {
-  days: [1, 2, 3, 4, 5, 6], // Mon-Sat
-  startMin: 10 * 60, // 10:00
-  endMin: 19 * 60, // 19:00
+  // Mon/Wed-Sun. Tuesday is the week off, so it is absent from the working
+  // days and handled by the separate week-off rule below.
+  days: [0, 1, 3, 4, 5, 6],
+  startMin: 10 * 60 + 30, // 10:30
+  endMin: 19 * 60 + 30, // 19:30
   enabled: true,
   timezone: "Asia/Kolkata",
+  weekOffDay: OFFICE_WEEK_OFF_DAY,
 };
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -56,6 +86,7 @@ export function parseOfficeHours(raw: string | null | undefined): OfficeHours {
           : DEFAULT_OFFICE_HOURS.endMin,
       enabled: p.enabled !== false,
       timezone: p.timezone || DEFAULT_OFFICE_HOURS.timezone,
+      weekOffDay: isWeekOffDayName(p.weekOffDay) ? p.weekOffDay! : DEFAULT_OFFICE_HOURS.weekOffDay,
     };
   } catch {
     return DEFAULT_OFFICE_HOURS;
@@ -73,6 +104,7 @@ export function serializeOfficeHours(h: OfficeHours): string {
     endMin: h.endMin,
     enabled: h.enabled,
     timezone: DEFAULT_OFFICE_HOURS.timezone,
+    weekOffDay: h.weekOffDay,
   });
 }
 
@@ -122,24 +154,85 @@ export function isWithinOfficeHours(h: OfficeHours, now: Date): boolean {
   return h.days.includes(dow) && minOfDay >= h.startMin && minOfDay < h.endMin;
 }
 
+export type MaskReason = "always_visible" | "week_off" | "within_hours" | "outside_hours" | "disabled";
+
 export type MaskDecision = {
   mask: boolean;
   hours: OfficeHours;
   withinHours: boolean;
+  /** Why this decision came out the way it did, for the banner. */
+  reason: MaskReason;
+  /** True when the person is on the office week-off but checked in and working. */
+  weekOffWorkedIn: boolean;
 };
+
+/** The person whose contacts are being decided, as far as masking cares. */
+export type MaskSubject = {
+  id: number;
+  role?: string | null;
+} | null;
+
+/**
+ * Has this person actually checked in today? On the week-off a person who chose
+ * to work is genuinely on the floor, so their contacts stay visible - the
+ * alternative is that opting to cover the office costs you the ability to do
+ * the job. Read from the attendance row rather than the week-off decision so a
+ * decision of "I'm working" with no check-in does not unlock anything.
+ */
+export function isCheckedInToday(userId: number, today = istToday()): boolean {
+  const db = getDb();
+  const row = db
+    .select({ id: schema.attendance.id })
+    .from(schema.attendance)
+    .where(and(eq(schema.attendance.userId, userId), eq(schema.attendance.date, today)))
+    .get();
+  return !!row;
+}
+
+/** Weekday number (0 = Sunday) for an instant, in the office timezone. */
+function weekdayInZone(now: Date, timezone: string): number {
+  const name = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(now);
+  const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return wdMap[name] ?? now.getUTCDay();
+}
+
+export function isWeekOffToday(h: OfficeHours, now = new Date()): boolean {
+  return WEEK_DAY_NAMES[weekdayInZone(now, h.timezone)] === h.weekOffDay;
+}
 
 /**
  * Single decision point used by every lead-returning API. Admin and sales_head
  * always get the unmasked value; masking is off entirely when the feature is
  * disabled in settings.
  */
-export function contactMaskFor(role: string | undefined | null, now = new Date()): MaskDecision {
+export function contactMaskFor(subject: MaskSubject, now = new Date()): MaskDecision {
   const hours = getOfficeHours();
   const withinHours = isWithinOfficeHours(hours, now);
+  const role = subject?.role;
+
   if (canAlwaysSeeContacts(role)) {
-    return { mask: false, hours, withinHours };
+    return { mask: false, hours, withinHours, reason: "always_visible", weekOffWorkedIn: false };
   }
-  return { mask: !withinHours, hours, withinHours };
+
+  if (!hours.enabled) {
+    return { mask: false, hours, withinHours, reason: "disabled", weekOffWorkedIn: false };
+  }
+
+  if (isWeekOffToday(hours, now)) {
+    const worked = subject ? isCheckedInToday(subject.id, istToday()) : false;
+    if (!worked) {
+      return { mask: true, hours, withinHours, reason: "week_off", weekOffWorkedIn: false };
+    }
+    return { mask: false, hours, withinHours, reason: "within_hours", weekOffWorkedIn: true };
+  }
+
+  return {
+    mask: !withinHours,
+    hours,
+    withinHours,
+    reason: withinHours ? "within_hours" : "outside_hours",
+    weekOffWorkedIn: false,
+  };
 }
 
 /**
@@ -205,8 +298,11 @@ export function maskLeadList<T extends {
 /** Human summary for the "contact details hidden" banner. */
 export function describeMasking(decision: MaskDecision): string | null {
   if (!decision.mask) return null;
-  const { startMin, endMin } = decision.hours;
+  const { startMin, endMin, weekOffDay } = decision.hours;
   const fmt = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  if (decision.reason === "week_off") {
+    return `${weekOffDay} is the office week-off. Contact details stay hidden all day unless you check in and work it.`;
+  }
   const days = decision.hours.days.map(dayLabel).join(", ");
   return `Contact details hidden outside office hours (${days}, ${fmt(startMin)}-${fmt(endMin)} IST).`;
 }

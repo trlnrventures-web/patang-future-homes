@@ -19,6 +19,11 @@ import {
   workingMinutes,
   type AttendanceRow,
 } from "@/lib/crm/attendance";
+import {
+  describeBalance,
+  formatCreditDate,
+  getLeaveBalance,
+} from "@/lib/crm/leave-credits";
 
 export const metadata: Metadata = {
   title: { absolute: "Attendance | Patang CRM" },
@@ -70,6 +75,7 @@ export default async function AttendancePage() {
     .get() as unknown as AttendanceRow | null;
 
   const approvedLeave = getApprovedLeaveDaysForUser(user.id);
+  const balance = getLeaveBalance(user.id, today);
   const isAdmin = user.role === "admin" || user.role === "sales_head";
 
   const weekOffDecisionRow = isWeekOffDate(today, weekOffDay)
@@ -200,6 +206,23 @@ export default async function AttendancePage() {
           history,
           week,
           leaveDaysThisMonth,
+          leaveBalance: {
+            available: balance.available,
+            earned: balance.earned,
+            spent: balance.spent,
+            expired: balance.expired,
+            summary: describeBalance(balance),
+            credits: balance.credits.map((c) => ({
+              creditId: c.creditId,
+              earnedDate: c.earnedDate,
+              earnedLabel: formatCreditDate(c.earnedDate),
+              expiresOn: c.expiresOn,
+              expiresLabel: formatCreditDate(c.expiresOn),
+              status: c.status,
+              usedOn: c.usedOn,
+              daysToExpiry: c.daysToExpiry,
+            })),
+          },
           myLeaves,
           pendingLeaves,
           teamView,

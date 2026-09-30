@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 
 const DB_PATH =
@@ -38,11 +39,14 @@ function createTables(sqlite: Database.Database) {
       week_off_day TEXT,
       last_login_at TEXT,
       must_change_password INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT ''
+      created_at TEXT NOT NULL DEFAULT '',
+      password_reset_token_hash TEXT,
+      password_reset_expires_at TEXT,
+      password_reset_used_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS login_attempts (
-      email TEXT PRIMARY KEY,
+      identifier TEXT PRIMARY KEY,
       failed_count INTEGER NOT NULL DEFAULT 0,
       locked_until TEXT,
       updated_at TEXT
@@ -404,6 +408,26 @@ function createTables(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_week_off_decisions_user_date ON week_off_decisions(user_id, date);
 
+    -- A banked credit is the week_off_decisions row itself (leave_banked = 1),
+    -- so the earned date is already stored and there is nothing to backfill.
+    -- This table records only the *consumption* of those credits, which nothing
+    -- tracked before: the balance a staff member can actually spend is the
+    -- earned credits minus the ones spent here, so the unique index on
+    -- credit_id is what stops a credit being spent against two leave days.
+    CREATE TABLE IF NOT EXISTS leave_credit_usages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      credit_id INTEGER NOT NULL,
+      used_on TEXT NOT NULL,
+      leave_request_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (credit_id) REFERENCES week_off_decisions(id),
+      FOREIGN KEY (leave_request_id) REFERENCES leave_requests(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_leave_credit_usages_credit ON leave_credit_usages(credit_id);
+    CREATE INDEX IF NOT EXISTS idx_leave_credit_usages_user ON leave_credit_usages(user_id);
+
     CREATE TABLE IF NOT EXISTS salary_reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -455,10 +479,14 @@ function createTables(sqlite: Database.Database) {
   migrateLeads(sqlite);
   migrateBookings(sqlite);
   migrateUsers(sqlite);
+  migrateLoginAttempts(sqlite);
+  migratePhoneIdentifiers(sqlite);
   migrateSiteVisits(sqlite);
   migrateMessageTemplates(sqlite);
   migrateAttendance(sqlite);
   migrateSalaryReports(sqlite);
+  migrateIncentives(sqlite);
+  migrateOfficeHoursDefaults(sqlite);
 }
 
 function migrateUsers(sqlite: Database.Database) {
@@ -479,6 +507,66 @@ function migrateUsers(sqlite: Database.Database) {
   if (!have.has("base_salary")) {
     sqlite.exec("ALTER TABLE users ADD COLUMN base_salary INTEGER");
   }
+  if (!have.has("password_reset_token_hash")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN password_reset_token_hash TEXT");
+  }
+  if (!have.has("password_reset_expires_at")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN password_reset_expires_at TEXT");
+  }
+  if (!have.has("password_reset_used_at")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN password_reset_used_at TEXT");
+  }
+}
+
+/**
+ * The lockout bucket key used to be named `email` because email was the only
+ * way in. It is now the normalized identifier a user typed, or the account's
+ * canonical email once that identifier has been resolved to a known account.
+ * Renaming rather than adding a column keeps the existing primary key, so no
+ * attempt history is lost and no duplicate-key window opens during deploys.
+ */
+function migrateLoginAttempts(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(login_attempts)").all() as {
+    name: string;
+  }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("email")) return;
+  if (!have.has("identifier")) {
+    sqlite.exec("ALTER TABLE login_attempts RENAME COLUMN email TO identifier");
+  }
+}
+
+/**
+ * Phone became a login identifier, which means it now has to identify a single
+ * account. It never did: the seed wrote the same number into every account and
+ * the live data ended up with "Admin" and "Marketing Team" sharing
+ * 917249138197. A duplicate would make "who is logging in" ambiguous, so
+ * duplicates are cleared back to NULL (the owner re-enters it in Team Manager)
+ * and a partial unique index then guarantees it cannot happen again. SQLite
+ * treats NULLs as distinct in a unique index, so un-set phones never collide.
+ */
+function migratePhoneIdentifiers(sqlite: Database.Database) {
+  const dupes = sqlite
+    .prepare(
+      `SELECT phone FROM users WHERE phone IS NOT NULL AND phone <> ''
+       GROUP BY phone HAVING COUNT(*) > 1`
+    )
+    .all() as { phone: string }[];
+
+  for (const { phone } of dupes) {
+    // Keep the lowest id (the original owner of the number) and clear the rest.
+    const cleared = sqlite
+      .prepare(
+        `UPDATE users SET phone = NULL
+         WHERE phone = ? AND id NOT IN (SELECT MIN(id) FROM users WHERE phone = ?)`
+      )
+      .run(phone, phone).changes;
+    console.warn(
+      `[crm] phone ${phone} was shared by multiple accounts; cleared from ${cleared} account(s).`
+    );
+  }
+
+  sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)");
 }
 
 function migrateAttendance(sqlite: Database.Database) {
@@ -503,6 +591,85 @@ function migrateSalaryReports(sqlite: Database.Database) {
   if (!have.has("released_by")) {
     sqlite.exec("ALTER TABLE salary_reports ADD COLUMN released_by INTEGER");
   }
+}
+
+/**
+ * Payments move from one row per person per month to one row per booking per
+ * role, so a payment needs to point at the booking it settles. NULL booking_id
+ * is the legacy month-total row and stays valid: it still marks the whole month
+ * paid for anyone who was paid before this column existed.
+ */
+function migrateIncentives(sqlite: Database.Database) {
+  const cols = sqlite.prepare("PRAGMA table_info(incentive_payments)").all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("booking_id")) {
+    sqlite.exec("ALTER TABLE incentive_payments ADD COLUMN booking_id INTEGER");
+  }
+  sqlite.exec(
+    "CREATE INDEX IF NOT EXISTS idx_incentive_payments_booking ON incentive_payments(booking_id)"
+  );
+}
+
+/**
+ * Office hours moved to 10:30-19:30 with Tuesday as a week-off, so the working
+ * days are Mon/Wed-Sun rather than Mon-Sat.
+ *
+ * The stored value wins over the code default, which means an install that
+ * already has an `office_hours` row would keep masking on the old window
+ * forever with no visible way to tell why. So an untouched default is rewritten
+ * here. A row an admin has actually edited is left alone - quietly reverting a
+ * deliberate setting is worse than leaving it stale, and the Settings page shows
+ * the current window either way.
+ *
+ * The comparison is on the fields the old default set, so the rewrite is
+ * naturally idempotent: once rewritten, the value no longer matches and this
+ * never fires again.
+ */
+function migrateOfficeHoursDefaults(sqlite: Database.Database) {
+  const OLD_DEFAULT = {
+    days: [1, 2, 3, 4, 5, 6],
+    startMin: 600,
+    endMin: 1140,
+    enabled: true,
+    timezone: "Asia/Kolkata",
+  };
+  const NEW_DEFAULT = {
+    days: [0, 1, 3, 4, 5, 6],
+    startMin: 630,
+    endMin: 1170,
+    enabled: true,
+    timezone: "Asia/Kolkata",
+    weekOffDay: "Tuesday",
+  };
+
+  const row = sqlite
+    .prepare("SELECT value FROM crm_settings WHERE key = 'office_hours'")
+    .get() as { value: string } | undefined;
+  if (!row?.value) return;
+
+  let stored: Record<string, unknown>;
+  try {
+    stored = JSON.parse(row.value) as Record<string, unknown>;
+  } catch {
+    return; // unparseable: leave it for an admin to fix in Settings
+  }
+
+  const sameAsOld =
+    JSON.stringify([...(stored.days as number[] ?? [])].sort()) ===
+      JSON.stringify([...OLD_DEFAULT.days].sort()) &&
+    stored.startMin === OLD_DEFAULT.startMin &&
+    stored.endMin === OLD_DEFAULT.endMin &&
+    stored.enabled === OLD_DEFAULT.enabled &&
+    (stored.weekOffDay == null || stored.weekOffDay === "Tuesday");
+
+  if (!sameAsOld) return;
+
+  sqlite
+    .prepare("UPDATE crm_settings SET value = ?, updated_at = ? WHERE key = 'office_hours'")
+    .run(JSON.stringify(NEW_DEFAULT), new Date().toISOString());
+  console.warn(
+    "[crm] office hours still held the pre-10:30 Mon-Sat default; updated to 10:30-19:30, Mon/Wed-Sun with Tuesday as week-off."
+  );
 }
 
 function migrateLeads(sqlite: Database.Database) {
@@ -620,19 +787,32 @@ function seedData() {
 
   const userCount = sqlite.prepare("SELECT COUNT(*) AS c FROM users").get() as { c: number };
   if (userCount.c === 0) {
-    const hash = bcrypt.hashSync("admin123", 10);
     const now = new Date().toISOString();
 
     const insertUser = sqlite.prepare(
-      "INSERT INTO users (name, email, password_hash, role, phone, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)"
+      "INSERT INTO users (name, email, password_hash, role, phone, active, must_change_password, created_at) VALUES (?, ?, ?, ?, NULL, 1, 1, ?)"
     );
 
-    insertUser.run("Admin", "admin@patangfuturehomes.com", hash, "admin", "917249138197", now);
-    insertUser.run("Priti Tiwari", "priti@patangfuturehomes.com", hash, "caller", "917249138197", now);
-    insertUser.run("Aatish Kini", "aatish@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
-    insertUser.run("Sajan Mishra", "sajan@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
-    insertUser.run("Vishrut Jain", "vishrut@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
-    insertUser.run("Kirit Godaniya", "kirit@patangfuturehomes.com", hash, "sales_manager", "917249138197", now);
+    // Every account gets its own unguessable password and is flagged
+    // must_change_password=1, so nobody - including whoever runs the deploy -
+    // ends up holding a credential that reaches the CRM. An admin enters it
+    // once, is forced onto /crm/change-password, and picks their own.
+    //
+    // Phone is left NULL: a real number belongs to a real person and is added
+    // in Team Manager. Seeding a placeholder would collide, and phone is a
+    // login identifier now, so a shared placeholder would be ambiguous.
+    const bootstrap = [
+      ["Admin", "admin@patangfuturehomes.com", "admin"],
+      ["Priti Tiwari", "priti@patangfuturehomes.com", "caller"],
+      ["Aatish Kini", "aatish@patangfuturehomes.com", "sales_manager"],
+      ["Vishrut Jain", "vishrut@patangfuturehomes.com", "sales_manager"],
+      ["Kirit Godaniya", "kirit@patangfuturehomes.com", "sales_manager"],
+      ["Akshar Patel", "akshar@patangfuturehomes.com", "sales_manager"],
+    ] as const;
+
+    for (const [name, email, role] of bootstrap) {
+      insertUser.run(name, email, bcrypt.hashSync(randomPassword(24), 10), role, now);
+    }
 
     // Set default base salaries
     sqlite.exec("UPDATE users SET base_salary = 25000 WHERE role = 'caller'");
@@ -644,17 +824,44 @@ function seedData() {
   ensureMarketingUser(sqlite);
 }
 
+// Alphanumeric only: enough entropy to be safe while staying easy to read aloud
+// and paste into a chat client that mangles symbols. "l", "I", "O" and "0/1"
+// are dropped so the alphabet cannot be misread when transcribed by hand.
+const PASSWORD_ALPHABET =
+  "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/**
+ * Rejection sampling rather than `byte % alphabet.length`, which would bias the
+ * first 256 % 57 = 28 characters of the alphabet. One-time bootstrap
+ * credentials are still credentials.
+ */
+function randomPassword(length: number): string {
+  const limit = Math.floor(256 / PASSWORD_ALPHABET.length) * PASSWORD_ALPHABET.length;
+  let out = "";
+  while (out.length < length) {
+    for (const byte of randomBytes(length)) {
+      if (byte < limit) out += PASSWORD_ALPHABET[byte % PASSWORD_ALPHABET.length];
+      if (out.length === length) break;
+    }
+  }
+  return out;
+}
+
 function ensureMarketingUser(sqlite: Database.Database) {
   const email = "marketing@patangfuturehomes.com";
   const existing = sqlite.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) return;
-  const hash = bcrypt.hashSync("marketing123", 10);
-  const now = new Date().toISOString();
   sqlite
     .prepare(
-      "INSERT INTO users (name, email, password_hash, role, phone, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)"
+      "INSERT INTO users (name, email, password_hash, role, phone, active, must_change_password, created_at) VALUES (?, ?, ?, ?, NULL, 1, 1, ?)"
     )
-    .run("Marketing Team", email, hash, "marketing", "917249138197", now);
+    .run(
+      "Marketing Team",
+      email,
+      bcrypt.hashSync(randomPassword(24), 10),
+      "marketing",
+      new Date().toISOString()
+    );
 }
 
 function migrateMessageTemplates(sqlite: Database.Database) {

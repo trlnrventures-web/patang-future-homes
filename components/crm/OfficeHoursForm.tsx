@@ -12,11 +12,22 @@ const DAY_LABELS = [
   { value: 0, short: "Sun" },
 ];
 
+const WEEK_OFF_OPTIONS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 type Hours = {
   days: number[];
   startMin: number;
   endMin: number;
   enabled: boolean;
+  weekOffDay: string;
 };
 
 const toTime = (m: number) =>
@@ -35,6 +46,9 @@ const fromTime = (v: string) => {
 export default function OfficeHoursForm() {
   const [hours, setHours] = useState<Hours | null>(null);
   const [withinHours, setWithinHours] = useState<boolean | null>(null);
+  const [weekOffToday, setWeekOffToday] = useState(false);
+  const [workingWeekOff, setWorkingWeekOff] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -46,7 +60,10 @@ export default function OfficeHoursForm() {
       .then((d) => {
         if (!active || !d) return;
         setWithinHours(!!d.withinOfficeHours);
-        if (d.hours?.startMin != null) setHours(d.hours);
+        setWeekOffToday(!!d.isWeekOff);
+        setWorkingWeekOff(!!d.workingWeekOff);
+        setBanner(d.banner ?? null);
+        if (d.hours?.startMin != null) setHours({ weekOffDay: "Tuesday", ...d.hours });
       })
       .catch(() => setErr("Could not load office hours."));
     return () => {
@@ -71,6 +88,7 @@ export default function OfficeHoursForm() {
         return;
       }
       setHours(data.hours);
+      setBanner(data.banner ?? null);
       setMsg("Saved. Masking applies immediately.");
     } catch {
       setErr("Network error.");
@@ -100,14 +118,22 @@ export default function OfficeHoursForm() {
     <div className="space-y-5">
       <div
         className={`rounded-xl border px-3 py-2.5 text-xs font-semibold ${
-          withinHours
-            ? "border-green-200 bg-green-50 text-green-800"
-            : "border-amber-300 bg-amber-50 text-amber-900"
+          weekOffToday
+            ? "border-amber-300 bg-amber-50 text-amber-900"
+            : withinHours
+              ? "border-green-200 bg-green-50 text-green-800"
+              : "border-amber-300 bg-amber-50 text-amber-900"
         }`}
       >
-        {withinHours
-          ? "Currently inside office hours - lead contact details are visible to staff."
-          : "Currently outside office hours - lead contact details are masked for Caller and Sales Manager roles."}
+        {banner
+          ? banner
+          : weekOffToday
+            ? workingWeekOff
+              ? `Today is your ${hours.weekOffDay} week-off, but you are checked in - contact details are visible.`
+              : `Today is the ${hours.weekOffDay} week-off. Contacts stay masked all day unless you check in and work it.`
+            : withinHours
+              ? "Currently inside office hours - lead contact details are visible to staff."
+              : "Currently outside office hours - lead contact details are masked for Caller and Sales Manager roles."}
       </div>
 
       <label className="flex cursor-pointer items-center gap-2.5">
@@ -191,6 +217,43 @@ export default function OfficeHoursForm() {
           overnight window running past midnight into the next working day.
         </p>
       )}
+
+      {/* Week-off. On this day contacts stay masked all day for Caller and SM
+          roles unless the person checks in, so opting to cover the office does
+          not cost you the ability to do the job. */}
+      <div className="rounded-xl border border-border bg-background/40 p-3">
+        <label
+          className="mb-1.5 block text-xs font-bold text-navy"
+          htmlFor="oh-weekoff"
+        >
+          Week-off day
+        </label>
+        <select
+          id="oh-weekoff"
+          value={hours.weekOffDay}
+          onChange={(e) => setHours({ ...hours, weekOffDay: e.target.value })}
+          className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-navy outline-none focus:border-primary"
+        >
+          {WEEK_OFF_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-[11px] text-muted">
+          On {hours.weekOffDay}, lead contact details are masked for Caller and
+          Sales Manager roles for the whole day &mdash; even inside the hours
+          above. Anyone checked in and working that day keeps full access.
+          Admin and Owner are never masked.
+        </p>
+        {hours.days.includes(2) && hours.weekOffDay === "Tuesday" && (
+          <p className="mt-2 text-[11px] text-amber-700">
+            Tuesday is also ticked as a working day. The week-off rule wins, so
+            Tuesday will still be masked &mdash; untick it to keep the two in
+            agreement.
+          </p>
+        )}
+      </div>
 
       <div className="rounded-xl border border-border bg-background/50 px-3 py-2.5 text-xs text-muted">
         Admin and Owner roles always see full numbers and full emails, at any

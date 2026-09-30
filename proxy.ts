@@ -9,8 +9,20 @@ const SECRET = new TextEncoder().encode(
 const COOKIE_NAME = "crm_token";
 const CRM_HOST = /^crm\./i;
 const MAIN_URL = "https://patangfuturehomes.com";
-const PUBLIC_PATHS = ["/crm/login"];
-const PUBLIC_API_PATHS = ["/crm/api/auth/login", "/crm/api/auth/logout"];
+const PUBLIC_PATHS = [
+  "/crm/login",
+  "/crm/forgot-password",
+  "/crm/reset-password",
+];
+// reset-password is unauthenticated by necessity: the caller is holding a
+// token from their mailbox, not a session. It is protected by that token's
+// expiry and single-use rule instead.
+const PUBLIC_API_PATHS = [
+  "/crm/api/auth/login",
+  "/crm/api/auth/logout",
+  "/crm/api/auth/forgot-password",
+  "/crm/api/auth/reset-password",
+];
 const FORCE_CHANGE_PASSWORD_PATH = "/crm/change-password";
 
 export async function proxy(request: NextRequest) {

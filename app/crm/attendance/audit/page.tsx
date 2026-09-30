@@ -13,6 +13,11 @@ import {
 } from "@/lib/crm/attendance-audit";
 import { Card, Button } from "@/components/crm/ui";
 import HolidayManager from "@/components/crm/HolidayManager";
+import {
+  formatCreditDate,
+  getAllStaffCreditBalances,
+  getStaffCreditLedger,
+} from "@/lib/crm/leave-credits";
 
 export const metadata: Metadata = {
   title: { absolute: "Attendance Audit | Patang CRM" },
@@ -100,6 +105,16 @@ export default async function AttendanceAuditPage({
   const users = auditUsers();
   const events = buildAttendanceAudit({ userId, from, to, types: typeSet });
   const holidays = activeHolidays();
+
+  const balances = getAllStaffCreditBalances(today);
+  const ledgerRows = balances.flatMap((b) =>
+    getStaffCreditLedger(b.userId, today).map((c) => ({
+      ...c,
+      userId: b.userId,
+      earnedLabel: formatCreditDate(c.earnedDate),
+      expiresLabel: formatCreditDate(c.expiresOn),
+    }))
+  );
 
   const grouped = events.reduce<Record<string, typeof events>>((acc, e) => {
     (acc[e.date] ||= []).push(e);
@@ -215,6 +230,94 @@ export default async function AttendanceAuditPage({
         <div className="mt-3">
           <HolidayManager holidays={holidays} today={today} />
         </div>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-primary">Banked Leave Credits</h2>
+            <p className="mt-0.5 text-[11px] text-soft">
+              Every credit banked by working a week-off, with the date it was
+              earned, when it lapses (2 months later), and whether it was spent.
+            </p>
+          </div>
+          <span className="text-[11px] text-soft">
+            {ledgerRows.length} credit{ledgerRows.length === 1 ? "" : "s"} across{" "}
+            {balances.length} staff
+          </span>
+        </div>
+
+        {ledgerRows.length === 0 ? (
+          <p className="mt-4 rounded-xl bg-background px-3 py-6 text-center text-sm text-soft">
+            No credits banked yet. They appear here the first time someone works
+            their week-off.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {balances.map((b) => {
+              const rows = ledgerRows.filter((r) => r.userId === b.userId);
+              if (rows.length === 0) return null;
+              return (
+                <div key={b.userId}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-navy">{b.name}</span>
+                    <span className="text-[10px] text-soft">{b.role}</span>
+                    <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-bold text-green-700">
+                      {b.available} available
+                    </span>
+                    {b.spent > 0 && (
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                        {b.spent} used
+                      </span>
+                    )}
+                    {b.expired > 0 && (
+                      <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                        {b.expired} expired
+                      </span>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-[10px] uppercase tracking-wide text-muted">
+                          <th className="px-2 py-1.5">Earned</th>
+                          <th className="px-2 py-1.5">Expires</th>
+                          <th className="px-2 py-1.5">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.creditId} className="border-b border-border/40 last:border-0">
+                            <td className="px-2 py-1.5 text-navy">{r.earnedLabel}</td>
+                            <td className="px-2 py-1.5 text-muted">
+                              {r.expiresLabel}
+                              {r.status === "available" && r.daysToExpiry <= 30 && (
+                                <span className="ml-1 font-semibold text-amber-600">
+                                  ({r.daysToExpiry}d left)
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              {r.status === "used" ? (
+                                <span className="font-semibold text-gray-600">
+                                  Used on {r.usedOn}
+                                </span>
+                              ) : r.status === "expired" ? (
+                                <span className="font-semibold text-red-600">Expired</span>
+                              ) : (
+                                <span className="font-semibold text-green-700">Unused</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       <Card className="p-4">

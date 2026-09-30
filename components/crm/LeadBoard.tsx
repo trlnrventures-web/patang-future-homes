@@ -43,6 +43,15 @@ type Props = {
 /** Roles that own leads directly, so "My Leads" is meaningful for them. */
 const MY_LEADS_ROLES = new Set(["caller", "sales_manager"]);
 
+/**
+ * How many cards a stage renders before it makes the reader ask for more. A
+ * column scrolls internally now, so this is about scroll lag and DOM weight on
+ * a stage holding hundreds of leads rather than about fit — every column shows
+ * its real count in the header, so nothing is hidden without saying so.
+ */
+const COLUMN_CARD_CAP = 60;
+const COLUMN_REVEAL_STEP = 60;
+
 function projectOf(lead: BoardLead): string {
   return lead.preferredProject || lead.originalProject || "";
 }
@@ -71,8 +80,8 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
     () => new Set(LEAD_COLUMNS.filter((c) => c.closed).map((c) => c.key))
   );
 
-  // Mobile stage tab. The desktop board shows all nine columns side by side,
-  // which on a phone just means nine narrow unreadable strips with no way to
+  // Mobile stage tab. The desktop board shows all eleven columns side by side,
+  // which on a phone just means eleven narrow unreadable strips with no way to
   // tell which one you are looking at. On mobile we show one stage at a time as
   // a flat list, chosen with this tab. Keyed by column key so it stays in step
   // with LEAD_COLUMNS.
@@ -85,6 +94,11 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   const [lostTarget, setLostTarget] = useState<BoardLead | null>(null);
   const [lostReason, setLostReason] = useState("");
   const [lostNote, setLostNote] = useState("");
+  // Cards shown past COLUMN_CARD_CAP, per column key. Each entry records the set
+  // of lead ids it was expanded for, so a new search or filter invalidates it
+  // without needing to reset state - a reader is never left looking at hundreds
+  // of expanded cards from a filter that no longer applies.
+  const [reveal, setReveal] = useState<Record<string, { sig: string; n: number }>>({});
   const [busy, setBusy] = useState(false);
   const loadSeq = useRef(0);
 
@@ -219,6 +233,24 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   const activeStageLabel = activeStageColumn.label;
   const activeLeads = byColumn[activeStageColumn.key] ?? [];
 
+  /** Identity of the current result set, used to expire stale expansions. */
+  const visibleSig = useMemo(() => visibleLeads.map((l) => l.id).join(","), [visibleLeads]);
+
+  /** Cards to render for a column right now: the cap, unless expanded. */
+  const shownFor = useCallback(
+    (key: string) => (reveal[key]?.sig === visibleSig ? reveal[key].n : COLUMN_CARD_CAP),
+    [reveal, visibleSig]
+  );
+
+  const showMore = useCallback(
+    (key: string) =>
+      setReveal((r) => {
+        const from = r[key]?.sig === visibleSig ? r[key].n : COLUMN_CARD_CAP;
+        return { ...r, [key]: { sig: visibleSig, n: from + COLUMN_REVEAL_STEP } };
+      }),
+    [visibleSig]
+  );
+
   const moveLead = useCallback(
     async (lead: BoardLead, targetStatus: string) => {
       if (readOnly || lead.status === targetStatus) return;
@@ -289,8 +321,8 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   );
 
   return (
-    <div className="pb-24">
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+    <div className="pb-24 md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden md:pb-0">
+      <div className="flex shrink-0 flex-col gap-2.5 sm:flex-row sm:items-center">
         <input
           type="search"
           value={query}
@@ -331,12 +363,12 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
         </div>
       </div>
 
-      <ContactMaskingBanner masking={masking} className="mt-2.5" />
+      <ContactMaskingBanner masking={masking} className="mt-2.5 md:shrink-0" />
 
       {/* ===== Mobile stage tabs =====
           A horizontally scrollable tab per stage with its lead count. Pinned
           under the quick filters so it stays reachable while the list scrolls.
-          md:hidden: from md up the full nine-column board renders instead. */}
+          md:hidden: from md up the full eleven-column board renders instead. */}
       <div className="sticky top-14 z-30 -mx-4 mt-2.5 border-y border-border bg-white px-4 py-2 md:hidden">
         <div
           className="flex gap-1.5 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -372,21 +404,21 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
       </div>
 
       {error && (
-        <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+        <div className="mt-2.5 shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="mt-3 flex gap-3">
+        <div className="mt-3 flex gap-3 md:min-h-0 md:flex-1">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[calc(100vh-16rem)] min-h-[24rem] w-64 shrink-0 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="min-h-[24rem] w-64 shrink-0 animate-pulse rounded-xl bg-gray-100 md:h-auto md:min-h-0 md:flex-1" />
           ))}
         </div>
       ) : (
         <>
           {visibleLeads.length === 0 && (
-            <div className="mt-3 rounded-xl border border-dashed border-border bg-white px-4 py-3 text-center">
+            <div className="mt-3 shrink-0 rounded-xl border border-dashed border-border bg-white px-4 py-3 text-center">
               <p className="text-sm font-semibold text-navy">
                 {myLeadsActive ? "No leads assigned to you" : "No leads match these filters"}
               </p>
@@ -402,7 +434,12 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
               Cards keep the same four lines as the board but get 12px of
               separation and a 64px minimum row, so they no longer run together
               behind a hairline. Drag-and-drop is not offered here; moving a
-              stage happens from the lead itself. */}
+              stage happens from the lead itself.
+
+              There is no horizontal misalignment to fix on mobile: one stage at
+              a time in normal page flow is the correct pattern for a phone, so
+              this list keeps scrolling with the page rather than becoming its
+              own viewport-height pane. It does share the desktop's card cap. */}
           <div
             className="mt-3 flex flex-col gap-3 pb-2 md:hidden"
             onTouchStart={onTouchStart}
@@ -418,24 +455,40 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
                 </p>
               </div>
             ) : (
-              activeLeads.map((lead) => (
-                <MobileStageCard
-                  key={lead.id}
-                  lead={lead}
-                  pending={pendingId === lead.id}
-                  onOpen={() => router.push(`/crm/leads/${lead.id}${hrefQuery}`)}
+              <>
+                {activeLeads
+                  .slice(0, shownFor(activeStageColumn.key))
+                  .map((lead) => (
+                    <MobileStageCard
+                      key={lead.id}
+                      lead={lead}
+                      pending={pendingId === lead.id}
+                      onOpen={() => router.push(`/crm/leads/${lead.id}${hrefQuery}`)}
+                    />
+                  ))}
+                <ShowMore
+                  hidden={Math.max(0, activeLeads.length - shownFor(activeStageColumn.key))}
+                  total={activeLeads.length}
+                  onShowMore={() => showMore(activeStageColumn.key)}
                 />
-              ))
+              </>
             )}
           </div>
 
-          {/* ===== Desktop: the full nine-column board ===== */}
-          <div className="mt-3 hidden items-stretch gap-3 overflow-x-auto pb-2 md:flex [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+          {/* ===== Desktop: the full eleven-column board =====
+              `min-h-0 flex-1` is what gives every column a definite height:
+              `items-stretch` then hands that same height to all eleven sections,
+              and each section's card list scrolls inside it. Without a bounded
+              height here the sections grow with their tallest card list, the
+              lists never overflow, and the whole page scrolls instead. */}
+          <div className="mt-3 hidden min-h-0 flex-1 items-stretch gap-3 overflow-x-auto pb-2 md:flex [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
           {LEAD_COLUMNS.map((column) => (
             <BoardColumn
               key={column.key}
               column={column}
               cards={byColumn[column.key]}
+              shownCount={shownFor(column.key)}
+              onShowMore={() => showMore(column.key)}
               collapsed={collapsed.has(column.key)}
               readOnly={readOnly}
               draggingId={draggingId}
@@ -526,6 +579,8 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
 function BoardColumn({
   column,
   cards,
+  shownCount,
+  onShowMore,
   collapsed,
   readOnly,
   draggingId,
@@ -541,6 +596,9 @@ function BoardColumn({
 }: {
   column: LeadColumn;
   cards: BoardLead[];
+  /** Cards rendered before the rest are held back; see COLUMN_CARD_CAP. */
+  shownCount: number;
+  onShowMore: () => void;
   collapsed: boolean;
   readOnly?: boolean;
   draggingId: number | null;
@@ -592,6 +650,9 @@ function BoardColumn({
         isOver ? "border-primary ring-2 ring-primary/20" : "border-border"
       }`}
     >
+      {/* `shrink-0` keeps the header pinned to the top of the column while the
+          list below it scrolls; the section's height comes from the board row,
+          which is what every column shares. */}
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
         <h3 className="min-w-0 flex-1 truncate text-sm font-bold text-navy">{column.label}</h3>
         <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-sm font-bold text-muted">
@@ -608,24 +669,53 @@ function BoardColumn({
           </svg>
         </button>
       </header>
-      <div className="flex min-h-[8rem] flex-1 flex-col gap-2 overflow-y-auto p-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
         {cards.length === 0 ? (
           <p className="px-1 py-6 text-center text-sm text-soft">{isOver ? "Drop here" : "No leads"}</p>
         ) : (
-          cards.map((lead) => (
-            <BoardCard
-              key={lead.id}
-              lead={lead}
-              dragging={draggingId === lead.id}
-              pending={pendingId === lead.id}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              onOpen={onOpen}
+          <>
+            {cards.slice(0, shownCount).map((lead) => (
+              <BoardCard
+                key={lead.id}
+                lead={lead}
+                dragging={draggingId === lead.id}
+                pending={pendingId === lead.id}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onOpen={onOpen}
+              />
+            ))}
+            <ShowMore
+              hidden={cards.length - Math.min(shownCount, cards.length)}
+              total={cards.length}
+              onShowMore={onShowMore}
             />
-          ))
+          </>
         )}
       </div>
     </section>
+  );
+}
+
+/** "+N more" affordance, so a capped column never looks truncated. */
+function ShowMore({
+  hidden,
+  total,
+  onShowMore,
+}: {
+  hidden: number;
+  total: number;
+  onShowMore: () => void;
+}) {
+  if (hidden <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onShowMore}
+      className="shrink-0 rounded-lg border border-dashed border-border bg-background/60 px-3 py-2 text-xs font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary"
+    >
+      Showing {total - hidden} of {total} — show {Math.min(hidden, COLUMN_REVEAL_STEP)} more
+    </button>
   );
 }
 

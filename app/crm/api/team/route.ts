@@ -5,6 +5,12 @@ import { eq } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import { writeAuditLog } from "@/lib/crm/audit";
 import { DEFAULT_WEEK_OFF_DAY } from "@/lib/crm/attendance";
+import {
+  isValidEmail,
+  isValidPhone,
+  normalizeEmail,
+  normalizePhone,
+} from "@/lib/crm/identifiers";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +63,63 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updates: Record<string, unknown> = {};
+
+    // Email and phone are both login identifiers, so changing one of them
+    // changes how that person gets in and where their reset link lands. Both
+    // are therefore held to the same uniqueness rule the login lookup assumes:
+    // an identifier resolves to exactly one account.
+    if (body.email !== undefined) {
+      const email = normalizeEmail(String(body.email ?? ""));
+      if (!isValidEmail(email)) {
+        return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+      }
+      const taken = db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, email))
+        .get();
+      if (taken && taken.id !== targetUserId) {
+        return NextResponse.json(
+          { error: "That email is already used by another account" },
+          { status: 400 }
+        );
+      }
+      if (email !== target.email) {
+        updates.email = email;
+        // A reset link already in flight was delivered to the address that is
+        // no longer theirs, so it stops working here rather than outliving the
+        // change.
+        updates.passwordResetTokenHash = null;
+        updates.passwordResetExpiresAt = null;
+      }
+    }
+
+    if (body.phone !== undefined) {
+      const raw = String(body.phone ?? "").trim();
+      if (raw === "") {
+        updates.phone = null;
+      } else {
+        const phone = normalizePhone(raw);
+        if (!phone || !isValidPhone(phone)) {
+          return NextResponse.json(
+            { error: "Enter a valid 10-digit mobile number" },
+            { status: 400 }
+          );
+        }
+        const taken = db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.phone, phone))
+          .get();
+        if (taken && taken.id !== targetUserId) {
+          return NextResponse.json(
+            { error: "That phone number is already used by another account" },
+            { status: 400 }
+          );
+        }
+        updates.phone = phone;
+      }
+    }
 
     if (body.baseSalary !== undefined) {
       const salary = body.baseSalary === null ? null : Number(body.baseSalary);

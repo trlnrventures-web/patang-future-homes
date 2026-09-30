@@ -131,6 +131,33 @@ export default function LeadFilterPanel({
   // copy inside the panel, so closing without applying changes nothing.
   const [draft, setDraft] = useState<LeadFilters>(applied);
   const panelRef = useFocusTrap(open, () => setOpen(false));
+  const [roster, setRoster] = useState<{ smList: Person[]; callerList: Person[] }>({
+    smList: [],
+    callerList: [],
+  });
+
+  // Every caller and SM in the CRM, not just the ones who happen to own a card
+  // on screen — otherwise a teammate with no leads in the current view (or in the
+  // current filter) cannot be picked at all. The board keeps deriving names from
+  // loaded leads as a fallback while this request is in flight.
+  useEffect(() => {
+    let live = true;
+    fetch("/crm/api/team/assignees")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!live || !d) return;
+        const toPeople = (rows: { id: number; name: string }[]): Person[] =>
+          rows
+            .filter((r) => r.name)
+            .map((r) => ({ id: r.id, name: r.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        setRoster({ smList: toPeople(d.sms), callerList: toPeople(d.callers) });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Restore this user's saved filters once we know who they are, then push the
   // result up to the board.
@@ -149,6 +176,9 @@ export default function LeadFilterPanel({
         caller.set(l.assignedCallerId, l.assignedCallerName);
       }
     }
+    // The roster wins where the two overlap; names only ever differ by whitespace.
+    for (const p of roster.smList) sm.set(p.id, p.name);
+    for (const p of roster.callerList) caller.set(p.id, p.name);
     return {
       sm: Object.fromEntries(sm),
       caller: Object.fromEntries(caller),
@@ -157,7 +187,7 @@ export default function LeadFilterPanel({
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     };
-  }, [leads]);
+  }, [leads, roster]);
 
   const options = useMemo(() => filterOptions(leads), [leads]);
   const activeCount = countActive(applied);

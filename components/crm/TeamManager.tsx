@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { normalizeEmail, normalizePhone } from "@/lib/crm/identifiers";
 
 type TeamUser = {
   id: number;
@@ -13,6 +14,13 @@ type TeamUser = {
   baseSalary: number | null;
 };
 
+type EditState = {
+  baseSalary: string;
+  weekOffDay: string;
+  email: string;
+  phone: string;
+};
+
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -23,12 +31,19 @@ const ROLE_LABELS: Record<string, string> = {
   marketing: "Marketing",
 };
 
+const EMPTY_EDIT: EditState = {
+  baseSalary: "",
+  weekOffDay: "Tuesday",
+  email: "",
+  phone: "",
+};
+
 export default function TeamManager() {
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
-  const [edits, setEdits] = useState<Record<number, { baseSalary: string; weekOffDay: string }>>({});
+  const [edits, setEdits] = useState<Record<number, EditState>>({});
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -41,11 +56,13 @@ export default function TeamManager() {
       const json = await res.json();
       if (res.ok) {
         setUsers(json.users);
-        const initial: Record<number, { baseSalary: string; weekOffDay: string }> = {};
+        const initial: Record<number, EditState> = {};
         for (const u of json.users) {
           initial[u.id] = {
             baseSalary: u.baseSalary != null ? String(u.baseSalary) : "",
             weekOffDay: u.weekOffDay || "Tuesday",
+            email: u.email || "",
+            phone: u.phone || "",
           };
         }
         setEdits(initial);
@@ -65,13 +82,16 @@ export default function TeamManager() {
   const saveUser = async (userId: number) => {
     setSaving(userId);
     try {
-      const edit = edits[userId];
-      const body: Record<string, unknown> = { userId };
-      if (edit.baseSalary !== "") {
-        body.baseSalary = Number(edit.baseSalary);
-      } else {
-        body.baseSalary = null;
-      }
+      const edit = edits[userId] ?? EMPTY_EDIT;
+      const body: Record<string, unknown> = {
+        userId,
+        // Both are login identifiers, so they are sent even when the admin
+        // touched only the salary: a blank phone is a deliberate "remove it",
+        // and the server needs to see the email to keep the two in step.
+        email: normalizeEmail(edit.email),
+        phone: edit.phone.trim() === "" ? null : normalizePhone(edit.phone),
+      };
+      body.baseSalary = edit.baseSalary !== "" ? Number(edit.baseSalary) : null;
       body.weekOffDay = edit.weekOffDay;
 
       const res = await fetch("/crm/api/team", {
@@ -90,10 +110,10 @@ export default function TeamManager() {
     }
   };
 
-  const updateEdit = (userId: number, field: "baseSalary" | "weekOffDay", value: string) => {
+  const updateEdit = (userId: number, field: keyof EditState, value: string) => {
     setEdits((prev) => ({
       ...prev,
-      [userId]: { ...prev[userId], [field]: value },
+      [userId]: { ...(prev[userId] ?? EMPTY_EDIT), [field]: value },
     }));
   };
 
@@ -119,6 +139,8 @@ export default function TeamManager() {
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted">
                 <th className="px-2 py-2">Name</th>
+                <th className="px-2 py-2">Email (login)</th>
+                <th className="px-2 py-2">Phone (login)</th>
                 <th className="px-2 py-2">Role</th>
                 <th className="px-2 py-2">Week Off</th>
                 <th className="px-2 py-2 text-right">Base Monthly Salary</th>
@@ -127,17 +149,47 @@ export default function TeamManager() {
             </thead>
             <tbody>
               {users.map((u) => {
-                const edit = edits[u.id] || { baseSalary: "", weekOffDay: "Tuesday" };
+                const edit = edits[u.id] ?? EMPTY_EDIT;
                 const salaryChanged =
                   edit.baseSalary !== (u.baseSalary != null ? String(u.baseSalary) : "");
                 const weekOffChanged = edit.weekOffDay !== u.weekOffDay;
-                const hasChanges = salaryChanged || weekOffChanged;
+                // Compared after normalization, otherwise trailing spaces or a
+                // +91 prefix leave the row permanently showing as unsaved.
+                const emailChanged = normalizeEmail(edit.email) !== (u.email ?? "");
+                const phoneChanged =
+                  (normalizePhone(edit.phone) ?? "") !== (u.phone ?? "");
+                const hasChanges =
+                  salaryChanged || weekOffChanged || emailChanged || phoneChanged;
 
                 return (
                   <tr key={u.id} className="border-b border-border/50 last:border-0">
                     <td className="px-2 py-2.5">
                       <div className="font-semibold text-navy">{u.name}</div>
-                      <div className="text-[11px] text-soft">{u.email}</div>
+                      {!u.active && (
+                        <div className="text-[11px] text-red-600">Inactive</div>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <input
+                        type="email"
+                        value={edit.email}
+                        onChange={(e) => updateEdit(u.id, "email", e.target.value)}
+                        className={`w-56 rounded-xl border bg-white px-3 py-1.5 text-xs text-navy ${
+                          emailChanged ? "border-primary" : "border-border"
+                        }`}
+                      />
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={edit.phone}
+                        onChange={(e) => updateEdit(u.id, "phone", e.target.value)}
+                        placeholder="Not set"
+                        className={`w-36 rounded-xl border bg-white px-3 py-1.5 text-xs text-navy ${
+                          phoneChanged ? "border-primary" : "border-border"
+                        }`}
+                      />
                     </td>
                     <td className="px-2 py-2.5 text-xs text-muted">
                       {ROLE_LABELS[u.role] || u.role}
@@ -189,8 +241,17 @@ export default function TeamManager() {
       </div>
 
       <div className="rounded-xl bg-primary/5 px-4 py-3 text-xs text-muted">
-        <strong className="text-primary">Note:</strong> Changing a salary only affects future months.
-        Past confirmed salary slips remain unchanged for historical accuracy.
+        <p>
+          <strong className="text-primary">Login identifiers:</strong> email and
+          phone are both used to sign in and must be unique across the team.
+          Phone is the number their reset link and account are tied to - leave
+          it blank only if the person has no number on file yet.
+        </p>
+        <p className="mt-1.5">
+          <strong className="text-primary">Note:</strong> Changing a salary only
+          affects future months. Past confirmed salary slips remain unchanged
+          for historical accuracy.
+        </p>
       </div>
     </div>
   );

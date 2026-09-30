@@ -6,7 +6,7 @@
 //
 //   NAME="Sohan Rajput" \
 //   EMAIL="sohan@patangfuturehomes.com" \
-//   PHONE="917249138197" \
+//   PHONE="9823727172" \
 //   WEEK_OFF="Tuesday" \
 //   node scripts/add-caller.mjs
 //
@@ -26,8 +26,8 @@
 //   CRM_DB_PATH=/var/lib/patang-crm/crm.db node scripts/add-caller.mjs
 //   DRY_RUN=1 CRM_DB_PATH=/var/lib/patang-crm/crm.db node scripts/add-caller.mjs
 //
-// Idempotent: if a user with the same email or name already exists the script
-// reports the existing account and exits 0 without writing. No leads are
+// Idempotent: if a user with the same email, name or phone already exists the
+// script reports the existing account and exits 0 without writing. No leads are
 // touched - the new account starts with an empty queue.
 
 import Database from "better-sqlite3";
@@ -40,11 +40,24 @@ const DRY_RUN = process.env.DRY_RUN === "1";
 
 const NAME = (process.env.NAME || "").trim();
 const EMAIL = (process.env.EMAIL || "").trim().toLowerCase();
-const PHONE = (process.env.PHONE || "").trim() || null;
+const PHONE_RAW = (process.env.PHONE || "").trim() || null;
 const WEEK_OFF = (process.env.WEEK_OFF || "").trim() || null;
 const TEMP_PASSWORD = process.env.TEMP_PASSWORD || null;
 const BASE_SALARY = process.env.BASE_SALARY ? Number(process.env.BASE_SALARY) : null;
 const ROLE = (process.env.ROLE || "caller").trim().toLowerCase();
+
+// Must match normalizePhone in lib/crm/identifiers.ts. Phone is a login
+// identifier, so what gets stored has to be the same 10-digit form the login
+// screen compares against - otherwise "+91 98237 27172" would create an account
+// nobody can sign in to. Duplicated rather than imported because this file is
+// plain .mjs and cannot import the TypeScript module; keep the two in step.
+function normalizePhone(value) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return null;
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+const PHONE = PHONE_RAW ? normalizePhone(PHONE_RAW) : null;
 
 // Must match the users.role enum in lib/crm/schema.ts. Inserting anything else
 // would fail at runtime in the nav and permission checks rather than at write
@@ -78,6 +91,9 @@ if (WEEK_OFF && !DAY_NAMES.includes(WEEK_OFF)) {
 if (BASE_SALARY !== null && !Number.isInteger(BASE_SALARY)) {
   fail(`BASE_SALARY must be a whole number (got "${process.env.BASE_SALARY}")`);
 }
+if (PHONE_RAW && (!PHONE || !/^[6-9]\d{9}$/.test(PHONE))) {
+  fail(`PHONE "${PHONE_RAW}" is not a valid 10-digit Indian mobile number`);
+}
 
 const password = TEMP_PASSWORD || randomBytes(9).toString("base64url");
 if (TEMP_PASSWORD && TEMP_PASSWORD.length < 8) {
@@ -94,9 +110,14 @@ const byEmail = db
 const byName = db
   .prepare("select id, name, email, role, active from users where lower(name) = ?")
   .get(NAME.toLowerCase());
+// Phone is a login identifier and carries a unique index, so a clash here has
+// to be caught before the insert turns it into a raw SQLite constraint error.
+const byPhone = PHONE
+  ? db.prepare("select id, name, email, role, active from users where phone = ?").get(PHONE)
+  : undefined;
 
-if (byEmail || byName) {
-  const existing = byEmail || byName;
+if (byEmail || byName || byPhone) {
+  const existing = byEmail || byName || byPhone;
   console.log(`${existing.name} already exists (id ${existing.id}, ${existing.role}, active ${existing.active}) - nothing to do.`);
   db.close();
   process.exit(0);

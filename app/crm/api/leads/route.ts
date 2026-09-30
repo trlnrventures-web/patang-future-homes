@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   // Masking happens here, on the way out, so the real number is never sent to a
   // staff browser at all - not hidden by CSS, and not recoverable from the
   // network tab or the page source.
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
   const total = all.length;
 
   // The board renders every lead of the current filter in one pass so a card can

@@ -66,7 +66,7 @@ export async function getDashboardData(user: CrmUser) {
     const assigned = allLeads.filter((l) => l.assignedSmId === sm.id);
     const leads = assigned.length;
     const connected = assigned.filter((l) =>
-      ["qualified", "assigned", "follow_up", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked"].includes(l.status)
+      ["qualified", "assigned", "follow_up", "plan_hold", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked"].includes(l.status)
     ).length;
     const followUps = db
       .select()
@@ -102,7 +102,7 @@ export async function getDashboardData(user: CrmUser) {
     .map((caller) => {
       const assigned = allLeads.filter((l) => l.assignedCallerId === caller.id);
       const contacted = assigned.filter((l) =>
-        ["calling", "connected", "qualified", "assigned", "follow_up", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked", "no_response"].includes(l.status)
+        ["calling", "connected", "initial_contact", "qualified", "assigned", "follow_up", "plan_hold", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked", "no_response"].includes(l.status)
       ).length;
       const qualified = assigned.filter((l) => l.status === "qualified").length;
       const assignedOut = assigned.filter((l) => l.assignedSmId).length;
@@ -158,7 +158,7 @@ export async function getDashboardData(user: CrmUser) {
   })() : null;
 
   const qualified = allLeads.filter((l) =>
-    ["qualified", "assigned", "follow_up", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked"].includes(l.status)
+    ["qualified", "assigned", "follow_up", "plan_hold", "visit_proposed", "visit_booked", "visit_confirmed", "visit_done", "negotiation", "booked"].includes(l.status)
   ).length;
   const visitsBooked = allSiteVisits.filter((v) =>
     ["booked", "confirmed", "arrived", "visit_done", "no_show"].includes(v.status)

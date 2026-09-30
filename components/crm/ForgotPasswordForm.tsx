@@ -2,44 +2,59 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth } from "./AuthProvider";
 
-export default function LoginForm() {
-  const { setUser } = useAuth();
+export default function ForgotPasswordForm() {
   const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
 
     try {
-      const res = await fetch("/crm/api/auth/login", {
+      const res = await fetch("/crm/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ identifier }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Login failed");
+        setError(data.error || "Could not send the reset link. Please try again.");
         setLoading(false);
         return;
       }
 
-      const data = await res.json();
-      setUser(data.user);
-      window.location.href = data.user?.mustChangePassword
-        ? "/crm/change-password"
-        : "/crm/dashboard";
+      // The server answers the same way whether or not the account exists, so
+      // this is the confirmation, not proof that a mail was sent.
+      setSent(true);
+      setLoading(false);
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
-  };
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-xl border border-border bg-background p-4 text-sm text-muted">
+        <p className="font-semibold text-navy">Check your inbox</p>
+        <p className="mt-1">
+          If that phone number or email belongs to an account, a reset link is on
+          its way. The link is valid for 30 minutes and can only be used once.
+        </p>
+        <Link
+          href="/crm/login"
+          className="mt-4 inline-block text-sm font-semibold text-primary underline"
+        >
+          Back to sign in
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -61,30 +76,9 @@ export default function LoginForm() {
           placeholder="9823727172 or you@patangfuturehomes.com"
           required
         />
-      </div>
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold text-muted" htmlFor="password">
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-primary"
-          placeholder="••••••••"
-          required
-        />
-      </div>
-
-      <div className="-mt-1 text-right">
-        <Link
-          href="/crm/forgot-password"
-          className="text-xs font-semibold text-primary underline"
-        >
-          Forgot password?
-        </Link>
+        <p className="mt-1.5 text-xs text-muted">
+          The link is emailed to the address on your CRM account.
+        </p>
       </div>
 
       {error && (
@@ -98,8 +92,15 @@ export default function LoginForm() {
         disabled={loading}
         className="w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-secondary disabled:opacity-60"
       >
-        {loading ? "Signing in..." : "Sign In"}
+        {loading ? "Sending..." : "Send reset link"}
       </button>
+
+      <Link
+        href="/crm/login"
+        className="text-center text-sm font-semibold text-primary underline"
+      >
+        Back to sign in
+      </Link>
     </form>
   );
 }

@@ -45,6 +45,27 @@ type TeamRow = {
   working?: string;
 };
 
+/** One banked credit, as the server computed it (expiry and status included). */
+type CreditRow = {
+  creditId: number;
+  earnedDate: string;
+  earnedLabel: string;
+  expiresOn: string;
+  expiresLabel: string;
+  status: "available" | "used" | "expired";
+  usedOn: string | null;
+  daysToExpiry: number;
+};
+
+type LeaveBalanceData = {
+  available: number;
+  earned: number;
+  spent: number;
+  expired: number;
+  summary: string;
+  credits: CreditRow[];
+};
+
 type AttendanceData = {
   today: string;
   weekOffDay: string;
@@ -54,6 +75,7 @@ type AttendanceData = {
   history: DayCard[];
   week: DayCard[];
   leaveDaysThisMonth: number;
+  leaveBalance: LeaveBalanceData;
   myLeaves: LeaveRow[];
   pendingLeaves: (LeaveRow & { userName: string })[];
   teamView: TeamRow[];
@@ -371,8 +393,66 @@ export default function AttendancePanel({ data }: { data: AttendanceData }) {
               day{data.leaveDaysThisMonth === 1 ? "" : "s"} used this month
             </div>
           </div>
+
+          {/* Banked credits. The count and the expiry date are both shown here
+              on purpose: a credit that quietly lapses is the one thing a
+              staff member cannot plan around after the fact. */}
+          <div className="mt-4 rounded-xl border border-border bg-background/60 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs font-bold text-navy">Banked Credits</span>
+              <span className="text-lg font-bold text-primary">
+                    {data.leaveBalance.available}
+                <span className="ml-1 text-[11px] font-semibold text-muted">available</span>
+              </span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+              {data.leaveBalance.summary}
+            </p>
+
+            {data.leaveBalance.credits.length > 0 && (
+              <div className="mt-2.5 space-y-1">
+                {data.leaveBalance.credits.slice(0, 4).map((c) => {
+                  const tone =
+                    c.status === "used"
+                      ? "bg-gray-100 text-gray-600"
+                      : c.status === "expired"
+                        ? "bg-red-50 text-red-700"
+                        : c.daysToExpiry <= 30
+                          ? "bg-amber-50 text-amber-800"
+                          : "bg-green-50 text-green-800";
+                  return (
+                    <div
+                      key={c.creditId}
+                      className={`flex flex-wrap items-center justify-between gap-1 rounded-lg px-2 py-1 text-[10px] ${tone}`}
+                    >
+                      <span className="font-semibold">
+                        Earned {c.earnedLabel}
+                      </span>
+                      <span>
+                        {c.status === "used"
+                          ? `Used ${c.usedOn ?? ""}`
+                          : c.status === "expired"
+                            ? `Expired ${c.expiresLabel}`
+                            : c.daysToExpiry <= 30
+                              ? `Expires ${c.expiresLabel} (${c.daysToExpiry}d)`
+                              : `Valid to ${c.expiresLabel}`}
+                      </span>
+                    </div>
+                  );
+                })}
+                {data.leaveBalance.credits.length > 4 && (
+                  <p className="pt-0.5 text-[10px] text-soft">
+                    +{data.leaveBalance.credits.length - 4} older credit
+                    {data.leaveBalance.credits.length - 4 === 1 ? "" : "s"}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="mt-3 rounded-xl bg-background px-3 py-2 text-[11px] text-muted">
-            Approved leaves count toward this month&apos;s balance and reset every month.
+            Approved leaves count toward this month&apos;s balance and reset every
+            month. Credits banked by working a week-off last 2 months.
           </div>
         </div>
       </div>

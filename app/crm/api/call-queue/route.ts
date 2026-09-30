@@ -31,7 +31,7 @@ export async function GET() {
   const now = new Date();
   const date = istToday();
   const { from, to } = istDayRange(date);
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
 
   const myLeads = db
     .select()

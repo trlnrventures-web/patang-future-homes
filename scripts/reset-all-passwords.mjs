@@ -103,10 +103,18 @@ const hashed = planned.map((p) => ({ ...p, hash: bcrypt.hashSync(p.password, 10)
 const hasAttempts = db
   .prepare("select 1 from sqlite_master where type = 'table' and name = 'login_attempts'")
   .get();
+// The key column was renamed from `email` to `identifier` when phone became a
+// second login identifier. It still holds the account's canonical email for a
+// known account, so matching on the user's email keeps working.
+const attemptsKey = hasAttempts
+  ? (db.prepare("PRAGMA table_info(login_attempts)").all().some((c) => c.name === "identifier")
+      ? "identifier"
+      : "email")
+  : null;
 const emails = targets.map((t) => String(t.email).toLowerCase());
 const clearAttempts = hasAttempts
   ? db.prepare(
-      `update login_attempts set failed_count = 0, locked_until = null, updated_at = ? where lower(email) in (${emails.map(() => "?").join(",")})`
+      `update login_attempts set failed_count = 0, locked_until = null, updated_at = ? where lower(${attemptsKey}) in (${emails.map(() => "?").join(",")})`
     )
   : null;
 let clearedLockouts = 0;
@@ -140,7 +148,7 @@ for (const h of hashed) {
 if (hasAttempts) {
   const stillLocked = db
     .prepare(
-      `select count(*) c from login_attempts where locked_until is not null and locked_until > ? and lower(email) in (${emails.map(() => "?").join(",")})`
+      `select count(*) c from login_attempts where locked_until is not null and locked_until > ? and lower(${attemptsKey}) in (${emails.map(() => "?").join(",")})`
     )
     .get(new Date().toISOString(), ...emails).c;
   if (stillLocked !== 0) allGood = false;

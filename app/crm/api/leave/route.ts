@@ -4,6 +4,7 @@ import * as schema from "@/lib/crm/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { istToday } from "@/lib/crm/attendance";
+import { addDaysToDateKey, consumeCreditsForLeave, releaseCreditsForLeave } from "@/lib/crm/leave-credits";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,28 @@ export async function PATCH(request: NextRequest) {
       .where(eq(schema.leaveRequests.id, id))
       .run();
 
-    return NextResponse.json({ ok: true });
+    // Approving spends the requester's banked credits, oldest expiry first, so
+    // the balance they see can never promise a credit that is already spoken
+    // for. Re-rejecting a request that was already approved hands the credits
+    // back rather than silently costing the staff member a day off they did not
+    // take.
+    const days: string[] = [];
+    for (let d = req.startDate, guard = 0; d <= req.endDate && guard < 366; d = addDaysToDateKey(d, 1), guard++) {
+      days.push(d);
+    }
+
+    let covered: string[] = [];
+    if (action === "approve") {
+      covered = consumeCreditsForLeave(req.userId, days, req.id);
+    } else {
+      releaseCreditsForLeave(req.id);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      bankedCreditsApplied: covered.length,
+      uncoveredDays: days.length - covered.length,
+    });
   } catch (error) {
     console.error("Leave PATCH error:", error);
     return NextResponse.json({ error: "Failed to update leave request" }, { status: 500 });

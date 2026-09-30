@@ -58,7 +58,7 @@ export async function GET(req: Request) {
   const db = getDb();
   const today = istToday();
   const { from: dayFrom, to: dayTo } = istDayRange(today);
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
   // Start of yesterday, so "called today or yesterday" is one comparison.
   const callCutoff = new Date(new Date(dayFrom).getTime() - 86400000).toISOString();
 

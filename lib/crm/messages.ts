@@ -176,7 +176,9 @@ export function suggestCategory(lead: Record<string, unknown>): string {
   if (concern.includes("budget")) return "property_option";
   if (concern.includes("project") || concern.includes("location")) return "alternative_project";
 
-  if (status === "no_response" || status === "new" || status === "calling") return "first_contact";
+  if (status === "no_response" || status === "new" || status === "calling" || status === "initial_contact") {
+    return "first_contact";
+  }
   if (status === "visit_proposed" || status === "visit_booked" || status === "visit_confirmed") {
     return "visit_confirmation";
   }

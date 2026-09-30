@@ -2,6 +2,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
 import { writeAuditLog, getUserName } from "./audit";
+import { getProject } from "../projects";
 
 export const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
@@ -397,4 +398,317 @@ export function markIncentiveUnpaid(
   });
 
   return { ok: true, previous };
+}
+
+// ---------------------------------------------------------------------------
+// Per-booking ledger
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per person per confirmed booking.
+ *
+ * A booking earns two of these - one for the assigned Caller, one for the
+ * assigned SM - because a lead can have both and each is paid and tracked on
+ * its own. Splitting by person (rather than one row per lead holding both
+ * amounts) is what makes it possible to tick off the Caller's half while the
+ * SM's is still owed.
+ */
+export type BookingIncentiveRow = {
+  /** Stable identity: the booking, the person, and which side they are on. */
+  key: string;
+  bookingId: number;
+  leadId: number;
+  leadName: string;
+  projectId: string;
+  projectTitle: string;
+  role: "sales_manager" | "caller";
+  userId: number;
+  userName: string;
+  /** Rate for this person's month total, so every row they own shows the same figure. */
+  amount: number;
+  month: string;
+  bookedAt: string;
+  unit: string | null;
+  paid: boolean;
+  paidAt: string | null;
+  paidByName: string | null;
+};
+
+export type BookingIncentiveFilters = {
+  month?: string;
+  userId?: number;
+  role?: "sales_manager" | "caller";
+  paid?: boolean;
+};
+
+/**
+ * The confirmed bookings a per-booking row can exist for.
+ *
+ * Deliberately the bookings module only, and not the legacy "lead status is
+ * booked" fallback that `confirmedBookingsForMonth` also accepts: a fallback has
+ * no booking id, no project and no confirm event, so there is nothing to point a
+ * payment at and nothing for staff to recognise. Leads booked that way still
+ * count toward the monthly ladder total used by salary and attendance reports -
+ * the two are different views and do not agree row-for-row by design.
+ */
+function confirmedBookingRecords() {
+  const db = getDb();
+
+  const bookings = db
+    .select({
+      id: schema.bookings.id,
+      leadId: schema.bookings.leadId,
+      smId: schema.bookings.smId,
+      projectId: schema.bookings.projectId,
+      unit: schema.bookings.unit,
+      bookingDate: schema.bookings.bookingDate,
+    })
+    .from(schema.bookings)
+    .where(eq(schema.bookings.status, "confirmed"))
+    .all();
+
+  const leads = new Map(
+    db
+      .select({
+        id: schema.leads.id,
+        name: schema.leads.name,
+        assignedCallerId: schema.leads.assignedCallerId,
+        assignedSmId: schema.leads.assignedSmId,
+      })
+      .from(schema.leads)
+      .all()
+      .map((l) => [l.id, l])
+  );
+
+  const users = new Map(
+    db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).all().map((u) => [u.id, u])
+  );
+
+  return bookings
+    .map((b) => {
+      const lead = leads.get(b.leadId);
+      return {
+        ...b,
+        month: istMonthKey(b.bookingDate),
+        leadName: lead?.name || `Lead #${b.leadId}`,
+        // The booking's own project wins; fall back to the lead's assignment
+        // when a booking was recorded without one.
+        projectId: b.projectId || "",
+        callerId: lead?.assignedCallerId ?? null,
+        smId: b.smId ?? lead?.assignedSmId ?? null,
+        users,
+      };
+    })
+    .filter((b) => b.smId != null || b.callerId != null);
+}
+
+export function getBookingIncentiveRows(filters: BookingIncentiveFilters = {}): BookingIncentiveRow[] {
+  const db = getDb();
+  const records = confirmedBookingRecords();
+
+  // How many bookings each person earned this month, across all months' records
+  // restricted to the one being viewed. The ladder rate is per month, so the
+  // count has to be month-scoped before a rate is read off it.
+  const countByUser = new Map<string, number>();
+  for (const rec of records) {
+    if (filters.month && rec.month !== filters.month) continue;
+    for (const [side, uid] of [["caller", rec.callerId], ["sm", rec.smId]] as const) {
+      if (uid == null) continue;
+      const k = `${rec.month}:${side}:${uid}`;
+      countByUser.set(k, (countByUser.get(k) ?? 0) + 1);
+    }
+  }
+
+  const payments = db.select().from(schema.incentivePayments).all();
+  const paidByBooking = new Map(
+    payments
+      .filter((p) => p.bookingId != null)
+      .map((p) => [`${p.bookingId}:${p.userId}:${p.role}`, p] as const)
+  );
+
+  const rows: BookingIncentiveRow[] = [];
+
+  for (const rec of records) {
+    if (filters.month && rec.month !== filters.month) continue;
+
+    const sides: Array<{ role: "caller" | "sales_manager"; uid: number | null }> = [
+      { role: "caller", uid: rec.callerId },
+      { role: "sales_manager", uid: rec.smId },
+    ];
+
+    for (const { role, uid } of sides) {
+      if (uid == null) continue;
+      if (filters.userId != null && filters.userId !== uid) continue;
+      if (filters.role && filters.role !== role) continue;
+
+      const ladderKey = role === "caller" ? "caller" : "sm";
+      const count = countByUser.get(`${rec.month}:${ladderKey}:${uid}`) ?? 1;
+      const rate = rateForCount(INCENTIVE_LADDERS[ladderKey], count);
+
+      const payment = paidByBooking.get(`${rec.id}:${uid}:${role}`);
+      const paid = !!payment;
+
+      if (filters.paid != null && paid !== filters.paid) continue;
+
+      rows.push({
+        key: `${rec.id}:${uid}:${role}`,
+        bookingId: rec.id,
+        leadId: rec.leadId,
+        leadName: rec.leadName,
+        projectId: rec.projectId,
+        projectTitle: projectTitleFor(rec.projectId),
+        role,
+        userId: uid,
+        userName: rec.users.get(uid)?.name || `User #${uid}`,
+        amount: rate,
+        month: rec.month,
+        bookedAt: rec.bookingDate,
+        unit: rec.unit,
+        paid,
+        paidAt: payment?.paidAt || null,
+        paidByName: payment?.paidBy != null ? rec.users.get(payment.paidBy)?.name ?? null : null,
+      });
+    }
+  }
+
+  return rows.sort((a, b) => (a.bookedAt < b.bookedAt ? 1 : a.bookedAt > b.bookedAt ? -1 : a.userName.localeCompare(b.userName)));
+}
+
+function projectTitleFor(slug: string): string {
+  if (!slug) return "";
+  return getProject(slug)?.title || slug;
+}
+
+/** Sum of every unpaid amount - what the company currently owes. */
+export function getUnpaidIncentiveLiability(filters: Omit<BookingIncentiveFilters, "paid"> = {}): number {
+  return getBookingIncentiveRows({ ...filters, paid: false }).reduce((sum, r) => sum + r.amount, 0);
+}
+
+export type IncentiveLiability = {
+  unpaidTotal: number;
+  unpaidRows: number;
+  paidTotal: number;
+  paidRows: number;
+};
+
+export function getIncentiveLiabilitySummary(filters: Omit<BookingIncentiveFilters, "paid"> = {}): IncentiveLiability {
+  const rows = getBookingIncentiveRows(filters);
+  const unpaid = rows.filter((r) => !r.paid);
+  const paid = rows.filter((r) => r.paid);
+  return {
+    unpaidTotal: unpaid.reduce((s, r) => s + r.amount, 0),
+    unpaidRows: unpaid.length,
+    paidTotal: paid.reduce((s, r) => s + r.amount, 0),
+    paidRows: paid.length,
+  };
+}
+
+/**
+ * Settle one person's half of one booking. `bookingId` and `userId` together
+ * identify the row, so a lead with both a Caller and an SM can have one side
+ * paid while the other is still owed.
+ */
+export function markBookingIncentivePaid(
+  bookingId: number,
+  userId: number,
+  role: string,
+  amount: number,
+  byUserId: number
+): { amount: number; paidAt: string } {
+  const db = getDb();
+  const paidAt = new Date().toISOString();
+
+  const existing = db
+    .select()
+    .from(schema.incentivePayments)
+    .where(
+      and(
+        eq(schema.incentivePayments.bookingId, bookingId),
+        eq(schema.incentivePayments.userId, userId),
+        eq(schema.incentivePayments.role, role)
+      )
+    )
+    .get();
+
+  if (existing) {
+    db.update(schema.incentivePayments)
+      .set({ amount, paidAt, paidBy: byUserId })
+      .where(eq(schema.incentivePayments.id, existing.id))
+      .run();
+  } else {
+    db.insert(schema.incentivePayments)
+      .values({
+        userId,
+        month: istMonthKey(paidAt),
+        role,
+        amount,
+        bookingId,
+        paidBy: byUserId,
+        paidAt,
+        createdAt: paidAt,
+      })
+      .run();
+  }
+
+  const row = getBookingIncentiveRows({}).find((r) => r.bookingId === bookingId && r.userId === userId && r.role === role);
+
+  writeAuditLog({
+    category: "incentive",
+    action: existing ? "incentive_paid_updated" : "incentive_marked_paid",
+    actorUserId: byUserId,
+    targetUserId: userId,
+    entityType: "incentive_payment",
+    entityId: existing?.id ?? `${bookingId}:${userId}:${role}`,
+    summary: `${getUserName(userId) ?? `User #${userId}`} marked paid ${formatRs(amount)} for booking #${bookingId}${row ? ` (${row.leadName})` : ""}.`,
+    details: { bookingId, userId, role, amount, lead: row?.leadName ?? null },
+  });
+
+  return { amount, paidAt };
+}
+
+export function markBookingIncentiveUnpaid(
+  bookingId: number,
+  userId: number,
+  role: string,
+  byUserId: number
+): { ok: boolean; previous: { amount: number; paidAt: string | null } | null } {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(schema.incentivePayments)
+    .where(
+      and(
+        eq(schema.incentivePayments.bookingId, bookingId),
+        eq(schema.incentivePayments.userId, userId),
+        eq(schema.incentivePayments.role, role)
+      )
+    )
+    .get();
+
+  if (!existing) return { ok: false, previous: null };
+
+  const previous = { amount: existing.amount, paidAt: existing.paidAt || null };
+  db.delete(schema.incentivePayments).where(eq(schema.incentivePayments.id, existing.id)).run();
+
+  writeAuditLog({
+    category: "incentive",
+    action: "incentive_marked_unpaid",
+    actorUserId: byUserId,
+    targetUserId: userId,
+    entityType: "incentive_payment",
+    entityId: existing.id,
+    summary: `Reversed ${getUserName(userId) ?? `User #${userId}`}'s ${formatRs(previous.amount)} for booking #${bookingId} back to unpaid.`,
+    details: { bookingId, userId, role, previous },
+  });
+
+  return { ok: true, previous };
+}
+
+/** Distinct people appearing in the ledger, for the filter dropdowns. */
+export function getIncentiveParticipants(filters: Omit<BookingIncentiveFilters, "userId" | "role"> = {}) {
+  const seen = new Map<string, { userId: number; name: string; role: string }>();
+  for (const r of getBookingIncentiveRows(filters)) {
+    seen.set(`${r.userId}:${r.role}`, { userId: r.userId, name: r.userName, role: r.role });
+  }
+  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

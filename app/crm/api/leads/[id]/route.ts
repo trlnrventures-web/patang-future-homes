@@ -86,7 +86,7 @@ export async function GET(
 
   // Same server-side mask as the list endpoints, so the detail page cannot be
   // used to read a full number outside office hours.
-  const decision = contactMaskFor(user.role);
+  const decision = contactMaskFor(user);
 
   return NextResponse.json({
     lead: {

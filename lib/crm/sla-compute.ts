@@ -57,11 +57,16 @@ export function getPriority(
     return "p7_no_response";
   }
   if (status === "qualified") return "p5_ready_to_assign";
-  if (status === "follow_up" || status === "visit_proposed" || status === "visit_booked" || status === "visit_confirmed" || status === "visit_done" || status === "negotiation") {
+  if (status === "follow_up" || status === "visit_proposed" || status === "visit_booked" || status === "visit_confirmed" || status === "visit_done" || status === "negotiation" || status === "initial_contact") {
     const next = lead.nextFollowUp;
     if (next && new Date(next).getTime() < new Date().getTime()) return "p3_overdue_call";
     if (next) return "p4_callback";
     return "p6_follow_up";
+  }
+  if (status === "plan_hold") {
+    const next = lead.nextFollowUp;
+    if (next && new Date(next).getTime() < new Date().getTime()) return "p3_overdue_call";
+    return "p8_idle";
   }
   if (status === "assigned") return "p6_follow_up";
   return "p8_idle";
