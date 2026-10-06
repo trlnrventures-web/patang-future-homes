@@ -130,10 +130,13 @@ export const leads = sqliteTable("leads", {
   whatsappNumber: text("whatsapp_number"),
   email: text("email"),
   source: text("source", {
-    enum: ["meta", "facebook", "google", "website", "walk_in", "referral", "other"],
+    enum: ["meta", "facebook", "google", "website", "walk_in", "referral", "other", "Meta"],
   })
     .notNull()
     .default("meta"),
+  campaignId: text("campaign_id"),
+  adSetId: text("ad_set_id"),
+  adId: text("ad_id"),
   campaignName: text("campaign_name"),
   adSetName: text("ad_set_name"),
   adName: text("ad_name"),
@@ -199,6 +202,123 @@ export const crmSettings = sqliteTable("crm_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: text("updated_at"),
+});
+
+/**
+ * A Facebook Page the CRM can pull leads from, established by one admin's OAuth
+ * handshake.
+ *
+ * The tokens are stored encrypted, never in the clear, and are never returned by
+ * any API route - the UI is told only whether a connection is healthy. The
+ * columns are nullable so a disconnect can destroy the secrets in place while
+ * keeping the row, which preserves the record of which Page was connected and by
+ * whom after the tokens are gone.
+ */
+export const metaConnections = sqliteTable("meta_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  pageId: text("page_id").notNull().unique(),
+  pageName: text("page_name").notNull(),
+  /**
+   * The CRM admin who performed the handshake. Facebook tokens belong to a
+   * person, and revoking access is done on that person's Facebook account, so the
+   * row has to remember who to point at when a token dies.
+   */
+  connectedByUserId: integer("connected_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  /** Facebook user id behind the handshake, for the app's own diagnostics. */
+  metaUserId: text("meta_user_id"),
+  encryptedUserToken: text("encrypted_user_token"),
+  encryptedPageToken: text("encrypted_page_token"),
+  /**
+   * Page tokens derived from a long-lived user token do not expire on their own,
+   * but they die with the user token. This is that user token's expiry, and it
+   * is what the health indicator counts down to.
+   */
+  userTokenExpiresAt: text("user_token_expires_at"),
+  status: text("status", { enum: ["connected", "needs_refresh", "disconnected"] })
+    .notNull()
+    .default("connected"),
+  lastVerifiedAt: text("last_verified_at"),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(""),
+});
+
+/**
+ * Per-form configuration: which CRM field each Meta question feeds, which
+ * project the form belongs to, and who the resulting lead is assigned to.
+ *
+ * The assignment lives here rather than in code so an admin can move a form to a
+ * different Sales Manager without a deploy. `last_synced_cursor` is the
+ * `created_time` of the newest lead already ingested, so a poll only asks for
+ * what came after it.
+ */
+export const metaFormMappings = sqliteTable("meta_form_mappings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  formId: text("form_id").notNull().unique(),
+  pageId: text("page_id").notNull(),
+  formName: text("form_name").notNull(),
+  /**
+   * Pre-set rather than mapped: one Lead Ad form belongs to one project almost
+   * always, so asking the admin to map a question to it every time is busywork.
+   */
+  project: text("project"),
+  callerId: integer("caller_id").references(() => users.id),
+  smId: integer("sm_id").references(() => users.id),
+  /**
+   * Meta question key -> CRM field name, or the literal "ignore". The keys come
+   * from the form's own question schema, so this is written by the mapping screen
+   * and read by the sync job.
+   */
+  fieldMap: text("field_map", { mode: "json" }).$type<Record<string, string>>(),
+  /** Off until an admin explicitly turns it on, so connecting imports nothing. */
+  syncEnabled: integer("sync_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  lastSyncedAt: text("last_synced_at"),
+  lastSyncedCursor: text("last_synced_cursor"),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(""),
+});
+
+/**
+ * One row per form per poll, so the admin can see the integration is alive
+ * without reading server logs. Failures are recorded rather than thrown: a form
+ * that errors must not stop the other four from syncing.
+ */
+export const metaSyncRuns = sqliteTable("meta_sync_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  formId: text("form_id"),
+  formName: text("form_name"),
+  status: text("status", { enum: ["ok", "warning", "error", "skipped"] })
+    .notNull()
+    .default("ok"),
+  leadsFetched: integer("leads_fetched").notNull().default(0),
+  createdCount: integer("created_count").notNull().default(0),
+  duplicates: integer("duplicates").notNull().default(0),
+  reactivatedCount: integer("reactivated_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  message: text("message"),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+/**
+ * Every leadgen id already ingested, so a repeated poll is a no-op instead of a
+ * duplicate. The cursor alone cannot guarantee that: Graph's `since` filter has
+ * one-second granularity, so two leads submitted in the same second can both be
+ * returned again on the next poll.
+ */
+export const metaIngestedLeads = sqliteTable("meta_ingested_leads", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leadgenId: text("leadgen_id").notNull().unique(),
+  formId: text("form_id").notNull(),
+  leadId: integer("lead_id").references(() => leads.id),
+  ingestedAt: text("ingested_at").notNull(),
+  createdAt: text("created_at").notNull().default(""),
 });
 
 export const activities = sqliteTable("activities", {
@@ -647,4 +767,24 @@ export const companyHolidays = sqliteTable("company_holidays", {
   createdAt: text("created_at").notNull().default(""),
   removedBy: integer("removed_by").references(() => users.id),
   removedAt: text("removed_at"),
+});
+
+/**
+ * Integration webhook logs for debugging. Captures every webhook receipt
+ * with its status, provider, and raw payload when needed.
+ */
+export const integrationLogs = sqliteTable("integration_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  provider: text("provider").notNull(),
+  webhookType: text("webhook_type"),
+  status: text("status", {
+    enum: ["received", "processed", "duplicate_matched", "reactivated", "failed"],
+  }).notNull(),
+  leadgenId: text("leadgen_id"),
+  formId: text("form_id"),
+  pageId: text("page_id"),
+  leadId: integer("lead_id").references(() => leads.id),
+  message: text("message"),
+  rawPayload: text("raw_payload"),
+  createdAt: text("created_at").notNull().default(""),
 });

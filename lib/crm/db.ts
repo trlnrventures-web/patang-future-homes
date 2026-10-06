@@ -59,6 +59,9 @@ function createTables(sqlite: Database.Database) {
       whatsapp_number TEXT,
       email TEXT,
       source TEXT NOT NULL DEFAULT 'meta',
+      campaign_id TEXT,
+      ad_set_id TEXT,
+      ad_id TEXT,
       campaign_name TEXT,
       ad_set_name TEXT,
       ad_name TEXT,
@@ -105,6 +108,83 @@ function createTables(sqlite: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS meta_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      page_id TEXT NOT NULL UNIQUE,
+      page_name TEXT NOT NULL,
+      connected_by_user_id INTEGER NOT NULL,
+      meta_user_id TEXT,
+      encrypted_user_token TEXT,
+      encrypted_page_token TEXT,
+      user_token_expires_at TEXT,
+      status TEXT NOT NULL DEFAULT 'connected',
+      last_verified_at TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (connected_by_user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS meta_form_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id TEXT NOT NULL UNIQUE,
+      page_id TEXT NOT NULL,
+      form_name TEXT NOT NULL,
+      project TEXT,
+      caller_id INTEGER,
+      sm_id INTEGER,
+      field_map TEXT,
+      sync_enabled INTEGER NOT NULL DEFAULT 0,
+      last_synced_at TEXT,
+      last_synced_cursor TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (caller_id) REFERENCES users(id),
+      FOREIGN KEY (sm_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS meta_sync_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id TEXT,
+      form_name TEXT,
+      status TEXT NOT NULL DEFAULT 'ok',
+      leads_fetched INTEGER NOT NULL DEFAULT 0,
+      created_count INTEGER NOT NULL DEFAULT 0,
+      duplicates INTEGER NOT NULL DEFAULT 0,
+      reactivated_count INTEGER NOT NULL DEFAULT 0,
+      error_count INTEGER NOT NULL DEFAULT 0,
+      message TEXT,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      created_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS meta_ingested_leads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      leadgen_id TEXT NOT NULL UNIQUE,
+      form_id TEXT NOT NULL,
+      lead_id INTEGER,
+      ingested_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (lead_id) REFERENCES leads(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS integration_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      webhook_type TEXT,
+      status TEXT NOT NULL,
+      leadgen_id TEXT,
+      form_id TEXT,
+      page_id TEXT,
+      lead_id INTEGER,
+      message TEXT,
+      raw_payload TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (lead_id) REFERENCES leads(id)
     );
 
     CREATE TABLE IF NOT EXISTS activities (
@@ -517,6 +597,14 @@ function createTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_leads_source ON leads(source);
     CREATE INDEX IF NOT EXISTS idx_leads_campaign_name ON leads(campaign_name);
     CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
+    CREATE INDEX IF NOT EXISTS idx_meta_mappings_page ON meta_form_mappings(page_id);
+    CREATE INDEX IF NOT EXISTS idx_meta_mappings_sync ON meta_form_mappings(sync_enabled);
+    CREATE INDEX IF NOT EXISTS idx_meta_sync_runs_started ON meta_sync_runs(started_at);
+    CREATE INDEX IF NOT EXISTS idx_meta_ingested_form ON meta_ingested_leads(form_id);
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_provider ON integration_logs(provider);
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_status ON integration_logs(status);
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_leadgen ON integration_logs(leadgen_id);
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_created ON integration_logs(created_at);
   `);
 
   migrateLeads(sqlite);
