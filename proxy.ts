@@ -32,6 +32,17 @@ const PUBLIC_API_PATHS = [
   "/crm/api/auth/reset-password",
   "/crm/api/call-events",
   "/crm/api/call-sessions/sweep",
+  // The Meta OAuth redirect target. Facebook sends the browser here from its own
+  // origin, which makes the navigation cross-site - and the CRM session cookie is
+  // SameSite=Strict, so it is NOT sent on it. A session requirement here would
+  // make the handshake impossible. The handler authorises itself with a signed,
+  // single-use state value issued to an authenticated admin instead.
+  "/crm/api/meta/callback",
+  // The lead poller, for a server-side cron. Same rule: refuses with 503 while
+  // CRM_META_SYNC_SECRET is unset, and otherwise requires that secret as a bearer
+  // token. An admin clicking "Sync now" authenticates with their session and is
+  // accepted by the same handler.
+  "/crm/api/meta/sync",
 ];
 const FORCE_CHANGE_PASSWORD_PATH = "/crm/change-password";
 

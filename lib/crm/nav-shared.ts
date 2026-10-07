@@ -45,6 +45,10 @@ export const NAV_MORE_ITEMS: NavItem[] = [
   { href: "/crm/settings/office-hours", label: "Office Hours", icon: "M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
   { href: "/crm/settings/incentives", label: "Incentive Rates", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
   { href: "/crm/settings/team", label: "Team Members", icon: "M17 20h5v-2a3 3 0 0 0-5-2.11M9 20H4v-2a3 3 0 0 1 5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5 16v-2a3 3 0 0 0-5-2.11M16 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
+  // Holds Facebook Page tokens that can read the pages' whole lead history, so it
+  // sits with the other admin-only configuration in More rather than in the core
+  // tabs a caller sees.
+  { href: "/crm/settings/meta", label: "Meta Integration", icon: "M18 2h-3a5 5 0 0 0-5 5v3H7m4 4H5a2 2 0 0 1-2-2V7m16 9v3a5 5 0 0 1-5 5h-3v-3M14 9h4a2 2 0 0 1 2 2v5" },
 ];
 
 /**

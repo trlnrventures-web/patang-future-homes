@@ -213,7 +213,8 @@ export async function POST(request: NextRequest) {
     const changes = entry.changes || [];
     for (const change of changes) {
       if (change.field !== "leadgen") continue;
-      const leadgenIdRaw = typeof change.value === "string" ? change.value : (change.value as any)?.leadgen_id;
+      const value = change.value;
+      const leadgenIdRaw = typeof value === "string" ? value : value && typeof value === "object" && "leadgen_id" in value ? (value as { leadgen_id?: unknown }).leadgen_id : undefined;
       const leadgenId = leadgenIdRaw ? String(leadgenIdRaw) : null;
 
       if (!leadgenId) continue;
