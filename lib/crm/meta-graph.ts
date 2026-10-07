@@ -152,15 +152,41 @@ export type TokenBundle = {
   expiresInSeconds: number | null;
 };
 
+/**
+ * Graph answers in snake_case (`access_token`, `expires_in`); the rest of the
+ * code reads camelCase. Reading the raw body as `TokenBundle` used to leave
+ * `accessToken` undefined, which quietly stripped `fb_exchange_token` from the
+ * long-lived exchange and made Facebook reject it.
+ */
+function toTokenBundle(body: TokenBundle & GraphResponse): TokenBundle {
+  const raw = body as unknown as { access_token?: unknown; expires_in?: unknown };
+  return {
+    accessToken: String(raw.access_token ?? body.accessToken ?? ""),
+    expiresInSeconds:
+      typeof raw.expires_in === "number"
+        ? raw.expires_in
+        : typeof raw.expires_in === "string" && Number.isFinite(Number(raw.expires_in))
+          ? Number(raw.expires_in)
+          : (body.expiresInSeconds ?? null),
+  };
+}
+
 /** Short-lived user token, straight from the authorization code. */
 export async function exchangeCodeForToken(code: string): Promise<TokenBundle> {
   const { appId, appSecret } = appCredentials();
-  return graphGet<TokenBundle & GraphResponse>("oauth/access_token", {
+  const body = await graphGet<TokenBundle & GraphResponse>("oauth/access_token", {
     client_id: appId,
     client_secret: appSecret,
     redirect_uri: callbackUrl(),
     code,
   });
+  const bundle = toTokenBundle(body);
+  // `graphGet` drops empty params, so an empty token would surface as a
+  // confusing Facebook complaint rather than as what actually went wrong.
+  if (!bundle.accessToken) {
+    throw new GraphError("Facebook did not return an access token for that code.", { status: 400 });
+  }
+  return bundle;
 }
 
 /**
@@ -169,12 +195,16 @@ export async function exchangeCodeForToken(code: string): Promise<TokenBundle> {
  */
 export async function exchangeForLongLivedToken(shortLivedToken: string): Promise<TokenBundle> {
   const { appId, appSecret } = appCredentials();
-  return graphGet<TokenBundle & GraphResponse>("oauth/access_token", {
+  if (!shortLivedToken) {
+    throw new GraphError("Cannot extend an empty short-lived token.", { status: 400 });
+  }
+  const body = await graphGet<TokenBundle & GraphResponse>("oauth/access_token", {
     grant_type: "fb_exchange_token",
     client_id: appId,
     client_secret: appSecret,
     fb_exchange_token: shortLivedToken,
   });
+  return toTokenBundle(body);
 }
 
 /**
