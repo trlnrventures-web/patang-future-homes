@@ -135,7 +135,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No changes to save" }, { status: 400 });
+      // Saving an untouched form is a no-op, not a failure. Answer with the
+      // same shape as a real save so the page just confirms instead of
+      // flashing an error at someone who changed their mind.
+      return NextResponse.json({
+        user: {
+          id: target.id,
+          name: target.name,
+          email: target.email,
+          role: target.role,
+          phone: target.phone,
+          mustChangePassword: !!target.mustChangePassword,
+        },
+      });
     }
 
     db.update(schema.users)
