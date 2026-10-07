@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
 import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
@@ -620,6 +621,124 @@ function createTables(sqlite: Database.Database) {
   migrateOfficeHoursDefaults(sqlite);
   migrateCallSessions(sqlite);
   migratePushSubscriptions(sqlite);
+  syncColumnsWithSchema(sqlite);
+}
+
+/**
+ * Backstop for every table: add any column the Drizzle schema declares that the
+ * on-disk database does not have yet.
+ *
+ * The hand-written migrations above only cover columns someone remembered to
+ * add them to. `CREATE TABLE IF NOT EXISTS` never alters a table that already
+ * exists, so a database created before a column was introduced silently keeps
+ * the old shape - and because Drizzle enumerates every column of a table it
+ * selects from, a single missing one makes *all* reads of that table throw
+ * `no such column`, which is how the leads board and the dashboard both went
+ * blank while the app itself still booted.
+ *
+ * Rules that keep this safe on a database with live rows:
+ *  - the column is added nullable unless the schema gives it a literal default,
+ *    because SQLite refuses a NOT NULL column with no default on a non-empty table;
+ *  - a primary key is never added, since ALTER TABLE cannot add one;
+ *  - a failure is logged and skipped rather than aborting boot, so one odd table
+ *    cannot take the whole CRM down.
+ */
+function syncColumnsWithSchema(sqlite: Database.Database) {
+  for (const candidate of Object.values(schema)) {
+    if (!isDrizzleTable(candidate)) continue;
+
+    const name = tableNameOf(candidate);
+    const columns = columnsOf(candidate);
+    if (!name || !columns) continue;
+
+    const info = sqlite.prepare(`PRAGMA table_info("${name}")`).all() as { name: string }[];
+    // The CREATE TABLE batch above has already run, so a missing table means it
+    // is not one of ours; nothing to sync onto.
+    if (!info.length) continue;
+    const have = new Set(info.map((c) => c.name));
+
+    for (const col of columns) {
+      if (have.has(col.name)) continue;
+      if (col.primary) {
+        console.warn(`[crm] ${name}.${col.name} is a missing primary key; not auto-added.`);
+        continue;
+      }
+
+      const parts = [col.name, col.getSQLType()];
+      if (col.notNull && col.hasDefault) {
+        const literal = sqlDefaultLiteral(col.default);
+        if (literal !== null) parts.push("NOT NULL", `DEFAULT ${literal}`);
+      }
+
+      try {
+        sqlite.exec(`ALTER TABLE "${name}" ADD COLUMN ${parts.join(" ")}`);
+        console.warn(`[crm] added missing column ${name}.${col.name}`);
+      } catch (error) {
+        console.error(`[crm] could not add ${name}.${col.name}:`, error);
+      }
+    }
+  }
+}
+
+/** Drizzle tags its tables with a private symbol; `instanceof` breaks when a
+ * bundler resolves two copies of the library, so the tag is what is checked. */
+function isDrizzleTable(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.getOwnPropertySymbols(value).some((s) => s.description === "drizzle:IsDrizzleTable")
+  );
+}
+
+type SchemaColumn = {
+  name: string;
+  primary: boolean;
+  notNull: boolean;
+  hasDefault: boolean;
+  default: unknown;
+  getSQLType: () => string;
+};
+
+function findSymbol(value: object, description: string): symbol | undefined {
+  return Object.getOwnPropertySymbols(value).find((s) => s.description === description);
+}
+
+function tableNameOf(table: object): string | null {
+  try {
+    return getTableConfig(table as Parameters<typeof getTableConfig>[0]).name;
+  } catch {
+    const sym = findSymbol(table, "drizzle:Name");
+    const name = sym ? (table as Record<symbol, unknown>)[sym] : null;
+    return typeof name === "string" ? name : null;
+  }
+}
+
+/**
+ * The public `getTableConfig` is tried first. If a bundler ever hands this file
+ * and the schema file two copies of Drizzle it would throw, so the table's own
+ * `drizzle:Columns` symbol is read instead - same data, no module identity to
+ * get wrong, and this migration is too important to skip silently.
+ */
+function columnsOf(table: object): SchemaColumn[] | null {
+  try {
+    return getTableConfig(table as Parameters<typeof getTableConfig>[0]).columns as SchemaColumn[];
+  } catch {
+    const sym = findSymbol(table, "drizzle:Columns");
+    const columns = sym ? (table as Record<symbol, unknown>)[sym] : null;
+    if (typeof columns !== "object" || columns === null) return null;
+    return Object.values(columns as Record<string, SchemaColumn>);
+  }
+}
+
+/** Renders a Drizzle column default as SQL, or null when it cannot be written
+ * as a literal (a `DEFAULT (expression)` fragment) and the column should simply
+ * be added as nullable instead. */
+function sqlDefaultLiteral(value: unknown): string | null {
+  if (typeof value === "string") return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "1" : "0";
+  if (value === null) return "NULL";
+  return null;
 }
 
 /**
