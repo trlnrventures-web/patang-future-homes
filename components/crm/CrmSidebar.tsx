@@ -114,6 +114,19 @@ export default function CrmSidebar({
                     : "Caller"}
           </div>
           <div className="mt-2">
+            <Link
+              href="/crm/my-account"
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                isActive("/crm/my-account")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted hover:bg-primary/5 hover:text-primary"
+              }`}
+            >
+              <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0" />
+              My Account
+            </Link>
+          </div>
+          <div className="mt-2">
             <LogoutButton />
           </div>
         </div>

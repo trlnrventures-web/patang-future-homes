@@ -38,8 +38,13 @@ export default async function CrmLayout({
                   />
                 </span>
               </Link>
-              <span className="flex items-center gap-1 text-xs font-medium text-muted">
-                {user.name}
+              <span className="flex items-center gap-2 text-xs font-medium text-muted">
+                <Link
+                  href="/crm/my-account"
+                  className="font-semibold text-navy transition-colors hover:text-primary"
+                >
+                  {user.name}
+                </Link>
                 <LogoutButton compact />
               </span>
             </header>

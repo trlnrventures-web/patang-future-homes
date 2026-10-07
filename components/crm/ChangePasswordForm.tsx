@@ -4,7 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 
-export default function ChangePasswordForm({ forced }: { forced: boolean }) {
+export default function ChangePasswordForm({
+  forced,
+  onSuccess,
+}: {
+  forced: boolean;
+  /** Overrides the default "jump to dashboard" so the caller can stay put. */
+  onSuccess?: () => void;
+}) {
   const { setUser } = useAuth();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -46,8 +53,12 @@ export default function ChangePasswordForm({ forced }: { forced: boolean }) {
 
       const data = await res.json();
       setUser(data.user);
-      router.push("/crm/dashboard");
-      router.refresh();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/crm/dashboard");
+        router.refresh();
+      }
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
