@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/crm/data";
+import { ensureMonthlySalaryDrafts } from "@/lib/crm/salary-sweep";
 import { AuthProvider } from "@/components/crm/AuthProvider";
 import CrmSidebar from "@/components/crm/CrmSidebar";
 import LogoutButton from "@/components/crm/LogoutButton";
@@ -15,6 +16,11 @@ export default async function CrmLayout({
   if (!user) {
     return <>{children}</>;
   }
+
+  // First CRM visit after a month closes drafts last month's salaries as
+  // pending rows. Guarded by a settings key, so this is one tiny read on every
+  // request after that, and it never throws into the page.
+  await ensureMonthlySalaryDrafts();
 
   return (
     <AuthProvider initialUser={user}>

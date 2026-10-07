@@ -67,7 +67,11 @@ export default function SalaryReport({
 }) {
   const [view, setView] = useState<"list" | "slip">("list");
   const [month, setMonth] = useState((initialMonth || currentMonthKey()).slice(0, 7));
-  const [userId, setUserId] = useState(initialUserId ? Number(initialUserId) : currentUserId);
+  // Admins open the list on "All users" (0) so the year shows everyone; picking
+  // a name filters the list and is who a fresh slip gets generated for.
+  const [userId, setUserId] = useState(
+    initialUserId ? Number(initialUserId) : isAdmin ? 0 : currentUserId
+  );
   const [year, setYear] = useState(currentYear());
   const [reports, setReports] = useState<SalaryReportRow[]>([]);
   const [slipReport, setSlipReport] = useState<SalaryReportRow | ComputedReport | null>(null);
@@ -85,18 +89,19 @@ export default function SalaryReport({
     setLoading(true);
     try {
       const params = new URLSearchParams({ year: String(year) });
-      if (isAdmin) {
-        // load all
-      }
+      // 0 (All users) or a missing value keeps the whole year; a specific id
+      // narrows the ledger to that person.
+      if (isAdmin && userId) params.set("userId", String(userId));
       const res = await fetch(`/crm/api/salary?${params}`);
       const json = await res.json();
       if (res.ok) setReports(json.reports || []);
+      else setReports([]);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [year, isAdmin]);
+  }, [year, isAdmin, userId]);
 
   const loadSlip = useCallback(async () => {
     setLoading(true);
@@ -268,11 +273,19 @@ export default function SalaryReport({
                 onChange={(e) => setUserId(Number(e.target.value))}
                 className="rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy"
               >
+                <option value={0}>All users</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
             )}
+            <a
+              href={`/crm/api/salary/export?year=${year}&userId=${isAdmin ? userId : currentUserId}`}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary px-3.5 py-1.5 text-xs font-bold text-white hover:bg-primary/90"
+              title="Download this year's salary ledger as an Excel sheet"
+            >
+              Export to Excel
+            </a>
           </>
         )}
       </div>
@@ -321,7 +334,7 @@ export default function SalaryReport({
                         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                           r.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
                         }`}>
-                          {r.paymentStatus === "paid" ? "Paid" : "Pending"}
+                          {r.paymentStatus === "paid" ? "Paid" : "Pending Confirmation"}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-xs text-muted">{r.paymentDate || "—"}</td>
@@ -478,7 +491,7 @@ function SalarySlip({
           </div>
           {hasId && (
             <>
-              <SlipRow label="Payment Status" value={r.paymentStatus === "paid" ? "Paid" : "Pending"} color={r.paymentStatus === "paid" ? "text-green-700" : "text-amber-700"} />
+              <SlipRow label="Payment Status" value={r.paymentStatus === "paid" ? "Paid" : "Pending Confirmation"} color={r.paymentStatus === "paid" ? "text-green-700" : "text-amber-700"} />
               {r.paymentDate && <SlipRow label="Payment Date" value={r.paymentDate} />}
               <SlipRow
                 label="Visible to Employee"

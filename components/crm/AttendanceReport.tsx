@@ -60,6 +60,19 @@ function currentMonthKey(): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * Same clock format the API uses (IST, 12-hour), rebuilt here because the
+ * shared helper lives in a module that pulls in the database.
+ */
+function clockOf(iso: string | null): string {
+  if (!iso) return "";
+  const ist = new Date(new Date(iso).getTime() + (5 * 60 + 30) * 60 * 1000);
+  const hour = ist.getUTCHours();
+  const minute = ist.getUTCMinutes();
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${String(h12).padStart(2, "0")}:${String(minute).padStart(2, "0")}${hour < 12 ? "a" : "p"}`;
+}
+
 export default function AttendanceReport({
   currentUserId,
   isAdmin,
@@ -77,20 +90,29 @@ export default function AttendanceReport({
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Admins can pick "All users": that view has no day grid of its own, it
+  // exists so the whole team's month can be exported in one file.
+  const showAll = isAdmin && userId === 0;
+
   const loadReport = useCallback(async () => {
     setLoading(true);
     try {
+      if (showAll) {
+        setReport(null);
+        return;
+      }
       const params = new URLSearchParams({ month });
       if (isAdmin && userId) params.set("userId", String(userId));
       const res = await fetch(`/crm/api/attendance/report?${params}`);
       const json = await res.json();
       if (res.ok) setReport(json);
+      else setReport(null);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [month, userId, isAdmin]);
+  }, [month, userId, isAdmin, showAll]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -133,16 +155,38 @@ export default function AttendanceReport({
             onChange={(e) => setUserId(Number(e.target.value))}
             className="rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy"
           >
+            <option value={0}>All users</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
         )}
+        <a
+          href={`/crm/api/attendance/report/export?month=${month}&userId=${isAdmin ? userId : currentUserId}`}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary px-3.5 py-1.5 text-xs font-bold text-white hover:bg-primary/90"
+          title="Download this month as an Excel sheet, with check-in and check-out times"
+        >
+          Export to Excel
+        </a>
       </div>
 
       {loading ? (
         <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-muted">
           Loading report...
+        </div>
+      ) : showAll ? (
+        <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-muted">
+          <div className="font-semibold text-navy">All users · {month}</div>
+          <p className="mt-1">
+            Pick a person above for the day-by-day view, or export the whole team&apos;s
+            month with check-in and check-out times.
+          </p>
+          <a
+            href={`/crm/api/attendance/report/export?month=${month}&userId=0`}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary/90"
+          >
+            Export all users to Excel
+          </a>
         </div>
       ) : !report ? (
         <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-muted">
@@ -237,6 +281,12 @@ export default function AttendanceReport({
                   <div className="text-[10px] font-semibold">{d.date.slice(8, 10)}</div>
                   <div className="text-[9px] font-medium">{d.dayName.slice(0, 3)}</div>
                   <div className="text-[8px] leading-tight">{d.label.split(":")[0]}</div>
+                  {(d.checkinTime || d.checkoutTime) && (
+                    <div className="w-full space-y-px text-[8px] font-semibold leading-tight">
+                      <div>In {clockOf(d.checkinTime) || "--"}</div>
+                      <div>Out {clockOf(d.checkoutTime) || "--"}</div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

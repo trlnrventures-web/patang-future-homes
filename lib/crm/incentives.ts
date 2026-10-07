@@ -245,6 +245,12 @@ type BookingRow = {
   bookingDate: string;
   status: string;
   callerId: number | null;
+  /**
+   * What the booking is worth: total sale value when recorded, else the token /
+   * booking amount. Bookings that exist only as a legacy lead-status flip have
+   * no amount on record, so they contribute 0.
+   */
+  value: number;
 };
 
 /**
@@ -280,6 +286,8 @@ export function confirmedBookingsForMonth(month: string, now: Date = new Date())
       smId: schema.bookings.smId,
       bookingDate: schema.bookings.bookingDate,
       status: schema.bookings.status,
+      bookingAmount: schema.bookings.bookingAmount,
+      totalValue: schema.bookings.totalValue,
     })
     .from(schema.bookings)
     .all()
@@ -304,10 +312,43 @@ export function confirmedBookingsForMonth(month: string, now: Date = new Date())
       status: "confirmed",
     }));
 
-  return [...fromBookingsModule, ...fromLeadStatus].map((b) => ({
+  // What the booking is worth, attached at the source so both origins land on
+  // the same shape: a real booking row carries total value (falling back to the
+  // token amount), a legacy lead-status flip has no money on record.
+  const fromBookingsWithValue = fromBookingsModule.map((b) => ({
+    ...b,
+    value: b.totalValue || b.bookingAmount || 0,
+  }));
+  const fromLeadStatusWithValue = fromLeadStatus.map((b) => ({ ...b, value: 0 }));
+
+  return [...fromBookingsWithValue, ...fromLeadStatusWithValue].map((b) => ({
     ...b,
     callerId: callerById.get(b.leadId) ?? null,
   }));
+}
+
+/**
+ * The marketing team is paid purely on performance: a flat share of what the
+ * company booked that month, with no base salary behind it. The share is
+ * computed from the same booking rows the marketing report shows, so the slip
+ * and the marketing dashboard can never disagree.
+ */
+export const MARKETING_COMMISSION_RATE = 0.05;
+
+export function marketingCommissionForMonth(month: string): {
+  salesValue: number;
+  rate: number;
+  commission: number;
+} {
+  const salesValue = confirmedBookingsForMonth(month).reduce(
+    (sum, b) => sum + b.value,
+    0
+  );
+  return {
+    salesValue,
+    rate: MARKETING_COMMISSION_RATE,
+    commission: Math.round(salesValue * MARKETING_COMMISSION_RATE),
+  };
 }
 
 export type IncentiveEntry = {
