@@ -69,10 +69,13 @@ export async function GET() {
  *
  * The state cookie - not the CRM session - is what validates the callback. The
  * redirect comes back from facebook.com, which makes it cross-site, and the
- * session cookie is `SameSite=Strict`, so it is not sent on that navigation. The
- * state is HMAC'd over the admin's id and an expiry, which is what stops a
+ * session cookie is `SameSite=Strict`, so it is not sent on that navigation.
+ * The state cookie must therefore be `SameSite=Lax`: `Strict` would withhold it
+ * on exactly that cross-site top-level GET, which is the hop we need it for,
+ * while `Lax` still keeps it off cross-site subrequests and POSTs. What stops a
  * leaked or replayed callback URL from binding somebody else's Facebook account
- * to this CRM.
+ * to this CRM is the state itself - HMAC'd over the admin's id and an expiry,
+ * single-use, and burned by the callback however it turns out.
  */
 export async function POST() {
   const user = await getAuthUser();
@@ -96,7 +99,7 @@ export async function POST() {
   jar.set(OAUTH_STATE_COOKIE, state, {
     path: "/crm/api/meta",
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: OAUTH_STATE_TTL_SECONDS,
     secure: process.env.NODE_ENV !== "development",
   });

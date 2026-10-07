@@ -37,8 +37,17 @@ export async function GET(request: Request) {
   const jar = await cookies();
   const expected = jar.get(OAUTH_STATE_COOKIE)?.value;
   // Burn the cookie whatever the outcome, so a captured callback URL cannot be
-  // replayed even if the first attempt failed for an unrelated reason.
-  jar.delete(OAUTH_STATE_COOKIE);
+  // replayed even if the first attempt failed for an unrelated reason. It is
+  // re-set to an empty, already-expired value rather than `delete`d, because
+  // `delete(name)` serialises `Path=/` while the cookie was set with
+  // `Path=/crm/api/meta`, and a browser only drops a cookie whose path matches.
+  jar.set(OAUTH_STATE_COOKIE, "", {
+    path: "/crm/api/meta",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 0,
+    secure: process.env.NODE_ENV !== "development",
+  });
 
   if (oauthError) {
     return popupPage(`Facebook did not grant access: ${oauthError}`, false);

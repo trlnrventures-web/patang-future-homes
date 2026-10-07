@@ -13,14 +13,21 @@ export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v26.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
 /**
- * The permissions the App must be configured with. `leads_retrieval` is the one
- * that governs whether lead data can be read at all; the rest are the supporting
- * set Meta's Lead Ads documentation lists for the retrieval path.
+ * The permissions the App must be configured with. `leads_retrieval` governs
+ * whether lead data can be read at all; `ads_management` and `pages_manage_ads`
+ * are what make the ad-level fields (`ad_id`, `adset_id`, `campaign_id`) on a
+ * lead readable; the two `pages_*` scopes are the supporting set Meta's Lead
+ * Ads documentation lists for the retrieval path.
+ *
+ * `pages_manage_metadata` is deliberately absent: Facebook rejects it on the
+ * standard Facebook Login product (it belongs to Facebook Login for Business),
+ * and it only covers webhook subscription, which this integration does not use.
  */
 export const REQUIRED_SCOPES = [
   "pages_show_list",
-  "pages_manage_metadata",
   "pages_read_engagement",
+  "pages_manage_ads",
+  "ads_management",
   "leads_retrieval",
 ] as const;
 
@@ -263,7 +270,20 @@ export type GraphLead = {
   createdTime: string | null;
   /** key -> answer, flattened out of Meta's `field_data` envelope. */
   fields: Record<string, string>;
+  /**
+   * The ad the submission came from. Only present when the token carries
+   * `ads_management` / `pages_manage_ads`; a lead from an organic post or an
+   * unapproved scope comes back with nulls here rather than failing the poll.
+   */
+  adId: string | null;
+  adSetId: string | null;
+  campaignId: string | null;
 };
+
+/** The lead body Meta returns regardless of ad-level permissions. */
+const LEAD_BODY_FIELDS = "id,created_time,field_data";
+/** The ad-level attribution fields, readable only with `ads_management`. */
+const LEAD_AD_FIELDS = `${LEAD_BODY_FIELDS},ad_id,adset_id,campaign_id`;
 
 /**
  * Leads submitted to a form since a unix timestamp, following every page.
@@ -271,6 +291,11 @@ export type GraphLead = {
  * `since` is the poll's whole optimisation: an unfiltered call returns the form's
  * entire history, which for a live form is tens of thousands of leads and counts
  * against the rate limit on every single poll.
+ *
+ * The ad-level fields need `ads_management` / `pages_manage_ads`. If the token
+ * does not carry them Meta fails the request outright rather than blanking the
+ * fields, so the poll falls back to the lead body alone: a missing campaign id
+ * costs attribution, a failed poll costs every lead.
  */
 export async function fetchLeadsSince(
   formId: string,
@@ -278,13 +303,28 @@ export async function fetchLeadsSince(
   sinceUnix: number | null,
   maxPages = 20
 ): Promise<GraphLead[]> {
+  try {
+    return await fetchLeadPages(formId, pageToken, sinceUnix, LEAD_AD_FIELDS, maxPages);
+  } catch (error) {
+    if (!(error instanceof GraphError) || error.type !== "permission") throw error;
+    return await fetchLeadPages(formId, pageToken, sinceUnix, LEAD_BODY_FIELDS, maxPages);
+  }
+}
+
+async function fetchLeadPages(
+  formId: string,
+  pageToken: string,
+  sinceUnix: number | null,
+  fields: string,
+  maxPages: number
+): Promise<GraphLead[]> {
   const out: GraphLead[] = [];
   let url: string | null = `${GRAPH_BASE}/${formId}/leads`;
 
   for (let page = 0; page < maxPages && url; page++) {
     const pageUrl = new URL(url);
     pageUrl.searchParams.set("access_token", pageToken);
-    pageUrl.searchParams.set("fields", "id,created_time,field_data");
+    pageUrl.searchParams.set("fields", fields);
     pageUrl.searchParams.set("limit", "100");
     if (sinceUnix != null) pageUrl.searchParams.set("since", String(sinceUnix));
     // A cursor page must not be re-filtered, and re-applying `since` to it would
@@ -310,15 +350,18 @@ export async function fetchLeadsSince(
 
     for (const raw of body.data || []) {
       const fieldData = (raw.field_data || {}) as { values?: RawFieldValue[] };
-      const fields: Record<string, string> = {};
+      const answers: Record<string, string> = {};
       for (const v of fieldData.values || []) {
         const text = v.text ?? v.values?.[0]?.value;
-        if (v.name && text != null) fields[v.name] = String(text);
+        if (v.name && text != null) answers[v.name] = String(text);
       }
       out.push({
         id: String(raw.id || ""),
         createdTime: raw.created_time ? String(raw.created_time) : null,
-        fields,
+        fields: answers,
+        adId: raw.ad_id ? String(raw.ad_id) : null,
+        adSetId: raw.adset_id ? String(raw.adset_id) : null,
+        campaignId: raw.campaign_id ? String(raw.campaign_id) : null,
       });
     }
 

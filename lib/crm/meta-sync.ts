@@ -363,6 +363,14 @@ function ingestLead(
           familyRequirements: values.family_requirements ?? null,
           otherPreferences: values.other_preferences ?? null,
           originalMessage: values.original_message ?? null,
+          // Ad-level attribution. Only filled when the token carries
+          // `ads_management`; the poll degrades to nulls rather than dropping
+          // the lead when it does not. `campaignName` is deliberately not set
+          // from these ids - it is matched against `campaigns.name` for
+          // attribution, and a raw Meta id there would never line up.
+          campaignId: lead.campaignId,
+          adSetId: lead.adSetId,
+          adId: lead.adId,
           campaignName: values.campaign_name ?? null,
           notes: [
             `Synced from Facebook form "${mapping.formName}".`,
