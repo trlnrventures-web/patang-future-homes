@@ -4,10 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "sync:images": "node scripts/sync-project-images.mjs",
+    "prebuild": "npm run sync:images",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "prepreview": "node scripts/patch-opennext-windows.mjs",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "predeploy": "node scripts/patch-opennext-windows.mjs",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },

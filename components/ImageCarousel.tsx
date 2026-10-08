@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type TouchEvent } from "react";
 import Image from "next/image";
 import HorizontalScroll from "./HorizontalScroll";
+import { statusBadge } from "@/lib/status";
 
 export default function ImageCarousel({
   images,
@@ -45,10 +46,7 @@ export default function ImageCarousel({
     );
   }
 
-  const statusClass =
-    status === "New Launch"
-      ? "bg-accent text-primary"
-      : "bg-background/90 text-primary";
+  const badge = statusBadge(status, "image");
 
   return (
     <div>
@@ -67,11 +65,13 @@ export default function ImageCarousel({
           sizes="(min-width: 1024px) 55vw, 100vw"
         />
 
-        <span
-          className={`absolute left-4 top-4 z-20 inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide shadow-lg ${statusClass}`}
-        >
-          {status}
-        </span>
+        {badge && (
+          <span
+            className={`absolute left-4 top-4 z-20 inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide shadow-lg ${badge.className}`}
+          >
+            {badge.label}
+          </span>
+        )}
 
         {count > 1 && (
           <>

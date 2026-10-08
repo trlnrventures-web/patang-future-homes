@@ -820,7 +820,10 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "imageFolder": "casa-terraza-phase-3",
+    "amenityImages": [],
+    "showFlatImages": []
   },
   {
     "slug": "celestial",
@@ -1569,15 +1572,11 @@
     "usps": [],
     "images": [
       "/projects/imperial-anantha/Elevation/main.jpg",
-      "/projects/imperial-anantha/Elevation/Long%20Shot.jpg",
-      "/projects/imperial-anantha/Elevation/Elevation%202.jpg",
       "/projects/imperial-anantha/Elevation/Bottom.jpg",
-      "/projects/imperial-anantha/Elevation/Top.jpg",
       "/projects/imperial-anantha/Elevation/Closeup.jpg",
-      "/projects/imperial-anantha/Actual%20Show%20Flat/Living%20Room.jpg",
-      "/projects/imperial-anantha/Actual%20Show%20Flat/Kitchen.png",
-      "/projects/imperial-anantha/Actual%20Show%20Flat/Master%20Washroom.jpg",
-      "/projects/imperial-anantha/Actual%20Show%20Flat/Washroom.png"
+      "/projects/imperial-anantha/Elevation/Elevation%202.jpg",
+      "/projects/imperial-anantha/Elevation/Long%20Shot.jpg",
+      "/projects/imperial-anantha/Elevation/Top.jpg"
     ],
     "reraId": "",
     "possessionDate": "2 YEAR",
@@ -1614,7 +1613,30 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "amenityImages": [],
+    "showFlatImages": [
+      {
+        "title": "Kitchen",
+        "type": "actual",
+        "src": "/projects/imperial-anantha/Actual%20Show%20Flat/Kitchen.png"
+      },
+      {
+        "title": "Living Room",
+        "type": "actual",
+        "src": "/projects/imperial-anantha/Actual%20Show%20Flat/Living%20Room.jpg"
+      },
+      {
+        "title": "Master Washroom",
+        "type": "actual",
+        "src": "/projects/imperial-anantha/Actual%20Show%20Flat/Master%20Washroom.jpg"
+      },
+      {
+        "title": "Washroom",
+        "type": "actual",
+        "src": "/projects/imperial-anantha/Actual%20Show%20Flat/Washroom.png"
+      }
+    ]
   },
   {
     "slug": "imperial-dhanraj",
@@ -2383,13 +2405,8 @@
       "/projects/pam-one-time-vasai-edition/1.jpg",
       "/projects/pam-one-time-vasai-edition/2.jpg",
       "/projects/pam-one-time-vasai-edition/3.jpg",
-      "/projects/pam-one-time-vasai-edition/Elevation/Evening-View.webp",
       "/projects/pam-one-time-vasai-edition/Elevation/Elevation-Top-Back-View.webp",
-      "/projects/pam-one-time-vasai-edition/Amenities/Swimming-pool-2.webp",
-      "/projects/pam-one-time-vasai-edition/Amenities/Entrance.webp",
-      "/projects/pam-one-time-vasai-edition/Show%20Flat/Living-room-1.webp",
-      "/projects/pam-one-time-vasai-edition/Show%20Flat/Kitchen-1.webp",
-      "/projects/pam-one-time-vasai-edition/Show%20Flat/Bedroom-1.webp"
+      "/projects/pam-one-time-vasai-edition/Elevation/Evening-View.webp"
     ],
     "reraId": "",
     "possessionDate": "2.5 YEAR",
@@ -2435,7 +2452,91 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "imageFolder": "pam-one-time-vasai-edition",
+    "amenityImages": [
+      {
+        "title": "Entrance",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/Entrance.webp"
+      },
+      {
+        "title": "Gazebo",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/Gazebo.webp"
+      },
+      {
+        "title": "Play area",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/Play-area.webp"
+      },
+      {
+        "title": "Swimming pool 2",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/Swimming-pool-2.webp"
+      },
+      {
+        "title": "Terrace",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/terrace.webp"
+      },
+      {
+        "title": "Yoga copy",
+        "src": "/projects/pam-one-time-vasai-edition/Amenities/Yoga-copy.jpg"
+      }
+    ],
+    "showFlatImages": [
+      {
+        "title": "Balcony",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/balcony.jpeg"
+      },
+      {
+        "title": "Bedroom",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/bedroom.jpeg"
+      },
+      {
+        "title": "Kids Bedroom",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/kids%20bedroom.jpeg"
+      },
+      {
+        "title": "Kitchen",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/kitchen.jpeg"
+      },
+      {
+        "title": "Living Room",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/living%20room.jpeg"
+      },
+      {
+        "title": "Master Bedroom",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/master%20bedroom.jpeg"
+      },
+      {
+        "title": "Washroom",
+        "type": "actual",
+        "src": "/projects/pam-one-time-vasai-edition/Actual%20Show%20Flat/washroom.jpeg"
+      },
+      {
+        "title": "Bedroom 1",
+        "type": "render",
+        "src": "/projects/pam-one-time-vasai-edition/Show%20Flat/Bedroom-1.webp"
+      },
+      {
+        "title": "Dinig",
+        "type": "render",
+        "src": "/projects/pam-one-time-vasai-edition/Show%20Flat/dinig.webp"
+      },
+      {
+        "title": "Kitchen 1",
+        "type": "render",
+        "src": "/projects/pam-one-time-vasai-edition/Show%20Flat/Kitchen-1.webp"
+      },
+      {
+        "title": "Living room 1",
+        "type": "render",
+        "src": "/projects/pam-one-time-vasai-edition/Show%20Flat/Living-room-1.webp"
+      }
+    ]
   },
   {
     "slug": "pearl-garden",
@@ -2455,15 +2556,12 @@
     "usps": [],
     "images": [
       "/projects/pearl-gardens/Elevation/Main.png",
-      "/projects/pearl-gardens/Elevation/Night%20Shot.png",
-      "/projects/pearl-gardens/Elevation/Night%20Long%20Shot.png",
       "/projects/pearl-gardens/Elevation/Building%20Down%20SHot.png",
-      "/projects/pearl-gardens/Elevation/Entrance%20Gate.png",
       "/projects/pearl-gardens/Elevation/Clubhouse.png",
-      "/projects/pearl-gardens/Elevation/Podium%20Amenitie.png",
-      "/projects/pearl-gardens/Show%20Flat/Living%20Room.png",
-      "/projects/pearl-gardens/Show%20Flat/Bedroom.png",
-      "/projects/pearl-gardens/Show%20Flat/Modular%20Kitchen.png"
+      "/projects/pearl-gardens/Elevation/Entrance%20Gate.png",
+      "/projects/pearl-gardens/Elevation/Night%20Long%20Shot.png",
+      "/projects/pearl-gardens/Elevation/Night%20Shot.png",
+      "/projects/pearl-gardens/Elevation/Podium%20Amenitie.png"
     ],
     "reraId": "",
     "possessionDate": "RTMI",
@@ -2500,7 +2598,59 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "imageFolder": "pearl-gardens",
+    "amenityImages": [
+      {
+        "title": "Gazebo",
+        "src": "/projects/pearl-gardens/Amenities/Gazebo.png"
+      },
+      {
+        "title": "GYM",
+        "src": "/projects/pearl-gardens/Amenities/GYM.png"
+      },
+      {
+        "title": "Indoor Games",
+        "src": "/projects/pearl-gardens/Amenities/Indoor%20Games.png"
+      },
+      {
+        "title": "Terrace BBQ Corner",
+        "src": "/projects/pearl-gardens/Amenities/Terrace%20BBQ%20Corner.png"
+      },
+      {
+        "title": "Terrace Family Lounge",
+        "src": "/projects/pearl-gardens/Amenities/Terrace%20Family%20Lounge.png"
+      },
+      {
+        "title": "Terrace Stargazing",
+        "src": "/projects/pearl-gardens/Amenities/Terrace%20Stargazing.png"
+      },
+      {
+        "title": "Turf",
+        "src": "/projects/pearl-gardens/Amenities/Turf.png"
+      },
+      {
+        "title": "Zen Garden",
+        "src": "/projects/pearl-gardens/Amenities/Zen%20Garden.png"
+      }
+    ],
+    "showFlatImages": [
+      {
+        "title": "Bedroom",
+        "type": "render",
+        "src": "/projects/pearl-gardens/Show%20Flat/Bedroom.png"
+      },
+      {
+        "title": "Living Room",
+        "type": "render",
+        "src": "/projects/pearl-gardens/Show%20Flat/Living%20Room.png"
+      },
+      {
+        "title": "Modular Kitchen",
+        "type": "render",
+        "src": "/projects/pearl-gardens/Show%20Flat/Modular%20Kitchen.png"
+      }
+    ]
   },
   {
     "slug": "platinum-aura",
@@ -2773,14 +2923,11 @@
     "images": [
       "/projects/sethi-palacio/Elevation/Main.png",
       "/projects/sethi-palacio/Elevation/Building%20Entrance.png",
-      "/projects/sethi-palacio/Elevation/Long%20Night%20Shot.png",
       "/projects/sethi-palacio/Elevation/Down%20Shot.png",
       "/projects/sethi-palacio/Elevation/Entrance%20Lobby.png",
+      "/projects/sethi-palacio/Elevation/Long%20Night%20Shot.png",
       "/projects/sethi-palacio/Elevation/Podium%20Amenities.png",
-      "/projects/sethi-palacio/Elevation/Terrace%20Amenities.png",
-      "/projects/sethi-palacio/Show%20Flat/Living%20Room.png",
-      "/projects/sethi-palacio/Show%20Flat/Kitchen.png",
-      "/projects/sethi-palacio/Show%20Flat/Master%20Bedroom.png"
+      "/projects/sethi-palacio/Elevation/Terrace%20Amenities.png"
     ],
     "reraId": "",
     "possessionDate": "6 MONTHS",
@@ -2817,7 +2964,121 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "amenityImages": [
+      {
+        "title": "Ganesh Temple",
+        "src": "/projects/sethi-palacio/Amenities/Ganesh%20Temple.png"
+      },
+      {
+        "title": "Jodding Track",
+        "src": "/projects/sethi-palacio/Amenities/Jodding%20Track.png"
+      },
+      {
+        "title": "Kids Play Area",
+        "src": "/projects/sethi-palacio/Amenities/Kids%20Play%20Area.png"
+      },
+      {
+        "title": "Multipurpose Turf",
+        "src": "/projects/sethi-palacio/Amenities/Multipurpose%20Turf.png"
+      },
+      {
+        "title": "Swing Seating",
+        "src": "/projects/sethi-palacio/Amenities/Swing%20Seating.png"
+      },
+      {
+        "title": "Terrace Multipurpose Deck",
+        "src": "/projects/sethi-palacio/Amenities/Terrace%20Multipurpose%20Deck.png"
+      },
+      {
+        "title": "Terrace Party Lawn",
+        "src": "/projects/sethi-palacio/Amenities/Terrace%20Party%20Lawn.png"
+      },
+      {
+        "title": "Terrace Walkway",
+        "src": "/projects/sethi-palacio/Amenities/Terrace%20Walkway.png"
+      },
+      {
+        "title": "Walkway",
+        "src": "/projects/sethi-palacio/Amenities/Walkway.png"
+      },
+      {
+        "title": "Yoga Area",
+        "src": "/projects/sethi-palacio/Amenities/Yoga%20Area.png"
+      }
+    ],
+    "showFlatImages": [
+      {
+        "title": "Bedroom",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/bedroom.jpeg"
+      },
+      {
+        "title": "Common bedroom",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/Common%20bedroom.jpeg"
+      },
+      {
+        "title": "Dinning Area",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/dinning%20area.jpeg"
+      },
+      {
+        "title": "Kitchen",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/kitchen.jpeg"
+      },
+      {
+        "title": "Living Room",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/living%20room.jpeg"
+      },
+      {
+        "title": "Master Bedroom",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/master%20bedroom.jpeg"
+      },
+      {
+        "title": "Master Washroom",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/master%20washroom.jpeg"
+      },
+      {
+        "title": "Washroom",
+        "type": "actual",
+        "src": "/projects/sethi-palacio/Actual%20Show%20Flat/washroom.jpeg"
+      },
+      {
+        "title": "Balcony",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Balcony.png"
+      },
+      {
+        "title": "Dinning Area",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Dinning%20Area.png"
+      },
+      {
+        "title": "Kitchen",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Kitchen.png"
+      },
+      {
+        "title": "Living Room",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Living%20Room.png"
+      },
+      {
+        "title": "Master Bedroom",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Master%20Bedroom.png"
+      },
+      {
+        "title": "Washroom",
+        "type": "render",
+        "src": "/projects/sethi-palacio/Show%20Flat/Washroom.png"
+      }
+    ]
   },
   {
     "slug": "shanta-bhawan",
@@ -2875,7 +3136,9 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "amenityImages": [],
+    "showFlatImages": []
   },
   {
     "slug": "shripal",
@@ -2894,14 +3157,10 @@
     "fullDescription": "",
     "usps": [],
     "images": [
-      "/projects/shripal-sattva/Elevation/Night%20Shot.png",
       "/projects/shripal-sattva/Elevation/02%20Night%20view.jpg",
       "/projects/shripal-sattva/Elevation/03%20Lake%20Side.jpg",
       "/projects/shripal-sattva/Elevation/Copy%20of%2004%20Rooftop%20Aerial.jpg",
-      "/projects/shripal-sattva/Show%20Flat/Living%20Room.png",
-      "/projects/shripal-sattva/Show%20Flat/Kitchen.png",
-      "/projects/shripal-sattva/Amenities/GYM.png",
-      "/projects/shripal-sattva/Amenities/Indoor%20Games%20Room.jpg"
+      "/projects/shripal-sattva/Elevation/Night%20Shot.png"
     ],
     "reraId": "",
     "possessionDate": "1 YEAR",
@@ -2938,7 +3197,30 @@
     },
     "metaTitle": "",
     "metaDescription": "",
-    "isActive": true
+    "isActive": true,
+    "imageFolder": "shripal-sattva",
+    "amenityImages": [
+      {
+        "title": "GYM",
+        "src": "/projects/shripal-sattva/Amenities/GYM.png"
+      },
+      {
+        "title": "Indoor Games Room",
+        "src": "/projects/shripal-sattva/Amenities/Indoor%20Games%20Room.jpg"
+      }
+    ],
+    "showFlatImages": [
+      {
+        "title": "Kitchen",
+        "type": "render",
+        "src": "/projects/shripal-sattva/Show%20Flat/Kitchen.png"
+      },
+      {
+        "title": "Living Room",
+        "type": "render",
+        "src": "/projects/shripal-sattva/Show%20Flat/Living%20Room.png"
+      }
+    ]
   },
   {
     "slug": "sky-aura",
@@ -3435,7 +3717,9 @@
     },
     "metaTitle": "Bless Residency, Vasai West | 2 & 3 BHK Flats from ₹82.34 Lacs",
     "metaDescription": "Bless Residency in Vasai West — 2 & 3 BHK homes from ₹82.34 Lacs at ₹11,500 per sq ft carpet. 86 flats on 4.97 acres, 25+ amenities, possession December 2027. RERA P9900005399.",
-    "isActive": true
+    "isActive": true,
+    "amenityImages": [],
+    "showFlatImages": []
   },
   {
     "slug": "sunteck-beach-residences",
@@ -3467,15 +3751,9 @@
     ],
     "images": [
       "/projects/sunteck-beach-residences/Elevation/Elevation%20Main%20Image.jpg",
-      "/projects/sunteck-beach-residences/Elevation/Elevation%20Long%20Shot.jpg",
       "/projects/sunteck-beach-residences/Elevation/Elevation%20Amenities.jpg",
-      "/projects/sunteck-beach-residences/Elevation/Entrance%20Gate.jpg",
-      "/projects/sunteck-beach-residences/Amenities/Beach%20View-1000x900.jpg",
-      "/projects/sunteck-beach-residences/Amenities/Gym-1000x900.jpg",
-      "/projects/sunteck-beach-residences/Amenities/Yoga-1000x900.jpg",
-      "/projects/sunteck-beach-residences/Amenities/Window%20View-1000x900.jpg",
-      "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Living%20Room-1000x900.jpg",
-      "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Bedroom-1000x900.jpg"
+      "/projects/sunteck-beach-residences/Elevation/Elevation%20Long%20Shot.jpg",
+      "/projects/sunteck-beach-residences/Elevation/Entrance%20Gate.jpg"
     ],
     "reraId": "P99000045490, P99000045499, P99000045599",
     "possessionDate": "January 2027 (Target), December 2027 (RERA)",
@@ -3513,20 +3791,20 @@
     "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
     "amenityImages": [
       {
-        "title": "State-of-the-Art Gym",
-        "src": "/projects/sunteck-beach-residences/Amenities/Gym-1000x900.jpg"
-      },
-      {
-        "title": "Yoga Deck",
-        "src": "/projects/sunteck-beach-residences/Amenities/Yoga-1000x900.jpg"
-      },
-      {
         "title": "Beach View",
         "src": "/projects/sunteck-beach-residences/Amenities/Beach%20View-1000x900.jpg"
       },
       {
+        "title": "Gym",
+        "src": "/projects/sunteck-beach-residences/Amenities/Gym-1000x900.jpg"
+      },
+      {
         "title": "Window View",
         "src": "/projects/sunteck-beach-residences/Amenities/Window%20View-1000x900.jpg"
+      },
+      {
+        "title": "Yoga",
+        "src": "/projects/sunteck-beach-residences/Amenities/Yoga-1000x900.jpg"
       }
     ],
     "showFlatImages": [
@@ -3536,9 +3814,9 @@
         "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Bedroom-1000x900.jpg"
       },
       {
-        "title": "Master Bedroom",
+        "title": "Licing Room",
         "type": "actual",
-        "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Master%20Bedroom-1000x900.jpg"
+        "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Licing%20Room-1000x900.jpg"
       },
       {
         "title": "Living Room",
@@ -3546,9 +3824,9 @@
         "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Living%20Room-1000x900.jpg"
       },
       {
-        "title": "Dining Area",
+        "title": "Master Bedroom",
         "type": "actual",
-        "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Licing%20Room-1000x900.jpg"
+        "src": "/projects/sunteck-beach-residences/Actual%20Show%20Flat/Master%20Bedroom-1000x900.jpg"
       }
     ],
     "nearbyLandmarks": [

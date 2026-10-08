@@ -5,6 +5,7 @@ import Link from "next/link";
 import ProjectCover from "./ProjectCover";
 import HorizontalScroll from "./HorizontalScroll";
 import { projects } from "@/lib/projects";
+import { statusBadge } from "@/lib/status";
 import { startingFrom } from "@/lib/price";
 
 const TABS = [
@@ -72,7 +73,9 @@ export default function NewProjects() {
 
         {/* Horizontal scroll row */}
         <HorizontalScroll className="mt-10 -mx-5 px-5 lg:-mx-8 lg:px-8">
-          {visible.map((project) => (
+          {visible.map((project) => {
+            const badge = statusBadge(project.status, "image");
+            return (
             <Link
               key={project.slug}
               href={`/projects/${project.slug}`}
@@ -88,15 +91,13 @@ export default function NewProjects() {
                 />
 
                 {/* Status badge */}
-                <span
-                  className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                    project.status === "New Launch"
-                      ? "bg-accent text-primary"
-                      : "bg-ink/80 text-white backdrop-blur-sm"
-                  }`}
-                >
-                  {project.status}
-                </span>
+                {badge && (
+                  <span
+                    className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
+                )}
               </div>
 
               <div className="p-4">
@@ -124,7 +125,8 @@ export default function NewProjects() {
                 </span>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </HorizontalScroll>
 
         {visible.length === 0 && (

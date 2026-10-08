@@ -12,6 +12,7 @@ import {
 } from "@/lib/projects";
 import { startingFrom } from "@/lib/price";
 import { categorizeAmenities, type AmenityCategory } from "@/lib/amenities";
+import { statusBadge } from "@/lib/status";
 import ImageCarousel from "@/components/ImageCarousel";
 import ProjectCover from "@/components/ProjectCover";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -96,12 +97,6 @@ const PHONE_ICON = (
     <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
   </svg>
 );
-
-function statusBadgeClass(status: string, surface: "image" | "dark" | "light") {
-  if (status === "New Launch") return "bg-accent text-primary";
-  if (surface === "image") return "bg-background/90 text-primary";
-  return "bg-white/10 text-white";
-}
 
 function SectionHeading({
   eyebrow,
@@ -309,6 +304,8 @@ export default async function ProjectDetail({ params }: Props) {
   }
 
   const startingPrice = startingFrom(project.priceRange);
+  const priceCardBadge = statusBadge(project.status, "dark");
+  const stickyBadge = statusBadge(project.status, "light");
   const categorizedAmenities = categorizeAmenities(project.amenities);
   const aboutParagraphs = toParagraphs(project.fullDescription);
   const aboutDescription = project.description ?? aboutParagraphs[0] ?? "";
@@ -383,15 +380,14 @@ export default async function ProjectDetail({ params }: Props) {
               <div className="overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-lg shadow-ink/5">
                 <div className="bg-primary px-6 py-5">
                   <div className="flex items-center justify-between">
-                    <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusBadgeClass(
-                        project.status,
-                        "dark"
-                      )}`}
-                    >
-                      {project.status}
-                    </span>
-                    <span className="text-xs text-white/60">
+                    {priceCardBadge && (
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${priceCardBadge.className}`}
+                      >
+                        {priceCardBadge.label}
+                      </span>
+                    )}
+                    <span className="ml-auto text-xs text-white/60">
                       RERA Registered
                     </span>
                   </div>
@@ -551,15 +547,13 @@ export default async function ProjectDetail({ params }: Props) {
                   eyebrow="Show flat"
                   title="Sample Flat Ready: Walk Through Your Dream Home"
                 />
-                {project.showFlatImages && project.showFlatImages.length > 0 && (
-                  <div className="mt-6">
-                    <ShowFlatGallery
-                      images={project.showFlatImages}
-                      projectTitle={project.title}
-                    />
-                  </div>
-                )}
                 <div className="mt-6">
+                  <ShowFlatGallery
+                    images={project.showFlatImages ?? []}
+                    projectTitle={project.title}
+                  />
+                </div>
+                <div className="mt-8">
                   <h3 className="text-lg font-bold text-ink">
                     Watch the Project AV
                   </h3>
@@ -783,7 +777,9 @@ export default async function ProjectDetail({ params }: Props) {
                 title="Similar Projects Nearby"
               />
               <HorizontalScroll className="mt-6">
-                {related.map((p) => (
+                {related.map((p) => {
+                  const cardBadge = statusBadge(p.status, "soft");
+                  return (
                   <Link
                     key={p.slug}
                     href={`/projects/${p.slug}`}
@@ -797,15 +793,13 @@ export default async function ProjectDetail({ params }: Props) {
                         className="object-cover transition-transform duration-400 ease-out hover:scale-105"
                         sizes="280px"
                       />
-                      <span
-                        className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                          p.status === "New Launch"
-                            ? "bg-accent text-primary"
-                            : "bg-white/90 text-ink"
-                        }`}
-                      >
-                        {p.status}
-                      </span>
+                      {cardBadge && (
+                        <span
+                          className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${cardBadge.className}`}
+                        >
+                          {cardBadge.label}
+                        </span>
+                      )}
                     </div>
                     <div className="p-4">
                       <h3 className="font-bold text-ink">{p.title}</h3>
@@ -832,7 +826,8 @@ export default async function ProjectDetail({ params }: Props) {
                       </span>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </HorizontalScroll>
             </section>
           )}
@@ -843,15 +838,13 @@ export default async function ProjectDetail({ params }: Props) {
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/10 bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <div className="min-w-0 flex-1">
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                project.status === "New Launch"
-                  ? "bg-accent text-primary"
-                  : "bg-primary text-white"
-              }`}
-            >
-              {project.status}
-            </span>
+            {stickyBadge && (
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${stickyBadge.className}`}
+              >
+                {stickyBadge.label}
+              </span>
+            )}
             <div className="mt-1 truncate text-sm font-extrabold text-primary">
               {startingPrice}
             </div>

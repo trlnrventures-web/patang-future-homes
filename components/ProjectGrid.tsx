@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import ProjectCover from "./ProjectCover";
 import { projects } from "@/lib/projects";
+import { statusBadge } from "@/lib/status";
 import { startingFrom } from "@/lib/price";
 
 const FILTERS = [
@@ -64,7 +65,9 @@ export default function ProjectGrid() {
 
       {/* Grid */}
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((project) => (
+        {filtered.map((project) => {
+          const badge = statusBadge(project.status, "image");
+          return (
           <Link
             key={project.slug}
             href={`/projects/${project.slug}`}
@@ -77,15 +80,13 @@ export default function ProjectGrid() {
                 className="object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
-              <span
-                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                  project.status === "New Launch"
-                    ? "bg-accent text-primary"
-                    : "bg-ink/80 text-white backdrop-blur-sm"
-                }`}
-              >
-                {project.status}
-              </span>
+              {badge && (
+                <span
+                  className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+              )}
             </div>
 
             <div className="p-5">
@@ -130,7 +131,8 @@ export default function ProjectGrid() {
               </span>
             </div>
           </Link>
-        ))}
+          );
+        })}
       </div>
 
       {filtered.length === 0 && (
