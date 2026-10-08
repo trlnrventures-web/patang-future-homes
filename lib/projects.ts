@@ -106,9 +106,11 @@ export function configurationLabel(configs: Configuration[]): string {
     .map((c) => c.type)
     .filter((t) => /^\d+\s*BHK/i.test(t));
   if (bhkTypes.length > 0 && bhkTypes.length === configs.length) {
-    const nums = bhkTypes
-      .map((t) => parseInt(t, 10))
-      .sort((a, b) => a - b);
+    const nums = [
+      ...new Set(
+        bhkTypes.map((t) => parseInt(t, 10)).sort((a, b) => a - b)
+      ),
+    ];
     return `${nums.join(", ")} BHK`;
   }
   return configs[0]?.type ?? "N/A";
