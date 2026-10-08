@@ -13,6 +13,13 @@ import {
 import { startingFrom } from "@/lib/price";
 import { categorizeAmenities, type AmenityCategory } from "@/lib/amenities";
 import { statusBadge } from "@/lib/status";
+import {
+  projectMeta,
+  projectAboutParagraphs,
+  projectUsps,
+  minPriceINR,
+} from "@/lib/seo";
+import { absoluteUrl, jsonLd } from "@/lib/json-ld";
 import ImageCarousel from "@/components/ImageCarousel";
 import ProjectCover from "@/components/ProjectCover";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -32,37 +39,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const project = getProject(slug);
   if (!project) notFound();
-  const heroImage = project.images?.[0];
+  const heroImage = project.images?.[0] ?? "/brand/og-image.png";
+  const meta = projectMeta(project);
+  const fullTitle = /patang/i.test(meta.title)
+    ? meta.title
+    : `${meta.title} | Patang Future Homes`;
 
   return {
-    title: { absolute: project.metaTitle },
-    description: project.metaDescription,
+    title: { absolute: fullTitle },
+    description: meta.description,
     alternates: {
       canonical: `/projects/${project.slug}`,
     },
     openGraph: {
-      title: project.metaTitle,
-      description: project.metaDescription,
+      title: fullTitle,
+      description: meta.description,
       url: `/projects/${project.slug}`,
       siteName: "Patang Future Homes",
       type: "website",
       locale: "en_IN",
-      images: heroImage
-        ? [
-            {
-              url: heroImage,
-              width: 1200,
-              height: 630,
-              alt: project.title,
-            },
-          ]
-        : [],
+      images: [
+        {
+          url: heroImage,
+          width: 1200,
+          height: 630,
+          alt: project.title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
-      title: project.metaTitle,
-      description: project.metaDescription,
-      images: heroImage ? [heroImage] : [],
+      title: fullTitle,
+      description: meta.description,
+      images: [heroImage],
     },
   };
 }
@@ -307,8 +316,19 @@ export default async function ProjectDetail({ params }: Props) {
   const priceCardBadge = statusBadge(project.status, "dark");
   const stickyBadge = statusBadge(project.status, "light");
   const categorizedAmenities = categorizeAmenities(project.amenities);
-  const aboutParagraphs = toParagraphs(project.fullDescription);
-  const aboutDescription = project.description ?? aboutParagraphs[0] ?? "";
+  const meta = projectMeta(project);
+  const aboutParagraphs = project.fullDescription
+    ? toParagraphs(project.fullDescription)
+    : projectAboutParagraphs(project);
+  const aboutDescription = project.description || aboutParagraphs[0] || "";
+  const usps = project.usps.length > 0 ? project.usps : projectUsps(project);
+  const hasRera = Boolean(project.reraId);
+  const hasDeveloper = Boolean(project.developer.name);
+  const hasAmenities =
+    project.amenities.length > 0 || (project.amenityImages?.length ?? 0) > 0;
+  const hasVideo = Boolean(project.showFlatVideoUrl);
+  const hasShowFlat =
+    (project.showFlatImages?.length ?? 0) > 0 || hasVideo;
   const quickFacts = [
     {
       label: "Configuration",
@@ -319,7 +339,7 @@ export default async function ProjectDetail({ params }: Props) {
       value: project.possessionDate.split(/[,|(]/)[0].trim(),
     },
     { label: "Price per sq ft", value: project.pricePerSqft },
-    { label: "RERA ID", value: project.reraId },
+    ...(hasRera ? [{ label: "RERA ID", value: project.reraId }] : []),
     {
       label: "Project Type",
       value:
@@ -335,32 +355,70 @@ export default async function ProjectDetail({ params }: Props) {
   const related = projects
     .filter((p) => p.slug !== project.slug)
     .slice(0, 5);
-  const jsonLd = {
+  const minPrice = minPriceINR(project.priceRange);
+  const projectUrl = absoluteUrl(`/projects/${project.slug}`);
+  const jsonLdData = {
     "@context": "https://schema.org",
-    "@type": "RealEstateListing",
-    name: project.title,
-    description: project.fullDescription,
-    url: `https://patangfuturehomes.com/projects/${project.slug}`,
-    image: project.images,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: project.location,
-      addressRegion: "Maharashtra",
-      addressCountry: "IN",
-    },
-    offers: {
-      "@type": "Offer",
-      price: project.priceRange,
-      priceCurrency: "INR",
-      availability: "https://schema.org/InStock",
-    },
+    "@graph": [
+      {
+        "@type": "RealEstateListing",
+        name: project.title,
+        description: meta.description,
+        url: projectUrl,
+        ...(project.images.length > 0 ? { image: project.images } : {}),
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: project.subLocation,
+          addressLocality: project.location,
+          addressRegion: "Maharashtra",
+          addressCountry: "IN",
+        },
+        ...(minPrice !== null
+          ? {
+              offers: {
+                "@type": "Offer",
+                price: minPrice,
+                priceCurrency: "INR",
+                availability: "https://schema.org/InStock",
+                url: projectUrl,
+              },
+            }
+          : {}),
+        provider: {
+          "@id": `${absoluteUrl("/")}#realestateagent`,
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: absoluteUrl("/"),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Projects",
+            item: absoluteUrl("/projects"),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: project.title,
+            item: projectUrl,
+          },
+        ],
+      },
+    ],
   };
 
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={jsonLd(jsonLdData)}
       />
 
       <div className="bg-background">
@@ -387,9 +445,11 @@ export default async function ProjectDetail({ params }: Props) {
                         {priceCardBadge.label}
                       </span>
                     )}
-                    <span className="ml-auto text-xs text-white/60">
-                      RERA Registered
-                    </span>
+                    {hasRera && (
+                      <span className="ml-auto text-xs text-white/60">
+                        RERA Registered
+                      </span>
+                    )}
                   </div>
                   <p className="mt-5 text-xs font-medium uppercase tracking-wider text-white/60">
                     Starting Price
@@ -415,12 +475,14 @@ export default async function ProjectDetail({ params }: Props) {
                       {configurationLabel(project.configurations)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-3 text-sm">
-                    <span className="text-soft">RERA ID</span>
-                    <span className="font-bold text-ink">
-                      {project.reraId}
-                    </span>
-                  </div>
+                  {hasRera && (
+                    <div className="flex items-center justify-between py-3 text-sm">
+                      <span className="text-soft">RERA ID</span>
+                      <span className="font-bold text-ink">
+                        {project.reraId}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="px-6 pb-6">
@@ -450,7 +512,10 @@ export default async function ProjectDetail({ params }: Props) {
 
           {/* ================= 2. COMPACT TITLE STRIP ================= */}
           <div className="mt-8">
-            <nav className="flex flex-wrap items-center gap-x-2 text-xs text-soft">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex flex-wrap items-center gap-x-2 text-xs text-soft"
+            >
               <Link href="/" className="transition-colors hover:text-accent-ink">
                 Home
               </Link>
@@ -498,7 +563,7 @@ export default async function ProjectDetail({ params }: Props) {
 
           {/* ================= 4. PROJECT USPs ================= */}
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {project.usps.map((u, i) => (
+            {usps.map((u, i) => (
               <div
                 key={u.title}
                 className="rounded-2xl border border-ink/10 bg-white p-5"
@@ -542,6 +607,7 @@ export default async function ProjectDetail({ params }: Props) {
               </section>
 
               {/* -------- 5. SAMPLE FLAT + GALLERY (ACTUAL / RENDER) -------- */}
+              {hasShowFlat && (
               <section id="sample-flat" className="scroll-mt-24">
                 <SectionHeading
                   eyebrow="Show flat"
@@ -568,8 +634,10 @@ export default async function ProjectDetail({ params }: Props) {
                   </div>
                 </div>
               </section>
+              )}
 
               {/* -------- 6. AMENITIES -------- */}
+              {hasAmenities && (
               <section id="amenities" className="scroll-mt-24">
                 <SectionHeading eyebrow="Lifestyle" title="Amenities" />
                 {project.amenityImages &&
@@ -607,8 +675,10 @@ export default async function ProjectDetail({ params }: Props) {
                   ))}
                 </div>
               </section>
+              )}
 
               {/* -------- 7. IMAGE GALLERY -------- */}
+              {project.images.length > 0 && (
               <section id="gallery" className="scroll-mt-24">
                 <SectionHeading
                   eyebrow="Photo gallery"
@@ -618,6 +688,7 @@ export default async function ProjectDetail({ params }: Props) {
                   <GalleryGrid images={project.images} title={project.title} />
                 </div>
               </section>
+              )}
 
               {/* -------- 8. LOCATION & CONNECTIVITY -------- */}
               <section id="location" className="scroll-mt-24">
@@ -642,6 +713,7 @@ export default async function ProjectDetail({ params }: Props) {
                     <h3 className="text-xs font-semibold uppercase tracking-widest text-primary">
                       Nearby Landmarks
                     </h3>
+                    {project.nearbyLandmarks.length > 0 ? (
                     <ul className="mt-4 divide-y divide-ink/10">
                       {project.nearbyLandmarks.map((lm) => (
                         <li
@@ -658,6 +730,17 @@ export default async function ProjectDetail({ params }: Props) {
                         </li>
                       ))}
                     </ul>
+                    ) : (
+                    <p className="mt-4 text-sm leading-relaxed text-muted">
+                      Well connected to Vasai Road Railway Station and the
+                      Western Express Highway, with schools, hospitals and
+                      daily markets close to{" "}
+                      {project.subLocation
+                        ? `${project.subLocation}, ${project.location}`
+                        : project.location}
+                      .
+                    </p>
+                    )}
                     <a
                       href={`https://maps.google.com/?q=${encodeURIComponent(
                         project.location
@@ -685,6 +768,7 @@ export default async function ProjectDetail({ params }: Props) {
               </section>
 
               {/* -------- 9. ABOUT THE DEVELOPER -------- */}
+              {hasDeveloper && (
               <section id="developer" className="scroll-mt-24">
                 <SectionHeading eyebrow="The developer" title="About the Developer" />
                 <div className="mt-6 overflow-hidden rounded-2xl bg-primary text-white">
@@ -695,9 +779,11 @@ export default async function ProjectDetail({ params }: Props) {
                     />
                     <div className="relative flex flex-wrap items-center gap-6">
                       <div className="min-w-0 flex-1">
-                        <span className="inline-flex items-center rounded-full bg-accent/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-accent ring-1 ring-accent/30">
-                          RERA-registered developer
-                        </span>
+                        {hasRera && (
+                          <span className="inline-flex items-center rounded-full bg-accent/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-accent ring-1 ring-accent/30">
+                            RERA-registered developer
+                          </span>
+                        )}
                         <h3 className="mt-2 text-2xl font-bold">
                           {project.developer.name}
                         </h3>
@@ -726,6 +812,7 @@ export default async function ProjectDetail({ params }: Props) {
                           Completed projects
                         </div>
                       </div>
+                      {hasRera && (
                       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                         <div className="break-all text-lg font-bold">
                           {project.reraId}
@@ -734,6 +821,7 @@ export default async function ProjectDetail({ params }: Props) {
                           RERA ID
                         </div>
                       </div>
+                      )}
                     </div>
                   </div>
 
@@ -767,6 +855,7 @@ export default async function ProjectDetail({ params }: Props) {
                   </div>
                 </div>
               </section>
+              )}
             </div>
 
           {/* ================= 11. SIMILAR PROJECTS NEARBY ================= */}
@@ -849,7 +938,7 @@ export default async function ProjectDetail({ params }: Props) {
               {startingPrice}
             </div>
             <div className="truncate text-[11px] text-soft">
-              RERA {project.reraId}
+              {hasRera ? `RERA ${project.reraId}` : project.location}
             </div>
           </div>
           <a

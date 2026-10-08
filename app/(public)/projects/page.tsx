@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import ProjectGrid from "@/components/ProjectGrid";
+import { projects } from "@/lib/projects";
+
+const DESCRIPTION = `Browse ${projects.length} projects in Vasai West: 1, 2 & 3 BHK flats with price lists, carpet areas, possession dates and RERA details. Compare shops & bungalows too.`;
 
 export const metadata: Metadata = {
-  title: "Projects",
-  description:
-    "Browse premium shops, flats, and bungalows in Vasai West by Patang Future Homes. Find your ideal property today.",
+  title: "New Projects in Vasai West & East",
+  description: DESCRIPTION,
   keywords: [
     "new projects in Vasai West",
-    "under construction projects Vasai East",
-    "shops flats and bungalows Vasai",
+    "under construction projects Vasai West",
     "RERA registered projects Vasai",
+    "flats in Vasai West with price list",
   ],
   alternates: {
     canonical: "/projects",
   },
   openGraph: {
     type: "website",
-    title: "Projects",
-    description:
-      "Explore premium shops, flats and bungalows in Vasai West & Vasai East listed by Patang Future Homes.",
+    title: "New Projects in Vasai West & East",
+    description: DESCRIPTION,
     url: "/projects",
     images: [
       {
@@ -40,10 +42,31 @@ export default function ProjectsPage() {
           Browse listings
         </div>
         <h1 className="mt-2 font-bold text-ink text-3xl sm:text-4xl">
-          Our Projects
+          New Projects in Vasai West &amp; East
         </h1>
-        <p className="mt-2 max-w-lg text-sm text-muted">
-          Explore our curated selection of properties in Vasai West.
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted sm:text-base">
+          Explore every project we list across{" "}
+          <Link
+            href="/vasai-west"
+            className="font-medium text-primary hover:underline"
+          >
+            Vasai West
+          </Link>
+          {" and "}
+          <Link
+            href="/vasai-east"
+            className="font-medium text-primary hover:underline"
+          >
+            Vasai East
+          </Link>
+          {" — from affordable 1 BHK flats to spacious 3 BHK homes, shops and bungalows. Filter by type, configuration and area, then open any project for its price list, carpet areas, floor plans and possession timeline. Prefer a guided shortlist? "}
+          <Link
+            href="/contact"
+            className="font-medium text-primary hover:underline"
+          >
+            Talk to our Vasai property advisors
+          </Link>
+          .
         </p>
 
         <div className="mt-10">

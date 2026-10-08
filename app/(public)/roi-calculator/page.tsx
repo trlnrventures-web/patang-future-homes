@@ -3,9 +3,9 @@ import RoiCalculator from "@/components/RoiCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Property ROI Calculator | Real Estate Returns",
+    title: "Property ROI Calculator",
     description:
-      "Calculate the return on investment for a property, factoring in rental yield plus capital appreciation. Free ROI calculator for flats, shops and bungalows in Vasai.",
+      "Calculate a property's return on investment with rental yield plus capital appreciation. Free ROI calculator for flats, shops and bungalows in Vasai.",
     keywords: [
       "property ROI calculator",
       "real estate ROI calculator",
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "Property ROI Calculator | Real Estate Returns",
+      title: "Property ROI Calculator",
       description:
         "Free property ROI calculator, see rental yield plus capital appreciation for flats, shops and bungalows in Vasai.",
       url: "/roi-calculator",

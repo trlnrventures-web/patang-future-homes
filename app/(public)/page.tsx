@@ -6,13 +6,21 @@ import Stats from "@/components/Stats";
 import Testimonials from "@/components/Testimonials";
 import FAQ from "@/components/FAQ";
 import PopularSearches from "@/components/PopularSearches";
+import { HOME_FAQS } from "@/data/home-faqs";
+import { jsonLd } from "@/lib/json-ld";
+
+const TITLE = "1, 2 & 3 BHK Flats in Vasai West | Patang Future Homes";
+const DESCRIPTION =
+  "Buy 1, 2 & 3 BHK flats in Vasai West with price lists, floor plans and RERA projects. Compare shops & bungalows across Vasai and book a free site visit.";
 
 export const metadata: Metadata = {
-  title: "Premium Flats, Shops & Bungalows in Vasai West",
-  description:
-    "Patang Future Homes is Vasai's trusted property advisory. Explore RERA-registered flats, bungalows and commercial shops across Vasai West & Vasai East with honest, expert guidance at every step.",
+  title: { absolute: TITLE },
+  description: DESCRIPTION,
   keywords: [
     "flats in Vasai West",
+    "1 BHK flat in Vasai West",
+    "2 BHK flat in Vasai West",
+    "new projects in Vasai West",
     "shops for sale in Vasai West",
     "bungalows in Vasai East",
     "property advisors Vasai",
@@ -23,9 +31,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "Premium Flats, Shops & Bungalows in Vasai West",
-    description:
-      "Discover RERA-registered flats, bungalows and commercial shops across Vasai West & Vasai East with Patang Future Homes.",
+    title: TITLE,
+    description: DESCRIPTION,
     url: "/",
     images: [
       {
@@ -38,9 +45,23 @@ export const metadata: Metadata = {
   },
 };
 
+const homeJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: HOME_FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 export default function Home() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLd(homeJsonLd)}
+      />
       <Hero />
       <CategoryCards />
       <NewProjects />

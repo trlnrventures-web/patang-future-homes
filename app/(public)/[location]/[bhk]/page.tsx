@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import seoLandingPages from "@/data/seo-landing-pages.json";
 import { projects, SUB_LOCATIONS, subLocationMatches } from "@/lib/projects";
+import { jsonLd as jsonLdProps } from "@/lib/json-ld";
 import PropertyCard from "@/components/PropertyCard";
 
 type SeoLandingPage = {
@@ -138,9 +139,7 @@ export default async function BhkLandingPage({ params, searchParams }: Props) {
             "@type": "ListItem",
             position: 2,
             name: areaLabel,
-            item: `https://patangfuturehomes.com/projects?area=${areaFromSlug(
-              location
-            )}`,
+            item: `https://patangfuturehomes.com/${location}`,
           },
           {
             "@type": "ListItem",
@@ -157,7 +156,7 @@ export default async function BhkLandingPage({ params, searchParams }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={jsonLdProps(jsonLd)}
       />
 
       {/* Header */}
@@ -172,7 +171,7 @@ export default async function BhkLandingPage({ params, searchParams }: Props) {
             </Link>
             <span>/</span>
             <Link
-              href={`/projects?area=${areaFromSlug(location)}`}
+              href={`/${location}`}
               className="transition-colors hover:text-accent-ink"
             >
               {areaLabel}

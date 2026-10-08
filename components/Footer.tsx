@@ -7,6 +7,18 @@ const FOOTER_LINKS = [
       { href: "/projects?type=shop", label: "Shops" },
       { href: "/projects?type=flat", label: "Flats" },
       { href: "/projects?type=bungalow", label: "Bungalows" },
+      { href: "/projects", label: "All Projects" },
+      { href: "/properties", label: "All Properties" },
+    ],
+  },
+  {
+    heading: "Areas",
+    links: [
+      { href: "/vasai-west", label: "Vasai West" },
+      { href: "/vasai-east", label: "Vasai East" },
+      { href: "/vasai-west/1-bhk", label: "1 BHK in Vasai West" },
+      { href: "/vasai-west/2-bhk", label: "2 BHK in Vasai West" },
+      { href: "/vasai-west/3-bhk", label: "3 BHK in Vasai West" },
     ],
   },
   {
@@ -54,7 +66,7 @@ export default function Footer() {
       </div>
 
       <div className="mx-auto max-w-7xl px-5 pb-24 pt-16 lg:px-8">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-7">
           {/* Brand lockup */}
           <div className="lg:col-span-2 lg:pr-10">
             <div className="flex flex-col leading-none">

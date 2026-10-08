@@ -3,9 +3,9 @@ import RentVsBuyCalculator from "@/components/RentVsBuyCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Rent vs Buy Calculator | Should I Rent or Buy in Vasai?",
+    title: "Rent vs Buy Calculator",
     description:
-      "Compare renting vs buying a home with our free calculator. Input your rent, property price, down payment and interest rate to see which option builds more wealth over time.",
+      "Compare renting vs buying a home with our free calculator. Enter rent, price, down payment and rate to see which option builds more wealth over time.",
     keywords: [
       "rent vs buy calculator",
       "should I rent or buy",
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "Rent vs Buy Calculator | Should I Rent or Buy in Vasai?",
+      title: "Rent vs Buy Calculator",
       description:
         "Free rent vs buy calculator, compare the long-term wealth of renting versus buying a home in Vasai.",
       url: "/rent-vs-buy-calculator",

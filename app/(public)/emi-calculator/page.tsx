@@ -3,9 +3,9 @@ import EmiCalculator from "@/components/EmiCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Home Loan EMI Calculator | Calculate Monthly EMI",
+    title: "Home Loan EMI Calculator",
     description:
-      "Calculate your home loan EMI instantly with our free calculator. Enter loan amount, interest rate and tenure to see monthly payments, total interest and total payment.",
+      "Calculate your home loan EMI instantly with our free calculator. Enter loan amount, rate and tenure to see monthly payments, total interest and more.",
     keywords: [
       "home loan EMI calculator",
       "EMI calculator India",
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "Home Loan EMI Calculator | Calculate Monthly EMI",
+      title: "Home Loan EMI Calculator",
       description:
         "Free home loan EMI calculator, enter loan amount, interest rate and tenure to see your monthly payment instantly.",
       url: "/emi-calculator",

@@ -3,9 +3,9 @@ import StampDutyCalculator from "@/components/StampDutyCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Stamp Duty Calculator | Maharashtra Property Cost",
+    title: "Stamp Duty Calculator, Maharashtra",
     description:
-      "Calculate stamp duty and registration charges for properties in Maharashtra (Vasai West & Vasai East). Choose buyer gender and area type to estimate your total cost instantly.",
+      "Calculate stamp duty and registration charges for property in Maharashtra (Vasai West & East). Pick buyer gender and area type for an instant estimate.",
     keywords: [
       "stamp duty calculator Maharashtra",
       "stamp duty Vasai",
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "Stamp Duty Calculator | Maharashtra Property Cost",
+      title: "Stamp Duty Calculator, Maharashtra",
       description:
         "Free Maharashtra stamp duty and registration calculator for Vasai West & Vasai East property buyers.",
       url: "/stamp-duty-calculator",

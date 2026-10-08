@@ -7,29 +7,20 @@ const SEARCHES = [
   { label: "2 BHK in Vasai East", href: "/vasai-east/2-bhk" },
   { label: "3 BHK in Vasai West", href: "/vasai-west/3-bhk" },
   { label: "3 BHK in Vasai East", href: "/vasai-east/3-bhk" },
-  {
-    label: "1 BHK Flat in Vasai West under 30 Lakhs",
-    href: "/projects?type=flat&area=west",
-  },
+  { label: "Flats for Sale in Vasai West", href: "/projects?type=flat&area=west" },
   {
     label: "2 BHK Flats in Vasai West near Station",
-    href: "/projects?type=flat&area=west",
+    href: "/vasai-west/2-bhk",
   },
-  { label: "New Projects in Vasai West", href: "/projects?area=west" },
-  { label: "New Projects in Vasai East", href: "/projects?area=east" },
+  { label: "New Projects in Vasai West", href: "/vasai-west" },
+  { label: "New Projects in Vasai East", href: "/vasai-east" },
+  { label: "Vasai West Property Prices", href: "/vasai-west" },
+  { label: "Vasai East Property Prices", href: "/vasai-east" },
+  { label: "Property for Sale in Vasai", href: "/properties" },
   {
-    label: "Under Construction Projects in Vasai East",
-    href: "/projects?area=east",
+    label: "Shops for Sale in Vasai West",
+    href: "/projects?type=shop&area=west",
   },
-  {
-    label: "Vasai West 1 BHK Flat Rent",
-    href: "/projects?type=flat&area=west",
-  },
-  {
-    label: "Vasai West 2 BHK Flat Price",
-    href: "/projects?type=flat&area=west",
-  },
-  { label: "Shops for Sale in Vasai West", href: "/projects?type=shop&area=west" },
   { label: "Bungalows in Vasai West", href: "/projects?type=bungalow&area=west" },
 ];
 

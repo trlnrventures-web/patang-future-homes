@@ -40,9 +40,6 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Patang Future Homes | Premium Properties in Vasai West",
-    description:
-      "Discover premium residential and commercial properties in Vasai West.",
     images: ["/brand/og-image.png"],
   },
   keywords: [

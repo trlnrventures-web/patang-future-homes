@@ -7,9 +7,9 @@ const WHATSAPP_LINK = "https://wa.me/917249138197";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Contact Us | Vasai West & East Property Experts",
+    title: "Contact Vasai Property Agents",
     description:
-      "Get in touch with Patang Future Homes. Call, WhatsApp, or send an enquiry, and our Vasai West & East property experts are here to help you find the right home or investment.",
+      "Call, WhatsApp or visit Patang Future Homes. Free site visits and verified flat, shop and bungalow options across Vasai West. +91 72491 38197.",
     keywords: [
       "contact Patang Future Homes",
       "property enquiry Vasai",

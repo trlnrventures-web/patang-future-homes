@@ -3,9 +3,9 @@ import HomeLoanCalculator from "@/components/HomeLoanCalculator";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Home Loan Eligibility & EMI Calculator | Free Online Tool",
+    title: "Home Loan Eligibility Calculator",
     description:
-      "Check your home loan eligibility and calculate monthly EMIs instantly. Free online calculator for buyers looking at flats, bungalows and shops in Vasai West & Vasai East.",
+      "Check your home loan eligibility and calculate monthly EMIs instantly. Free calculator for buyers looking at flats, bungalows and shops in Vasai.",
     keywords: [
       "home loan eligibility calculator",
       "home loan EMI calculator",
@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "Home Loan Eligibility & EMI Calculator | Free Online Tool",
+      title: "Home Loan Eligibility Calculator",
       description:
         "Check how much home loan you can afford and your monthly EMI, with a free, instant eligibility and EMI calculator for Vasai property buyers.",
       url: "/home-loan-calculator",
