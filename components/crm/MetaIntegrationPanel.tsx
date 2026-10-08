@@ -25,7 +25,7 @@ type Connection = {
   tokenExpiresAt: string | null;
 };
 
-type Question = { key: string; label: string; type: string; required: boolean; options: string[] };
+type Question = { key: string; label: string; type: string; options: string[] };
 
 type Form = {
   id: string;
@@ -325,6 +325,12 @@ export default function MetaIntegrationPanel({
       const data = await res.json();
       if (!res.ok) {
         setBanner({ tone: "error", text: data.error || "Could not save this form." });
+        // "No Caller assigned" is the one rejection the admin can fix on this
+        // screen, and only from inside the mapping editor — open it for them
+        // rather than leaving them hunting for where the caller is picked.
+        if (typeof data.error === "string" && data.error.includes("No Caller assigned")) {
+          setOpenFormId(form.id);
+        }
         return false;
       }
       setForms((prev) =>
@@ -612,6 +618,8 @@ export default function MetaIntegrationPanel({
                   <FormRow
                     key={form.id}
                     form={form}
+                    callerName={callers.find((c) => c.id === form.callerId)?.name || null}
+                    smName={salesManagers.find((s) => s.id === form.smId)?.name || null}
                     saving={savingFormId === form.id}
                     syncing={syncing}
                     onToggle={(next) => saveForm(form, { syncEnabled: next })}
@@ -709,6 +717,8 @@ export default function MetaIntegrationPanel({
 
 function FormRow({
   form,
+  callerName,
+  smName,
   saving,
   syncing,
   onToggle,
@@ -716,6 +726,8 @@ function FormRow({
   onSync,
 }: {
   form: Form;
+  callerName: string | null;
+  smName: string | null;
   saving: boolean;
   syncing: boolean;
   onToggle: (next: boolean) => void;
@@ -742,7 +754,13 @@ function FormRow({
       </td>
       <td className="py-2.5 pr-3 text-muted">{formatDate(form.createdTime)}</td>
       <td className="py-2.5 pr-3 text-muted">
-        {[form.callerId, form.smId].filter(Boolean).length ? "Assigned" : <span className="text-amber-700">Not set</span>}
+        {callerName || smName ? (
+          <span title={[callerName && `Caller: ${callerName}`, smName && `SM: ${smName}`].filter(Boolean).join(" · ")}>
+            {[callerName, smName].filter(Boolean).join(" · ")}
+          </span>
+        ) : (
+          <span className="text-amber-700">Not set</span>
+        )}
       </td>
       <td className="py-2.5 pr-3 text-muted">{form.lastSyncedAt ? formatTime(form.lastSyncedAt) : "Never"}</td>
       <td className="py-2.5">
@@ -823,6 +841,12 @@ function MappingEditor({
       </div>
 
       <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {form.questions.length === 0 && (
+          <p className="text-xs font-semibold text-red-700">
+            Questions for this form could not be read from Facebook, so field mapping is
+            unavailable right now. Assignment below still works.
+          </p>
+        )}
         {custom.map((q) => {
           const suggested = !form.saved;
           return (
@@ -830,7 +854,6 @@ function MappingEditor({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-semibold text-navy" title={q.label}>
                   {q.label}
-                  {q.required && <span className="ml-1 text-red-600">*</span>}
                 </div>
                 <div className="truncate text-[11px] text-muted">{q.key}</div>
               </div>
@@ -909,6 +932,12 @@ function MappingEditor({
               </option>
             ))}
           </select>
+          {callers.length === 0 && (
+            <p className="mt-1 text-[11px] font-semibold text-red-700">
+              No active Caller users found. Add a user with the Caller role in Team — sync cannot
+              turn on without one.
+            </p>
+          )}
         </div>
 
         <div>
@@ -928,6 +957,9 @@ function MappingEditor({
               </option>
             ))}
           </select>
+          {salesManagers.length === 0 && (
+            <p className="mt-1 text-[11px] text-muted">No active Sales Manager users found.</p>
+          )}
         </div>
       </div>
 

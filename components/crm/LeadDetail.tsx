@@ -13,7 +13,6 @@ import {
   getLeadLostReason,
   setLeadLostReasonInNotes,
   bhkLabel,
-  isInCallerScope,
 } from "@/lib/crm/leads";
 import { LEAD_COLUMNS, columnForStatus, sourceLabel } from "@/lib/crm/board-shared";
 import { formatPhoneForWhatsApp } from "@/lib/crm/messages";
@@ -108,7 +107,7 @@ type CallLogView = {
 
 type Props = {
   data: LeadDetailData;
-  currentUser: { id: number; role: string; name: string };
+  currentUser: { id: number; role: string; name: string; seeAllLeads?: boolean };
   initialVisitOpen?: boolean;
   /** Rendered inside the "Messages" tab by the server page. */
   messageCenter?: React.ReactNode;
@@ -162,19 +161,12 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const callerUsers = data.users.filter((u) => u.role === "caller");
   const isCaller = currentUser.role === "caller";
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
-  // Callers keep visibility of a lead after it is handed off to an SM, but the
-  // sales team owns it from then on — so the view becomes read-only for them.
-  const readOnly =
-    isCaller &&
-    !isInCallerScope({
-      status: String(lead.status),
-      assignedSmId: (lead.assignedSmId as number | null) ?? null,
-    });
-  // Handing a lead to an SM is how a caller finishes qualifying it, so a caller
-  // who still owns the lead may do that much. Reassigning a caller, auto-assign
-  // and delete stay owner/admin controls, and an SM keeps today's behaviour —
-  // only an admin may move a lead sideways.
-  const canAssignSm = isAdmin || (isCaller && !readOnly);
+  // Callers may edit every lead, including one already handed off to an SM:
+  // the view never becomes read-only for them. Handing a lead to an SM is a
+  // caller action too. Reassigning a caller, auto-assign and delete stay
+  // owner/admin controls, and an SM keeps today's behaviour — only an admin
+  // may move a lead sideways.
+  const canAssignSm = isAdmin || isCaller;
   const canManageAssignment = isAdmin;
   const router = useRouter();
 
@@ -258,11 +250,11 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   // requirement is complete, no need to tap "Recommend Property".
   const autoMatchedRef = useRef(false);
   useEffect(() => {
-    if (requiredFieldsFilled && !readOnly && !autoMatchedRef.current) {
+    if (requiredFieldsFilled && !autoMatchedRef.current) {
       autoMatchedRef.current = true;
       refreshMatches();
     }
-  }, [requiredFieldsFilled, readOnly, refreshMatches]);
+  }, [requiredFieldsFilled, refreshMatches]);
 
   const hasProgressed =
     activities.length > 1 ||
@@ -668,7 +660,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       setShowCallResult(true);
     },
     onVisit: openVisit,
-    readOnly,
     busy,
     contactsHidden,
   };
@@ -704,7 +695,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
             <button
               key={column.key}
               type="button"
-              disabled={busy || readOnly}
+              disabled={busy}
               onClick={() => handleColumnClick(column.key)}
               aria-current={isCurrent ? "true" : undefined}
               title={`Move to ${column.label}`}
@@ -725,13 +716,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
           Reactivated on {reactivationDateLabel(lead.reactivatedAt)}
           {lead.reactivatedFrom ? `, previously ${reactivationPreviousLabel(lead.reactivatedFrom)}` : ""}
         </p>
-      )}
-
-      {readOnly && (
-        <div className="mt-4 rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
-          Handed off to {lead.assignedSmName || "the sales team"} — this lead is now managed by the
-          sales team. You can still view the full history here, but editing is disabled.
-        </div>
       )}
 
       <div className="mt-6 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-6">
@@ -787,17 +771,15 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
           <div className="mt-4 hidden lg:block">{cardActions}</div>
 
-          {!readOnly && (
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setShowEdit(true)}
-                className="text-sm font-semibold text-primary hover:underline"
-              >
-                Edit Details
-              </button>
-            </div>
-          )}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setShowEdit(true)}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Edit Details
+            </button>
+          </div>
 
           {/* Handing off to an SM is a caller action too; caller reassignment,
               auto-assign and delete stay owner/admin controls. */}
@@ -977,24 +959,22 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
             <div role="tabpanel" id="lead-tabpanel-notes" aria-labelledby="lead-tab-notes" className="mt-4">
               {/* Composer sits on top, as in Bigin. The 16px card padding keeps
                   the focus outline (offset 2px) clear of the note cards. */}
-              {!readOnly && (
-                <div className="rounded-xl border border-border bg-white p-4">
-                  <div className="flex gap-3">
-                    <input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddNote();
-                      }}
-                      placeholder="Add a note..."
-                      className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-navy focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    />
-                    <Button onClick={handleAddNote} disabled={busy || !note.trim()} className="shrink-0">
-                      Add
-                    </Button>
-                  </div>
+              <div className="rounded-xl border border-border bg-white p-4">
+                <div className="flex gap-3">
+                  <input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddNote();
+                    }}
+                    placeholder="Add a note..."
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-navy focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  />
+                  <Button onClick={handleAddNote} disabled={busy || !note.trim()} className="shrink-0">
+                    Add
+                  </Button>
                 </div>
-              )}
+              </div>
 
               <div className="mt-4 space-y-3">
                 {notesList.length === 0 ? (
@@ -1039,17 +1019,15 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               <div>
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-navy">Follow-ups</h3>
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={() => setShowFollowUp((s) => !s)}
-                      className="text-sm font-semibold text-primary hover:underline"
-                    >
-                      {showFollowUp ? "Cancel" : "Schedule"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowFollowUp((s) => !s)}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {showFollowUp ? "Cancel" : "Schedule"}
+                  </button>
                 </div>
-                {showFollowUp && !readOnly && (
+                {showFollowUp && (
                   <form onSubmit={handleFollowUp} className="mt-2.5 space-y-3 rounded-xl border border-border bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
@@ -1161,7 +1139,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               )}
 
               {/* Concern recorder */}
-              {!readOnly && lead.originalProject && (
+              {lead.originalProject && (
                 <div>
                   <h3 className="text-sm font-bold text-navy">Record a concern</h3>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1189,16 +1167,14 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                 <div id="matching-properties">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-navy">Recommended Properties</h3>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => refreshMatches()}
-                        className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
-                      >
-                        Refresh
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => refreshMatches()}
+                      className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+                    >
+                      Refresh
+                    </button>
                   </div>
                   {matches.length === 0 ? (
                     <p className="mt-2 text-sm text-muted">
@@ -1341,15 +1317,13 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
                 </div>
               )}
 
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={openVisit}
-                  className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-primary/5"
-                >
-                  Schedule Site Visit
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={openVisit}
+                className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:bg-primary/5"
+              >
+                Schedule Site Visit
+              </button>
 
               {visits.length === 0 ? (
                 <p className="text-sm text-muted">No site visits yet.</p>
@@ -1443,7 +1417,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       </div>
 
       {/* ===== Call result popup ===== */}
-      {showCallResult && !readOnly && (
+      {showCallResult && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-navy/40 sm:items-center sm:p-4">
           <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-5">
             <h3 className="text-sm font-bold text-navy">Log this call</h3>
@@ -1526,7 +1500,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       )}
 
       {/* ===== Site visit popup (book / manage / mandatory tagging) ===== */}
-      {showVisit && !readOnly && (
+      {showVisit && (
         <SiteVisitModal
           key={latestVisit ? `visit-${latestVisit.id}` : "new-visit"}
           visit={latestVisit as VisitRecord | null}
@@ -1670,8 +1644,7 @@ const ACTION_ICON = "h-[18px] w-[18px] shrink-0";
 /**
  * Call / WhatsApp / Site Visit. `layout` picks the container so each placement
  * gets the right column count: the fixed 320px card stacks, the full width
- * mobile bar goes across once there is room. With Site Visit hidden (read
- * only) the remaining two buttons split the row instead of leaving a gap.
+ * mobile bar goes across once there is room.
  */
 function LeadActions({
   layout,
@@ -1679,7 +1652,6 @@ function LeadActions({
   waNumber,
   onCall,
   onVisit,
-  readOnly,
   busy,
   contactsHidden = false,
 }: {
@@ -1688,14 +1660,12 @@ function LeadActions({
   waNumber: string;
   onCall: () => void;
   onVisit: () => void;
-  readOnly: boolean;
   busy: boolean;
   /** Set by the API when contact details are masked outside office hours. */
   contactsHidden?: boolean;
 }) {
-  const container = readOnly
-    ? "grid grid-cols-2 gap-2"
-    : layout === "card"
+  const container =
+    layout === "card"
       ? "grid grid-cols-1 gap-2"
       : "grid grid-cols-1 gap-2 min-[360px]:grid-cols-3";
 
@@ -1736,28 +1706,26 @@ function LeadActions({
           WhatsApp
         </a>
       )}
-      {!readOnly && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onVisit}
-          className={`${ACTION_BTN} border border-border bg-white text-navy hover:bg-primary/5`}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onVisit}
+        className={`${ACTION_BTN} border border-border bg-white text-navy hover:bg-primary/5`}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={ACTION_ICON}
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={ACTION_ICON}
-          >
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          Site Visit
-        </button>
-      )}
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+        Site Visit
+      </button>
     </div>
   );
 }

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
+import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import {
-  isInCallerScope,
   resolveDefaultCallerId,
   resolveDefaultSmId,
   findLikelyDuplicates,
@@ -146,10 +145,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  if (user.role === "caller" && !isInCallerScope(existing) && !seesAllLeads(user)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  // Callers may edit any lead, including one already handed off to an SM. The
+  // old gate here (isInCallerScope) locked them out the moment the SM assignment
+  // moved the status past qualification, which is exactly when they still need
+  // to correct details, add notes or hand the lead to a different SM.
   try {
     const body = await request.json();
     const now = new Date().toISOString();

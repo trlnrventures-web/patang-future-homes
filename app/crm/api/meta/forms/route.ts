@@ -68,17 +68,22 @@ export async function GET(request: Request) {
             lastError: saved?.lastError ?? null,
           };
         } catch (error) {
-          // One form whose questions will not load should not hide the other four.
+          // One form whose questions will not load should not hide the other
+          // four — and it must not hide what is already stored either: the
+          // saved mapping still drives the sync toggle and the assignment
+          // display, and the UI sends whatever it got back on the next save,
+          // so returning nulls here would wipe a saved caller on the next save.
+          const saved = getMapping(form.id);
           return {
             ...form,
             questions: [],
-            fieldMap: {},
-            saved: false,
-            syncEnabled: false,
-            project: null,
-            callerId: null,
-            smId: null,
-            lastSyncedAt: null,
+            fieldMap: saved?.fieldMap ?? {},
+            saved: !!saved,
+            syncEnabled: saved?.syncEnabled ?? false,
+            project: saved?.project ?? null,
+            callerId: saved?.callerId ?? null,
+            smId: saved?.smId ?? null,
+            lastSyncedAt: saved?.lastSyncedAt ?? null,
             lastError: `Could not read this form's questions: ${(error as GraphError).message}`,
           };
         }

@@ -29,6 +29,15 @@ export const AMENITY_OPTIONS: AmenityOption[] = [
   { key: "piped_gas", label: "Piped Gas" },
   { key: "intercom", label: "Intercom" },
   { key: "vaastu", label: "Vaastu Compliant" },
+  { key: "car_parking", label: "Car Parking" },
+  { key: "visitor_parking", label: "Visitor Parking" },
+  { key: "street_lighting", label: "Street Lighting" },
+  { key: "solar_power", label: "Solar Energy Provisions" },
+  { key: "yoga_area", label: "Yoga Area" },
+  { key: "multipurpose_court", label: "Multipurpose Court" },
+  { key: "meditation_area", label: "Meditation Area" },
+  { key: "senior_citizen_area", label: "Senior Citizen Area" },
+  { key: "party_lawn", label: "Party Lawn" },
 ];
 
 const CATEGORY_BY_KEY: Record<string, AmenityCategory> = {
@@ -54,6 +63,15 @@ const CATEGORY_BY_KEY: Record<string, AmenityCategory> = {
   piped_gas: "convenience",
   intercom: "convenience",
   vaastu: "leisure",
+  car_parking: "convenience",
+  visitor_parking: "convenience",
+  street_lighting: "convenience",
+  solar_power: "convenience",
+  yoga_area: "sports",
+  multipurpose_court: "sports",
+  meditation_area: "leisure",
+  senior_citizen_area: "leisure",
+  party_lawn: "leisure",
 };
 
 const LABELS = new Map(AMENITY_OPTIONS.map((a) => [a.key, a.label]));

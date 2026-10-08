@@ -63,6 +63,41 @@ function ownerOf(lead: BoardLead): string {
   return "Unassigned";
 }
 
+/**
+ * Bulk-select tick for a card. The whole card is a button that opens the lead, so
+ * the tick swallows its own click and keypress — otherwise every attempt to
+ * select a card would navigate away from the board and the action bar could
+ * never be used.
+ */
+function SelectBox({
+  checked,
+  onToggle,
+  name,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  name: string;
+}) {
+  return (
+    <label
+      className="absolute left-2 top-2 z-10 -m-1.5 cursor-pointer p-1.5"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter" || e.key === " ") e.preventDefault();
+      }}
+    >
+      <span className="sr-only">Select {name} for bulk actions</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="h-4 w-4 cursor-pointer rounded border-border text-primary accent-primary"
+      />
+    </label>
+  );
+}
+
 export default function LeadBoard({ listContext, readOnly }: Props) {
   const router = useRouter();
   const [leads, setLeads] = useState<BoardLead[]>([]);
@@ -101,7 +136,6 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   const [reveal, setReveal] = useState<Record<string, { sig: string; n: number }>>({});
   const [busy, setBusy] = useState(false);
   const loadSeq = useRef(0);
-
   // Adjacent stage, for the swipe gesture and for keeping the tab in view.
   const stageIndex = LEAD_COLUMNS.findIndex((c) => c.key === activeStage);
   const goToStage = (index: number) => {
@@ -236,6 +270,138 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   /** Identity of the current result set, used to expire stale expansions. */
   const visibleSig = useMemo(() => visibleLeads.map((l) => l.id).join(","), [visibleLeads]);
 
+  // ---- Bulk selection ----
+  // Selection lives in the board, not the server: the board already holds every
+  // lead of the current filter, so ticking cards and acting on them needs no
+  // round trip until the action itself. Ids are always read through
+  // `selectedIds`, which keeps the bar in step with what is on screen.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  // "Assign SM", "Assign caller" and "Delete" are owner controls; a caller or
+  // an SM may still bulk-move status within their own scope, which the server
+  // re-checks lead by lead.
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkSm, setBulkSm] = useState("");
+  const [bulkCaller, setBulkCaller] = useState("");
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkMsg, setBulkMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const canBulk = !!user && user.role !== "marketing";
+  const isAdminUser = !!user && (user.role === "admin" || user.role === "sales_head");
+
+  // The people a lead can be handed to, for the two assign menus.
+  const [assignees, setAssignees] = useState<{ sms: { id: number; name: string }[]; callers: { id: number; name: string }[] }>({
+    sms: [],
+    callers: [],
+  });
+  useEffect(() => {
+    if (!isAdminUser) return;
+    let active = true;
+    fetch("/crm/api/team")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!active || !d?.users) return;
+        setAssignees({
+          sms: d.users.filter((u: { role: string }) => u.role === "sales_manager").map((u: { id: number; name: string }) => ({ id: u.id, name: u.name })),
+          callers: d.users.filter((u: { role: string }) => u.role === "caller").map((u: { id: number; name: string }) => ({ id: u.id, name: u.name })),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isAdminUser]);
+
+  // Selection is always read through `selectedIds`, which intersects with the
+  // rows on screen: ticks for leads outside the current filter never reach the
+  // bar, the count, or a bulk request, so there is nothing to clean up when the
+  // filter changes (and pruning in an effect would just cause a second render).
+  const selectedIds = useMemo(
+    () => [...selected].filter((id) => visibleLeads.some((l) => l.id === id)),
+    [selected, visibleLeads]
+  );
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    setBulkStatus("");
+    setBulkSm("");
+    setBulkCaller("");
+    setBulkNote("");
+    setBulkMsg(null);
+    setConfirmDelete(false);
+  }, []);
+
+  const toggleSelectAllVisible = useCallback(() => {
+    setSelected((prev) => {
+      const allSelected = visibleLeads.every((l) => prev.has(l.id));
+      if (allSelected) {
+        const visible = new Set(visibleLeads.map((l) => l.id));
+        return new Set([...prev].filter((id) => !visible.has(id)));
+      }
+      return new Set([...prev, ...visibleLeads.map((l) => l.id)]);
+    });
+  }, [visibleLeads]);
+
+  const runBulk = useCallback(
+    async (body: Record<string, unknown>, successText: (n: number) => string) => {
+      if (selectedIds.length === 0) return;
+      setBusy(true);
+      setBulkMsg(null);
+      try {
+        const res = await fetch("/crm/api/leads/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: selectedIds, ...body }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "That action could not be completed.");
+        setBulkMsg({ tone: "ok", text: successText(Number(data.updated) || 0) });
+        clearSelection();
+        await load();
+      } catch (e) {
+        setBulkMsg({ tone: "err", text: e instanceof Error ? e.message : "That action could not be completed." });
+      } finally {
+        setBusy(false);
+        setConfirmDelete(false);
+      }
+    },
+    [selectedIds, clearSelection, load]
+  );
+
+  const applyBulkStatus = useCallback(() => {
+    if (!bulkStatus) return;
+    const label = LEAD_STATUS_LABELS[bulkStatus] || bulkStatus;
+    void runBulk({ action: "status", status: bulkStatus, notes: bulkNote.trim() || undefined }, (n) =>
+      n === 0 ? "Those leads were already in that stage." : `${n} lead${n === 1 ? "" : "s"} moved to ${label}.`
+    );
+  }, [bulkStatus, bulkNote, runBulk]);
+
+  const applyBulkSm = useCallback(() => {
+    if (!bulkSm) return;
+    const name = bulkSm === "auto" ? "auto-assign" : assignees.sms.find((s) => String(s.id) === bulkSm)?.name;
+    void runBulk({ action: "assign_sm", ...(bulkSm === "clear" ? { clear: true } : { smId: bulkSm === "auto" ? null : Number(bulkSm) }) }, (n) =>
+      n === 0 ? "No lead changed — they already had that sales manager." : `${n} lead${n === 1 ? "" : "s"} assigned to ${name}.`
+    );
+  }, [bulkSm, assignees.sms, runBulk]);
+
+  const applyBulkCaller = useCallback(() => {
+    if (!bulkCaller) return;
+    const name = bulkCaller === "auto" ? "auto-assign" : assignees.callers.find((c) => String(c.id) === bulkCaller)?.name;
+    void runBulk({ action: "assign_caller", ...(bulkCaller === "clear" ? { clear: true } : { callerId: bulkCaller === "auto" ? null : Number(bulkCaller) }) }, (n) =>
+      n === 0 ? "No lead changed — they already had that caller." : `${n} lead${n === 1 ? "" : "s"} assigned to ${name}.`
+    );
+  }, [bulkCaller, assignees.callers, runBulk]);
+
+
   /** Cards to render for a column right now: the cap, unless expanded. */
   const shownFor = useCallback(
     (key: string) => (reveal[key]?.sig === visibleSig ? reveal[key].n : COLUMN_CARD_CAP),
@@ -361,7 +527,174 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
             </button>
           ))}
         </div>
+        {canBulk && visibleLeads.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleSelectAllVisible}
+            className="shrink-0 rounded-lg border border-border bg-white px-3.5 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary"
+          >
+            {selectedIds.length === visibleLeads.length ? "Clear selection" : "Select all"}
+          </button>
+        )}
       </div>
+
+      {/* ===== Bulk action bar =====
+          Appears only while something is ticked, so it cannot push the board
+          around during ordinary reading. Every control here maps to one case in
+          /crm/api/leads/bulk, which re-checks scope per lead; the client only
+          decides what to draw. Delete is the one destructive action, so it
+          takes a second, explicit confirmation rather than firing on click. */}
+      {canBulk && selectedIds.length > 0 && (
+        <div className="mt-2.5 shrink-0 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-navy">
+              {selectedIds.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={busy}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-semibold text-muted hover:text-navy disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted">Move to stage</span>
+              <div className="flex gap-1.5">
+                <select
+                  value={bulkStatus}
+                  onChange={(e) => setBulkStatus(e.target.value)}
+                  disabled={busy}
+                  className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm font-semibold text-navy outline-none focus:border-primary"
+                >
+                  <option value="">Choose a stage</option>
+                  {LEAD_COLUMNS.map((c) => (
+                    <option key={c.key} value={c.dropStatus}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={applyBulkStatus}
+                  disabled={busy || !bulkStatus}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  Apply
+                </button>
+              </div>
+            </label>
+
+            {isAdminUser && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-muted">Assign sales manager</span>
+                <div className="flex gap-1.5">
+                  <select
+                    value={bulkSm}
+                    onChange={(e) => setBulkSm(e.target.value)}
+                    disabled={busy}
+                    className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm font-semibold text-navy outline-none focus:border-primary"
+                  >
+                    <option value="">Choose</option>
+                    <option value="auto">Auto-assign (lightest load)</option>
+                    <option value="clear">Unassign</option>
+                    {assignees.sms.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={applyBulkSm}
+                    disabled={busy || !bulkSm}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </label>
+            )}
+
+            {isAdminUser && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-muted">Assign caller</span>
+                <div className="flex gap-1.5">
+                  <select
+                    value={bulkCaller}
+                    onChange={(e) => setBulkCaller(e.target.value)}
+                    disabled={busy}
+                    className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm font-semibold text-navy outline-none focus:border-primary"
+                  >
+                    <option value="">Choose</option>
+                    <option value="auto">Auto-assign (lightest load)</option>
+                    <option value="clear">Unassign</option>
+                    {assignees.callers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={applyBulkCaller}
+                    disabled={busy || !bulkCaller}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </label>
+            )}
+
+            {isAdminUser &&
+              (confirmDelete ? (
+                <div className="flex items-end gap-1.5">
+                  <span className="pb-1.5 text-xs font-semibold text-red-700">
+                    Delete {selectedIds.length} lead{selectedIds.length === 1 ? "" : "s"}?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void runBulk({ action: "delete" }, (n) => `${n} lead${n === 1 ? "" : "s"} deleted.`)}
+                    disabled={busy}
+                    className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Yes, delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={busy}
+                    className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-semibold text-muted hover:text-navy"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={busy}
+                  className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
+                >
+                  Delete
+                </button>
+              ))}
+          </div>
+
+          {bulkMsg && (
+            <p
+              className={`mt-2 text-sm font-semibold ${bulkMsg.tone === "ok" ? "text-green-700" : "text-red-700"}`}
+              role="status"
+            >
+              {bulkMsg.text}
+            </p>
+          )}
+        </div>
+      )}
 
       <ContactMaskingBanner masking={masking} className="mt-2.5 md:shrink-0" />
 
@@ -464,6 +797,9 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
                       lead={lead}
                       pending={pendingId === lead.id}
                       onOpen={() => router.push(`/crm/leads/${lead.id}${hrefQuery}`)}
+                      selectable={canBulk}
+                      selected={selected.has(lead.id)}
+                      onToggleSelect={toggleSelect}
                     />
                   ))}
                 <ShowMore
@@ -517,6 +853,9 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
               }
               onDrop={(id) => handleDrop(column, id)}
               onOpen={(id) => router.push(`/crm/leads/${id}${hrefQuery}`)}
+              selectable={canBulk}
+              selected={selected}
+              onToggleSelect={toggleSelect}
             />
           ))}
           </div>
@@ -593,6 +932,9 @@ function BoardColumn({
   onDragLeaveColumn,
   onDrop,
   onOpen,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   column: LeadColumn;
   cards: BoardLead[];
@@ -611,6 +953,9 @@ function BoardColumn({
   onDragLeaveColumn: () => void;
   onDrop: (id: number) => void;
   onOpen: (id: number) => void;
+  selectable: boolean;
+  selected: Set<number>;
+  onToggleSelect: (id: number) => void;
 }) {
   if (collapsed) {
     return (
@@ -683,6 +1028,9 @@ function BoardColumn({
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
                 onOpen={onOpen}
+                selectable={selectable}
+                selected={selected.has(lead.id)}
+                onToggleSelect={onToggleSelect}
               />
             ))}
             <ShowMore
@@ -726,6 +1074,9 @@ function BoardCard({
   onDragStart,
   onDragEnd,
   onOpen,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   lead: BoardLead;
   dragging: boolean;
@@ -733,6 +1084,9 @@ function BoardCard({
   onDragStart: (e: React.DragEvent, id: number) => void;
   onDragEnd: () => void;
   onOpen: (id: number) => void;
+  selectable: boolean;
+  selected: boolean;
+  onToggleSelect: (id: number) => void;
 }) {
   const project = projectOf(lead);
   const owner = ownerOf(lead);
@@ -755,8 +1109,17 @@ function BoardCard({
       aria-label={`${lead.name}, ${LEAD_STATUS_LABELS[lead.status] || lead.status}`}
       className={`relative cursor-pointer rounded-lg border border-border bg-white px-3 py-2.5 transition-colors hover:border-primary/40 ${
         dragging ? "border-primary opacity-40" : ""
-      } ${pending ? "animate-pulse" : ""}`}
+      } ${pending ? "animate-pulse" : ""} ${selected ? "border-primary ring-2 ring-primary/20" : ""} ${
+        selectable ? "pl-7" : ""
+      }`}
     >
+      {selectable && (
+        <SelectBox
+          checked={selected}
+          onToggle={() => onToggleSelect(lead.id)}
+          name={lead.name}
+        />
+      )}
       <div className="min-w-0">
         <div className="truncate text-sm font-bold text-navy">{lead.name}</div>
         {project && <div className="mt-0.5 truncate text-sm text-muted">{project}</div>}
@@ -789,10 +1152,16 @@ function MobileStageCard({
   lead,
   pending,
   onOpen,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   lead: BoardLead;
   pending: boolean;
   onOpen: () => void;
+  selectable: boolean;
+  selected: boolean;
+  onToggleSelect: (id: number) => void;
 }) {
   const project = projectOf(lead);
   const owner = ownerOf(lead);
@@ -812,8 +1181,15 @@ function MobileStageCard({
       aria-label={`${lead.name}, ${LEAD_STATUS_LABELS[lead.status] || lead.status}`}
       className={`relative flex min-h-16 cursor-pointer items-center rounded-xl border border-border bg-white px-3 py-3 transition-colors active:border-primary ${
         pending ? "animate-pulse" : ""
-      }`}
+      } ${selected ? "border-primary ring-2 ring-primary/20" : ""} ${selectable ? "pl-9" : ""}`}
     >
+      {selectable && (
+        <SelectBox
+          checked={selected}
+          onToggle={() => onToggleSelect(lead.id)}
+          name={lead.name}
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-bold text-navy">{lead.name}</div>
         {project && <div className="mt-0.5 truncate text-sm text-muted">{project}</div>}

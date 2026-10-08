@@ -61,7 +61,7 @@ function groupConfigurations(configs: Configuration[]): ConfigGroup[] {
 function areaNumbers(items: Configuration[]): number[] {
   const nums: number[] = [];
   for (const c of items) {
-    const source = c.saleableArea ?? c.carpetArea ?? "";
+    const source = c.saleableArea || c.carpetArea || "";
     const found = (source.match(/\d{3,}(?:\.\d+)?/g) || []).map(Number);
     nums.push(...found);
   }

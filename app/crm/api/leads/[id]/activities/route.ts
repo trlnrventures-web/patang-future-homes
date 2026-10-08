@@ -23,12 +23,9 @@ export async function POST(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  // Role access check
-  if (user.role === "caller" && lead.assignedCallerId !== user.id && lead.assignedCallerId !== null) {
-    if (lead.assignedCallerId !== user.id && !seesAllLeads(user)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  // Role access check: callers may add notes/activities to any lead, including
+  // one already assigned to an SM or to another caller. Sales managers stay
+  // limited to their own leads.
   if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

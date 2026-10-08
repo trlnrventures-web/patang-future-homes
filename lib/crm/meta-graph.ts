@@ -271,22 +271,25 @@ export type FormQuestion = {
   /** The human question as the ad actually asks it, e.g. "What's your budget?". */
   label: string;
   type: string;
-  required: boolean;
   options: string[];
 };
 
-/** The question schema for one form, which is what the mapping screen is built from. */
+/**
+ * The question schema for one form, which is what the mapping screen is built
+ * from. `required` is deliberately not requested: Graph removed it and asking
+ * for it fails the whole expansion with "(#100) Tried accessing nonexisting
+ * field (required)" — nothing in the mapping or sync logic reads it.
+ */
 export async function getFormQuestions(formId: string, pageToken: string): Promise<FormQuestion[]> {
   const data = await graphGet<{ questions?: { data?: unknown[] } }>(formId, {
     access_token: pageToken,
-    fields: "questions{key,label,type,required,options}",
+    fields: "questions{key,label,type,options}",
   });
   const raw = (data.questions?.data || []) as Record<string, unknown>[];
   return raw.map((q) => ({
     key: String(q.key || ""),
     label: String(q.label || q.key || "Question"),
     type: String(q.type || ""),
-    required: q.required === true || q.required === "true",
     options: Array.isArray(q.options)
       ? (q.options as Record<string, unknown>[]).map((o) => String(o.title ?? o.name ?? "")).filter(Boolean)
       : [],

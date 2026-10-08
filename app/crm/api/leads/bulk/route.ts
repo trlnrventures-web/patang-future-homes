@@ -3,7 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
-import { resolveDefaultSmId } from "@/lib/crm/leads";
+import { resolveDefaultSmId, resolveDefaultCallerId } from "@/lib/crm/leads";
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
@@ -84,6 +84,25 @@ export async function POST(request: NextRequest) {
       if (!isAdmin(user)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+      // `clear` unassigns without touching status; otherwise a null/absent smId
+      // means "auto", which must still move the lead into the assigned stage.
+      if (body.clear === true) {
+        const cleared = targetLeads.filter((l) => l.assignedSmId != null);
+        for (const l of cleared) {
+          db.update(schema.leads)
+            .set({ assignedSmId: null, assignedBy: user.id, updatedAt: now })
+            .where(eq(schema.leads.id, l.id))
+            .run();
+          db.insert(schema.activities).values({
+            leadId: l.id,
+            userId: user.id,
+            type: "assignment",
+            notes: "Assignment: SM → Unassigned",
+            createdAt: now,
+          }).run();
+        }
+        return NextResponse.json({ ok: true, updated: cleared.length });
+      }
       const smId = body.smId ? Number(body.smId) : null;
       const sm = smId
         ? db.select().from(schema.users).where(eq(schema.users.id, smId)).get()
@@ -96,8 +115,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "No sales manager available" }, { status: 400 });
       }
       const names = new Map(db.select().from(schema.users).all().map((u) => [u.id, u.name]));
+      let changed = 0;
       for (const l of targetLeads) {
         if (l.assignedSmId === resolvedSm) continue;
+        changed++;
         db.update(schema.leads)
           .set({ assignedSmId: resolvedSm, assignedAt: now, assignedBy: user.id, status: "assigned", stageChangedAt: now, nextAction: "sm_follow_up", updatedAt: now })
           .where(eq(schema.leads.id, l.id))
@@ -110,7 +131,61 @@ export async function POST(request: NextRequest) {
           createdAt: now,
         }).run();
       }
-      return NextResponse.json({ ok: true, updated: targetLeads.length });
+      return NextResponse.json({ ok: true, updated: changed });
+    }
+
+    case "assign_caller": {
+      if (!isAdmin(user)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      // The mirror of assign_sm, kept separate because caller assignment never
+      // moves the lead out of qualification the way handing it to an SM does.
+      if (body.clear === true) {
+        const cleared = targetLeads.filter((l) => l.assignedCallerId != null);
+        for (const l of cleared) {
+          db.update(schema.leads)
+            .set({ assignedCallerId: null, updatedAt: now })
+            .where(eq(schema.leads.id, l.id))
+            .run();
+          db.insert(schema.activities).values({
+            leadId: l.id,
+            userId: user.id,
+            type: "assignment",
+            notes: "Assignment: Caller → Unassigned",
+            createdAt: now,
+          }).run();
+        }
+        return NextResponse.json({ ok: true, updated: cleared.length });
+      }
+      const callerId = body.callerId ? Number(body.callerId) : null;
+      const caller = callerId
+        ? db.select().from(schema.users).where(eq(schema.users.id, callerId)).get()
+        : null;
+      if (callerId != null && (!caller || caller.role !== "caller")) {
+        return NextResponse.json({ error: "Invalid caller" }, { status: 400 });
+      }
+      const resolvedCaller = callerId != null ? callerId : resolveDefaultCallerId(db);
+      if (resolvedCaller == null) {
+        return NextResponse.json({ error: "No caller available" }, { status: 400 });
+      }
+      const names = new Map(db.select().from(schema.users).all().map((u) => [u.id, u.name]));
+      let changed = 0;
+      for (const l of targetLeads) {
+        if (l.assignedCallerId === resolvedCaller) continue;
+        changed++;
+        db.update(schema.leads)
+          .set({ assignedCallerId: resolvedCaller, updatedAt: now })
+          .where(eq(schema.leads.id, l.id))
+          .run();
+        db.insert(schema.activities).values({
+          leadId: l.id,
+          userId: user.id,
+          type: "assignment",
+          notes: `Assigned: Caller → ${names.get(resolvedCaller) || ""}`,
+          createdAt: now,
+        }).run();
+      }
+      return NextResponse.json({ ok: true, updated: changed });
     }
 
     case "delete": {

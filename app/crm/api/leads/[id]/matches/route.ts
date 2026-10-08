@@ -22,9 +22,8 @@ export async function GET(
     return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   }
 
-  if (user.role === "caller" && lead.assignedCallerId !== user.id && !seesAllLeads(user)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Callers may view matches for any lead; sales managers stay limited to
+  // their own leads.
   if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

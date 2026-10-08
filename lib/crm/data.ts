@@ -11,6 +11,13 @@ export type CrmUser = {
   phone: string | null;
   mustChangePassword: boolean;
   lastLoginAt: string | null;
+  /**
+   * Resolved from the row on every request rather than from the JWT, so an admin
+   * grant takes effect on the reader's next page load with no re-login. The
+   * client needs it because it decides which controls to draw; the server still
+   * re-checks every one of them.
+   */
+  seeAllLeads: boolean;
 };
 
 export async function getCurrentUser(): Promise<CrmUser | null> {
@@ -29,6 +36,7 @@ export async function getCurrentUser(): Promise<CrmUser | null> {
     phone: user.phone,
     mustChangePassword: !!user.mustChangePassword,
     lastLoginAt: user.lastLoginAt,
+    seeAllLeads: !!user.seeAllLeads,
   };
 }
 
