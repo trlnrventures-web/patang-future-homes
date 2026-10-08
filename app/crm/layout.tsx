@@ -36,13 +36,11 @@ export default async function CrmLayout({
             {/* Mobile top bar */}
             <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-white px-4 py-3 md:hidden">
               <Link href="/crm/dashboard" className="flex items-center">
-                <span className="inline-block rounded-lg bg-navy p-1.5">
-                  <img
-                    src="/brand/PFH_512_white_nobg_horizontal.png"
-                    alt="Patang CRM"
-                    className="h-7 w-auto"
-                  />
-                </span>
+                <img
+                  src="/brand/PFH_512_nobg_horizontal.png"
+                  alt="Patang CRM"
+                  className="h-7 w-auto"
+                />
               </Link>
               <span className="flex items-center gap-2 text-xs font-medium text-muted">
                 <Link
