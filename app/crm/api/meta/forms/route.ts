@@ -53,12 +53,16 @@ export async function GET(request: Request) {
         try {
           const questions = await getFormQuestions(form.id, token);
           const saved = getMapping(form.id);
+          // A saved map wins over a fresh suggestion — unless it is empty,
+          // which happens when the form was saved while its questions failed
+          // to load: an empty map is not a choice anybody can act on, and it
+          // leaves the form permanently un-syncable.
+          const savedMap = saved?.fieldMap ?? {};
+          const hasSavedMap = Object.keys(savedMap).length > 0;
           return {
             ...form,
             questions,
-            // A saved map wins over a fresh suggestion, or an admin's deliberate
-            // choice would be overwritten every time this list loads.
-            fieldMap: saved?.fieldMap ?? suggestFieldMap(questions.map((q) => q.key)),
+            fieldMap: hasSavedMap ? savedMap : suggestFieldMap(questions.map((q) => q.key)),
             saved: !!saved,
             syncEnabled: saved?.syncEnabled ?? false,
             project: saved?.project ?? null,

@@ -281,17 +281,25 @@ export type FormQuestion = {
  * field (required)" — nothing in the mapping or sync logic reads it.
  */
 export async function getFormQuestions(formId: string, pageToken: string): Promise<FormQuestion[]> {
-  const data = await graphGet<{ questions?: { data?: unknown[] } }>(formId, {
+  const data = await graphGet<{ questions?: unknown }>(formId, {
     access_token: pageToken,
     fields: "questions{key,label,type,options}",
   });
-  const raw = (data.questions?.data || []) as Record<string, unknown>[];
-  return raw.map((q) => ({
-    key: String(q.key || ""),
-    label: String(q.label || q.key || "Question"),
-    type: String(q.type || ""),
-    options: Array.isArray(q.options)
-      ? (q.options as Record<string, unknown>[]).map((o) => String(o.title ?? o.name ?? "")).filter(Boolean)
+  // Graph answers `fields=questions{...}` with a bare array, but the same edge
+  // read as a connection comes back as `{ data: [...] }` — accept both, because
+  // an empty parse here silently empties the whole mapping screen.
+  const q = data.questions;
+  const raw = (Array.isArray(q) ? q : ((q as { data?: unknown[] })?.data || [])) as Record<string, unknown>[];
+  return raw.map((entry) => ({
+    key: String(entry.key || ""),
+    label: String(entry.label || entry.key || "Question"),
+    type: String(entry.type || ""),
+    options: Array.isArray(entry.options)
+      ? (entry.options as unknown[])
+          .map((o) =>
+            typeof o === "string" ? o : String((o as Record<string, unknown>).value ?? (o as Record<string, unknown>).title ?? (o as Record<string, unknown>).name ?? "")
+          )
+          .filter(Boolean)
       : [],
   }));
 }
@@ -382,9 +390,15 @@ async function fetchLeadPages(
     }
 
     for (const raw of body.data || []) {
-      const fieldData = (raw.field_data || {}) as { values?: RawFieldValue[] };
+      // Meta documents `field_data` as an array of { name, values } entries.
+      // Accept the object envelope too, but never treat an array's inherited
+      // `values` method as data — iterating it throws mid-poll.
+      const fd = raw.field_data;
+      const entries: RawFieldValue[] = Array.isArray(fd)
+        ? (fd as RawFieldValue[])
+        : ((fd as { values?: RawFieldValue[] } | null | undefined)?.values || []);
       const answers: Record<string, string> = {};
-      for (const v of fieldData.values || []) {
+      for (const v of entries) {
         const text = v.text ?? v.values?.[0]?.value;
         if (v.name && text != null) answers[v.name] = String(text);
       }
