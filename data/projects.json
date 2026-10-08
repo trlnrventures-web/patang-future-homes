@@ -1,99 +1,5 @@
 [
   {
-    "slug": "sample-project",
-    "tier": "affordable",
-    "title": "Patang Sample Project",
-    "location": "Vasai West",
-    "area": "west",
-    "type": "flat",
-    "status": "Under Construction",
-    "subLocation": "Om Nagar",
-    "priceRange": "1 BHK from ₹54 Lacs onwards*",
-    "pricePerSqft": "On request",
-    "shortDescription": "Sample project showing the new configuration format — multiple 1 & 2 BHK options with pricing, all-inclusive, parking and amenities. Replace with real inventory.",
-    "description": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive and whether parking is included, while amenities are set once at project level. Add real projects from CRM → Properties → Add Property.",
-    "fullDescription": "This is a single dummy project retained so the CRM and website have one example in the new configuration format. Each configuration stores its own type, carpet and saleable area, price, whether the price is all-inclusive and whether parking is included, while amenities are set once at project level. Add real projects from CRM → Properties → Add Property.",
-    "usps": [
-      {
-        "title": "Sample Format",
-        "description": "Demonstrates multi-configuration pricing with parking and amenities"
-      },
-      {
-        "title": "Easy to Replace",
-        "description": "Delete this project once real inventory is added from the CRM"
-      }
-    ],
-    "images": [
-      "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&q=80",
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80"
-    ],
-    "reraId": "P00000000000",
-    "possessionDate": "December 2028 (Target)",
-    "totalTowers": 1,
-    "landParcel": "Details on request",
-    "configurations": [
-      {
-        "type": "1 BHK",
-        "carpetArea": "320 sq ft",
-        "saleableArea": "610 sq ft",
-        "price": "₹54 Lacs",
-        "allInclusive": true,
-        "parkingIncluded": true,
-        "floorPlanImage": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&q=80"
-      },
-      {
-        "type": "1 BHK (Corner)",
-        "carpetArea": "355 sq ft",
-        "saleableArea": "660 sq ft",
-        "price": "₹58 Lacs",
-        "allInclusive": false,
-        "parkingIncluded": false,
-        "floorPlanImage": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&q=80"
-      },
-      {
-        "type": "2 BHK",
-        "carpetArea": "505 sq ft",
-        "saleableArea": "940 sq ft",
-        "price": "₹72 Lacs",
-        "allInclusive": true,
-        "parkingIncluded": true,
-        "floorPlanImage": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80"
-      }
-    ],
-    "amenities": [
-      "lift",
-      "power_backup",
-      "security",
-      "cctv",
-      "gym",
-      "swimming_pool",
-      "clubhouse",
-      "kids_play_area",
-      "water_supply",
-      "fire_safety"
-    ],
-    "showFlatVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
-    "walkthroughVideoUrl": "PASTE_YOUTUBE_EMBED_URL_HERE",
-    "nearbyLandmarks": [
-      {
-        "name": "Om Nagar Market",
-        "distance": "500 m"
-      },
-      {
-        "name": "Vasai Road Railway Station",
-        "distance": "2.5 km"
-      }
-    ],
-    "developer": {
-      "name": "Sample Developer",
-      "since": 2015,
-      "completedProjects": "Sample"
-    },
-    "metaTitle": "Patang Sample Project | 1 & 2 BHK Flats in Om Nagar, Vasai West",
-    "metaDescription": "Dummy project showing 1 & 2 BHK configurations with pricing, all-inclusive, parking and amenities in the new CRM format.",
-    "isActive": true
-  },
-  {
     "slug": "agnes-pride",
     "tier": "affordable",
     "title": "Agnes Pride",
@@ -249,7 +155,7 @@
   {
     "slug": "alpine",
     "tier": "affordable",
-    "title": "Alpine",
+    "title": "Acme Alpine",
     "location": "Vasai West",
     "subLocation": "Yashwant County",
     "area": "west",
