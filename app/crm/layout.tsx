@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/crm/AuthProvider";
 import CrmSidebar from "@/components/crm/CrmSidebar";
 import LogoutButton from "@/components/crm/LogoutButton";
 import MobileNav from "@/components/crm/MobileNav";
+import LeadAlertWatcher from "@/components/crm/LeadAlertWatcher";
 
 export default async function CrmLayout({
   children,
@@ -59,6 +60,9 @@ export default async function CrmLayout({
 
         {/* Mobile bottom nav */}
         <MobileNav userRole={user.role} />
+
+        {/* New-lead popup + chime, present on every CRM screen. */}
+        <LeadAlertWatcher />
       </div>
     </AuthProvider>
   );

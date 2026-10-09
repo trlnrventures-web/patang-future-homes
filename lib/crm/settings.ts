@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { crmSettings } from "./schema";
 import { eq } from "drizzle-orm";
+import { parseBudgetRanges, type BudgetPreset } from "./budget";
 
 const DEFAULTS: Record<string, string> = {
   sla_first_response_min: "5",
@@ -25,6 +26,11 @@ export function getSetting(key: string): string {
 export function getSlaFirstResponseMin(): number {
   const v = parseInt(getSetting("sla_first_response_min"), 10);
   return Number.isFinite(v) && v > 0 ? v : 5;
+}
+
+/** The admin-configured budget chips shown on the lead editor. */
+export function getBudgetPresets(): BudgetPreset[] {
+  return parseBudgetRanges(getSetting("budget_ranges"));
 }
 
 export function getMatchingWeights(): MatchingWeights {

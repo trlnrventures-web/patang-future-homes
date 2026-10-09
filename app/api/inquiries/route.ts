@@ -3,6 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { resolveDefaultCallerId } from "@/lib/crm/leads";
+import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
 
 export const runtime = "nodejs";
@@ -110,6 +111,10 @@ export async function POST(request: NextRequest) {
           createdAt: now,
         })
         .run();
+    }
+
+    if (result.kind === "new" || result.kind === "reactivated") {
+      notifyNewLead(lead.assignedCallerId, lead, { kind: result.kind });
     }
 
     return NextResponse.json(

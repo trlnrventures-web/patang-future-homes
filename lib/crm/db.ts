@@ -501,6 +501,20 @@ function createTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_user_id);
 
+    CREATE TABLE IF NOT EXISTS lead_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      lead_id INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'new',
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      acknowledged_at TEXT,
+      created_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (lead_id) REFERENCES leads(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_lead_alerts_user ON lead_alerts(user_id, acknowledged_at);
+
     CREATE TABLE IF NOT EXISTS company_holidays (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,

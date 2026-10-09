@@ -12,6 +12,7 @@ import { queryInboxLeads } from "@/lib/crm/inbox-query";
 import { INBOX_SORTS, isInboxTab } from "@/lib/crm/inbox-shared";
 import { BOARD_SORT_KEYS } from "@/lib/crm/board-shared";
 import { readProjectsFile } from "@/lib/crm/projects-store";
+import { getBudgetPresets } from "@/lib/crm/settings";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
 
@@ -247,6 +248,7 @@ const visits = db
         data={leadData}
         currentUser={user}
         initialVisitOpen={initialVisitOpen}
+        budgetPresets={getBudgetPresets()}
         messageCenter={
           <div className="scroll-mt-24" id="message-center">
             <h2 className="mb-3 text-base font-bold text-primary">

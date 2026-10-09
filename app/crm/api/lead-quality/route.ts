@@ -5,7 +5,7 @@ import { isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { formatLeadAge } from "@/lib/crm/sla";
 import { istToday, istDayRange } from "@/lib/crm/reports";
-import { CALLER_ACTIVITY_KEYS, isInCallerScope } from "@/lib/crm/leads";
+import { CALLER_ACTIVITY_KEYS, inCallerBook } from "@/lib/crm/leads";
 import { loadPastNotes, requirementLines } from "@/lib/crm/call-queue-shared";
 import type { CallQueueItem } from "@/lib/crm/call-queue-shared";
 import { contactMaskFor, maskPhone, describeMasking } from "@/lib/crm/office-hours";
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     .from(schema.leads)
     .where(isNull(schema.leads.deletedAt))
     .all()
-    .filter(isInCallerScope);
+    .filter((l) => inCallerBook(l, user.id));
 
   const candidates = myLeads.filter(
     (l) => !OUT_OF_POOL_STATUSES.has(l.status) && !calledRecently.has(l.id) && !booked.has(l.id) && !visitBlocked.has(l.id)

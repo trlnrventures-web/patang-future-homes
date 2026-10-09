@@ -6,7 +6,7 @@ import { getAuthUser } from "@/lib/crm/auth";
 import { computeSlaStatus, getPriority } from "@/lib/crm/sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "@/lib/crm/sla";
 import { getDailyMetricsForEmployee, istToday, istDayRange, type DailyMetrics } from "@/lib/crm/reports";
-import { buildEarliestFollowUpMap, isInCallerScope } from "@/lib/crm/leads";
+import { buildEarliestFollowUpMap, inCallerBook } from "@/lib/crm/leads";
 import { closeStaleCallSessions } from "@/lib/crm/call-sessions";
 
 export type DashboardLeadCard = {
@@ -166,7 +166,7 @@ const myLeads = db
     .where(isNull(schema.leads.deletedAt))
     .orderBy(desc(schema.leads.createdAt))
     .all()
-    .filter(isInCallerScope);
+    .filter((l) => inCallerBook(l, user.id));
 
   const pendingFollowUps = db
     .select()

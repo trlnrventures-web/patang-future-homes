@@ -8,6 +8,7 @@
 
 export const INBOX_TABS = [
   "new",
+  "my_leads",
   "calling_now",
   "today_calls",
   "overdue",

@@ -3,7 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
-import { resolveDefaultSmId, resolveDefaultCallerId } from "@/lib/crm/leads";
+import { resolveDefaultSmId, resolveDefaultCallerId, inCallerBook } from "@/lib/crm/leads";
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         .from(schema.leads)
         .where(inArray(schema.leads.id, leadIds))
         .all()
-        .filter((l) => !l.deletedAt && (allLeads || l.assignedCallerId === user.id))
+        .filter((l) => !l.deletedAt && (allLeads || inCallerBook(l, user.id)))
         .map((l) => l.id)
     );
     const scoped = targetLeads.filter((l) => allowed.has(l.id));
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
   if (user.role === "caller") {
     const scoped = seesAllLeads(user)
       ? leads
-      : leads.filter((l) => l.assignedCallerId === user.id || !l.assignedSmId);
+      : leads.filter((l) => inCallerBook(l, user.id));
     leads.splice(0, leads.length, ...scoped);
   } else if (user.role === "sales_manager") {
     const scoped = seesAllLeads(user) ? leads : leads.filter((l) => l.assignedSmId === user.id);

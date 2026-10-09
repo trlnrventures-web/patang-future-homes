@@ -20,6 +20,7 @@ import { formatCallDuration } from "@/lib/crm/call-sessions-shared";
 import { useCallSession } from "./useCallSession";
 import { matchLevelMeta, type PropertyMatch } from "@/lib/crm/matching";
 import { SUB_LOCATIONS, priceValidityInfo } from "@/lib/projects";
+import { DEFAULT_BUDGET_PRESETS, type BudgetPreset } from "@/lib/crm/budget";
 import SiteVisitModal, {
   parseShown,
   shownSummary,
@@ -111,9 +112,11 @@ type Props = {
   initialVisitOpen?: boolean;
   /** Rendered inside the "Messages" tab by the server page. */
   messageCenter?: React.ReactNode;
+  /** Admin-configured budget chips; falls back to the built-in ranges. */
+  budgetPresets?: BudgetPreset[];
 };
 
-export default function LeadDetail({ data, currentUser, initialVisitOpen, messageCenter }: Props) {
+export default function LeadDetail({ data, currentUser, initialVisitOpen, messageCenter, budgetPresets = DEFAULT_BUDGET_PRESETS }: Props) {
   const [lead, setLead] = useState(data.lead);
   const [activities, setActivities] = useState(data.activities);
   const [followUps, setFollowUps] = useState(data.followUps);
@@ -1570,6 +1573,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
         <EditDetailsModal
           lead={lead}
           busy={busy}
+          budgetPresets={budgetPresets}
           onSave={handleSaveEdit}
           onCancel={() => setShowEdit(false)}
         />
@@ -1742,14 +1746,6 @@ const LEAD_SOURCES = [
   { value: "other", label: "Other" },
 ];
 
-const BUDGET_PRESETS: { label: string; min: number | null; max: number | null }[] = [
-  { label: "Under ₹25L", min: null, max: 25 },
-  { label: "₹25–40L", min: 25, max: 40 },
-  { label: "₹40–60L", min: 40, max: 60 },
-  { label: "₹60–85L", min: 60, max: 85 },
-  { label: "₹85L+", min: 85, max: null },
-];
-
 /**
  * One popup for every field the detail page does not show inline. Merges the
  * former contact editor and requirement editor; the PATCH route already
@@ -1758,11 +1754,13 @@ const BUDGET_PRESETS: { label: string; min: number | null; max: number | null }[
 function EditDetailsModal({
   lead,
   busy,
+  budgetPresets,
   onSave,
   onCancel,
 }: {
   lead: Record<string, any>;
   busy: boolean;
+  budgetPresets: BudgetPreset[];
   onSave: (vals: Record<string, any>) => void;
   onCancel: () => void;
 }) {
@@ -1923,7 +1921,7 @@ function EditDetailsModal({
           <div>
             <label className={label}>Budget Range</label>
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {BUDGET_PRESETS.map((p) => {
+              {budgetPresets.map((p) => {
                 const active =
                   String(p.min ?? "") === form.budgetMin && String(p.max ?? "") === form.budgetMax;
                 return (

@@ -64,6 +64,10 @@ export type PushMessage = {
   /** Where tapping the notification should take the user. */
   url: string;
   tag?: string;
+  /** Keep the notification on screen until the user acts on it. */
+  requireInteraction?: boolean;
+  /** Vibration pattern (ms) for devices that honour it. */
+  vibrate?: number[];
 };
 
 /**

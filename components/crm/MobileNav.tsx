@@ -24,6 +24,27 @@ function Icon({ d }: { d: string }) {
   );
 }
 
+/** Custom SVG drawn through a CSS mask so it inherits the item's colour. */
+function NavIcon({ d, src }: { d: string; src?: string }) {
+  if (!src) return <Icon d={d} />;
+  return (
+    <span
+      aria-hidden
+      className="h-5 w-5 shrink-0 bg-current"
+      style={{
+        WebkitMaskImage: `url("${src}")`,
+        maskImage: `url("${src}")`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+      }}
+    />
+  );
+}
+
 export default function MobileNav({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -122,7 +143,7 @@ export default function MobileNav({ userRole }: { userRole?: string }) {
                       : "border-border bg-white text-navy hover:bg-primary/5"
                   }`}
                 >
-                  <Icon d={item.icon} />
+                  <NavIcon d={item.icon} src={item.iconSrc} />
                   {item.label}
                 </Link>
               ))}

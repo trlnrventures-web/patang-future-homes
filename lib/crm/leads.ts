@@ -41,6 +41,20 @@ export function isInCallerScope(l: { status: string; assignedSmId: number | null
   return l.assignedSmId == null || CALLER_SCOPE_STATUSES.has(l.status);
 }
 
+/**
+ * A lead belongs in a caller's own working book when it is explicitly assigned
+ * to them, or it is still unassigned (the shared pool every caller may pick
+ * from). This is the isolation boundary: a caller must never see leads that are
+ * assigned to a different caller, even when those leads are still in the
+ * qualification pipeline.
+ */
+export function inCallerBook(
+  l: { assignedCallerId: number | null },
+  userId: number
+): boolean {
+  return l.assignedCallerId === userId || l.assignedCallerId == null;
+}
+
 export type CrmDb = ReturnType<typeof getDb>;
 
 /** Earliest pending scheduled follow-up per lead, keyed by leadId. */
@@ -133,6 +147,22 @@ export function resolveDefaultCallerId(
     return diff !== 0 ? diff : a.id - b.id;
   });
   return sorted[0].id;
+}
+
+/**
+ * Pick a random active caller to own a freshly-arrived lead. Random rather than
+ * load-balanced so incoming Meta leads spread across the team without any
+ * caller being able to predict or game the order. Returns null when there is no
+ * active caller to assign to.
+ */
+export function pickRandomCallerId(db: CrmDb): number | null {
+  const callers = db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.role, "caller"), eq(schema.users.active, true)))
+    .all();
+  if (callers.length === 0) return null;
+  return callers[Math.floor(Math.random() * callers.length)].id;
 }
 
 export function resolveDefaultSmId(

@@ -135,6 +135,7 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   // of expanded cards from a filter that no longer applies.
   const [reveal, setReveal] = useState<Record<string, { sig: string; n: number }>>({});
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const loadSeq = useRef(0);
   // Adjacent stage, for the swipe gesture and for keeping the tab in view.
   const stageIndex = LEAD_COLUMNS.findIndex((c) => c.key === activeStage);
@@ -351,6 +352,39 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
     });
   }, [visibleLeads]);
 
+  // Exports every lead the current filters put on screen (not just the ticked
+  // ones), by posting their ids so the sheet and the board cannot disagree about
+  // which filters apply.
+  const exportXlsx = useCallback(async () => {
+    if (visibleLeads.length === 0) return;
+    setExporting(true);
+    setError("");
+    try {
+      const res = await fetch("/crm/api/leads/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: visibleLeads.map((l) => l.id) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [visibleLeads]);
+
   const runBulk = useCallback(
     async (body: Record<string, unknown>, successText: (n: number) => string) => {
       if (selectedIds.length === 0) return;
@@ -534,6 +568,16 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
             className="shrink-0 rounded-lg border border-border bg-white px-3.5 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary"
           >
             {selectedIds.length === visibleLeads.length ? "Clear selection" : "Select all"}
+          </button>
+        )}
+        {isAdminUser && visibleLeads.length > 0 && (
+          <button
+            type="button"
+            onClick={exportXlsx}
+            disabled={exporting}
+            className="shrink-0 rounded-lg border border-border bg-white px-3.5 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-50"
+          >
+            {exporting ? "Exporting..." : "Export"}
           </button>
         )}
       </div>

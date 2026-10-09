@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth, roleLabel } from "./AuthProvider";
 import ChangePasswordForm from "./ChangePasswordForm";
 
@@ -10,6 +11,7 @@ const LABEL = "mb-1.5 block text-sm font-semibold text-muted";
 
 export default function MyAccountForm() {
   const { user, setUser, refresh } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
@@ -43,6 +45,7 @@ export default function MyAccountForm() {
         phone: data.user.phone ?? null,
       });
       setSaved(true);
+      router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
     }

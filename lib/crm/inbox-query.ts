@@ -2,7 +2,7 @@ import { desc, isNull } from "drizzle-orm";
 import * as schema from "./schema";
 import { getPriority, isLeadActionOverdue, computeSlaStatus } from "./sla-compute";
 import { formatLeadAge, leadAgeMinutes, type PriorityLevel } from "./sla";
-import { buildEarliestFollowUpMap, isInCallerScope, type CrmDb } from "./leads";
+import { buildEarliestFollowUpMap, inCallerBook, type CrmDb } from "./leads";
 import { seesAllLeads, type AuthUser } from "./auth";
 import {
   isInboxSort,
@@ -118,13 +118,10 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
     .all();
 
   if (user.role === "caller") {
-    // Callers keep visibility of leads they handled even after they are handed
-    // off to a sales manager (read-only), alongside their active qualification
-    // pipeline. A caller flagged see_all_leads sees the whole book.
-    rows =
-      q || tab === "lost" || seesAllLeads(user)
-        ? rows
-        : rows.filter((l) => isInCallerScope(l) || l.assignedCallerId === user.id);
+    // A caller sees their own book: leads assigned to them (including ones
+    // handed off to a sales manager) plus the shared unassigned pool. Search no
+    // longer widens the scope, so a caller can never surface a colleague's lead.
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => inCallerBook(l, user.id));
   } else if (user.role === "sales_manager") {
     rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
   }
@@ -145,6 +142,11 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
   switch (tab) {
     case "new":
       filtered = rows.filter((l) => l.status === "new" && !terminal.has(l.status));
+      break;
+    case "my_leads":
+      // Everything currently assigned to the caller, at any status, so a lead
+      // that was handed off to a sales manager does not vanish from the inbox.
+      filtered = rows.filter((l) => l.assignedCallerId === user.id);
       break;
     case "calling_now":
       filtered = rows.filter((l) => l.status === "calling" || l.status === "connected");

@@ -4,6 +4,7 @@ import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { resolveDefaultCallerId } from "@/lib/crm/leads";
+import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { queryLeadList } from "@/lib/crm/lead-query";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
 import { contactMaskFor, describeMasking, maskLeadList } from "@/lib/crm/office-hours";
@@ -142,6 +143,10 @@ export async function POST(request: NextRequest) {
     });
 
     const lead = result.lead;
+
+    if (result.kind === "new" || result.kind === "reactivated") {
+      notifyNewLead(lead.assignedCallerId, lead, { kind: result.kind });
+    }
 
     if (result.kind === "new") {
       db.insert(schema.activities).values({

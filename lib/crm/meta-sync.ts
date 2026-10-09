@@ -1,7 +1,9 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
 import { notifyUser } from "./push";
+import { notifyNewLead } from "./lead-alerts";
 import { handleReInquiry } from "./reinquiry";
+import { pickRandomCallerId } from "./leads";
 import {
   fetchLeadsSince,
   GraphError,
@@ -325,6 +327,11 @@ function ingestLead(
 
   const answerLines = Object.entries(values).map(([field, value]) => `${field}: ${value}`);
 
+  // The form's configured caller wins. When the form has no caller set, the lead
+  // is handed to a random active caller instead of sitting unassigned, so a
+  // synced Meta lead always has an owner the moment it lands.
+  const resolvedCallerId = mapping.callerId ?? pickRandomCallerId(db);
+
   const result = handleReInquiry({
     db,
     phone: phoneForMatch,
@@ -382,9 +389,9 @@ function ingestLead(
           stageChangedAt: now,
           // Assignment comes from the form's configuration, not from load
           // balancing: a Pam enquiry belongs to the person Pam's leads belong to.
-          assignedCallerId: mapping.callerId,
+          assignedCallerId: resolvedCallerId,
           assignedSmId: mapping.smId,
-          assignedAt: mapping.callerId || mapping.smId ? now : null,
+          assignedAt: resolvedCallerId || mapping.smId ? now : null,
           createdAt: now,
           updatedAt: now,
         })
@@ -398,7 +405,7 @@ function ingestLead(
     db.insert(schema.activities)
       .values({
         leadId: leadRow.id,
-        userId: mapping.callerId || mapping.smId || leadRow.assignedCallerId || 1,
+        userId: resolvedCallerId || mapping.smId || leadRow.assignedCallerId || 1,
         type: "note",
         notes: `Lead created from Facebook form "${mapping.formName}".`,
         createdAt: now,
@@ -406,7 +413,11 @@ function ingestLead(
       .run();
   }
 
-  void notifyAssigned(mapping, leadRow.id, name, mapping.formName);
+  void notifyAssigned(resolvedCallerId, mapping, leadRow.id, name, mapping.formName);
+
+  if (result.kind === "new" || result.kind === "reactivated") {
+    notifyNewLead(resolvedCallerId || leadRow.assignedCallerId, leadRow, { kind: result.kind });
+  }
 
   return {
     created: result.kind === "new" ? 1 : 0,
@@ -433,8 +444,14 @@ function enumValue<T extends string>(raw: string | undefined, allowed: readonly 
  * committed, and `notifyUser` never throws, so a push failure cannot roll back an
  * import.
  */
-function notifyAssigned(mapping: MappingRow, leadId: number, name: string, formName: string): void {
-  const recipients = [mapping.callerId, mapping.smId].filter((v): v is number => v != null);
+function notifyAssigned(
+  assignedCallerId: number | null,
+  mapping: MappingRow,
+  leadId: number,
+  name: string,
+  formName: string
+): void {
+  const recipients = [assignedCallerId, mapping.smId].filter((v): v is number => v != null);
   if (recipients.length === 0) return;
 
   for (const userId of recipients) {
@@ -443,6 +460,7 @@ function notifyAssigned(mapping: MappingRow, leadId: number, name: string, formN
       body: `${name || "New enquiry"} - ${formName}`,
       url: `/crm/leads/${leadId}`,
       tag: `meta-lead-${leadId}`,
+      requireInteraction: true,
     }).catch(() => {});
   }
 }

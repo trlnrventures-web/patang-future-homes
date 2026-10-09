@@ -3,7 +3,7 @@ import * as schema from "./schema";
 import { FINAL_STAGES } from "./sales";
 import {
   buildEarliestFollowUpMap,
-  isInCallerScope,
+  inCallerBook,
   nextActionLabel,
   type CrmDb,
 } from "./leads";
@@ -52,12 +52,12 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
     .all();
 
   // Role-based filtering
-  // Caller: primary focus is every unassigned/qualification-stage lead. A search
-  // query or an explicit status filter bypasses the scope so they can still find
-  // handed-off leads (including lost ones). A caller flagged see_all_leads skips
-  // the scope entirely and sees the whole book.
+  // Caller: their own book — leads assigned to them plus the shared unassigned
+  // pool. They can never see another caller's assigned leads, even via a search
+  // or an explicit status filter, so a caller cannot poach or leak a colleague's
+  // pipeline. A caller flagged see_all_leads skips the scope entirely.
   if (user.role === "caller") {
-    rows = q || status || seesAllLeads(user) ? rows : rows.filter(isInCallerScope);
+    rows = seesAllLeads(user) ? rows : rows.filter((l) => inCallerBook(l, user.id));
   } else if (user.role === "sales_manager") {
     rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
   }

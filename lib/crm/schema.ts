@@ -770,6 +770,28 @@ export const companyHolidays = sqliteTable("company_holidays", {
 });
 
 /**
+ * An unacknowledged in-app "new lead" alert for one caller. Persistent so the
+ * popup survives a reload or a second tab, and acknowledged rather than deleted
+ * so the same alert is never raised twice.
+ */
+export const leadAlerts = sqliteTable("lead_alerts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id),
+  kind: text("kind", { enum: ["new", "reactivated"] })
+    .notNull()
+    .default("new"),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+  acknowledgedAt: text("acknowledged_at"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+/**
  * Integration webhook logs for debugging. Captures every webhook receipt
  * with its status, provider, and raw payload when needed.
  */

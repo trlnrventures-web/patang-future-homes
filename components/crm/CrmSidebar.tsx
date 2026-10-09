@@ -24,6 +24,31 @@ function Icon({ d }: { d: string }) {
   );
 }
 
+/**
+ * Renders a nav icon. When a custom SVG is supplied it is used as a CSS mask so
+ * the glyph takes the link's colour (currentColor) exactly like the inline
+ * stroke icons, instead of shipping its own fill.
+ */
+function NavIcon({ d, src }: { d: string; src?: string }) {
+  if (!src) return <Icon d={d} />;
+  return (
+    <span
+      aria-hidden
+      className="h-[18px] w-[18px] shrink-0 bg-current"
+      style={{
+        WebkitMaskImage: `url("${src}")`,
+        maskImage: `url("${src}")`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+      }}
+    />
+  );
+}
+
 export default function CrmSidebar({
   userName,
   userRole,
@@ -42,7 +67,7 @@ export default function CrmSidebar({
   const moreItems = moreItemsFor(userRole);
   const moreActive = showMore && moreItems.some((m) => isActive(m.href));
 
-  const Item = ({ href, label, icon }: NavItem) => (
+  const Item = ({ href, label, icon, iconSrc }: NavItem) => (
     <Link
       href={href}
       className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -51,7 +76,7 @@ export default function CrmSidebar({
           : "text-muted hover:bg-primary/5 hover:text-primary"
       }`}
     >
-      <Icon d={icon} />
+      <NavIcon d={icon} src={iconSrc} />
       {label}
     </Link>
   );

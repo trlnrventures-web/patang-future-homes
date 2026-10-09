@@ -23,8 +23,10 @@ self.addEventListener("push", (event) => {
     badge: "/brand/icon-192.png",
     tag: payload.tag || "crm-call",
     // An incoming call is only worth interrupting for if the CRM is not already
-    // in front of the person, where they can see the same thing.
-    requireInteraction: false,
+    // in front of the person, where they can see the same thing. New-lead alerts
+    // set requireInteraction in their payload to stay until acknowledged.
+    requireInteraction: payload.requireInteraction === true,
+    vibrate: payload.vibrate || [200, 100, 200],
     data: { url: payload.url || "/crm" },
   };
 

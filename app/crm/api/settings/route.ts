@@ -3,8 +3,12 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
 import { getSetting, updateSetting } from "@/lib/crm/settings";
+import { BUDGET_RANGE_DEFS, DEFAULT_BUDGET_RANGE_KEYS } from "@/lib/crm/budget";
 
 const PUBLIC_KEYS = ["sla_first_response_min"];
+
+/** Steps of the no-response ladder, in order. */
+const NO_RESPONSE_STEPS = [1, 2, 3, 4, 5];
 
 export async function GET() {
   const user = await getAuthUser();
@@ -49,6 +53,45 @@ export async function PATCH(request: NextRequest) {
       }
       updateSetting("matching_weights", JSON.stringify(weights));
       updated.matching_weights = JSON.stringify(weights);
+    }
+
+    if (body.budget_ranges != null) {
+      if (!Array.isArray(body.budget_ranges)) {
+        return NextResponse.json({ error: "Budget ranges must be a list" }, { status: 400 });
+      }
+      const keys = body.budget_ranges.filter(
+        (k: unknown): k is string => typeof k === "string" && k in BUDGET_RANGE_DEFS
+      );
+      if (keys.length === 0) {
+        return NextResponse.json(
+          { error: `Pick at least one range (from ${DEFAULT_BUDGET_RANGE_KEYS.join(", ")})` },
+          { status: 400 }
+        );
+      }
+      const value = JSON.stringify([...new Set(keys)]);
+      updateSetting("budget_ranges", value);
+      updated.budget_ranges = value;
+    }
+
+    if (body.no_response_schedule != null) {
+      if (typeof body.no_response_schedule !== "object" || body.no_response_schedule === null) {
+        return NextResponse.json({ error: "No-response schedule must be an object" }, { status: 400 });
+      }
+      const raw = body.no_response_schedule as Record<string, unknown>;
+      const schedule: Record<string, number> = {};
+      for (const step of NO_RESPONSE_STEPS) {
+        const mins = Number(raw[step] ?? raw[String(step)]);
+        if (!Number.isFinite(mins) || mins < 0) {
+          return NextResponse.json(
+            { error: `Attempt ${step} must be a number of minutes (0 or more)` },
+            { status: 400 }
+          );
+        }
+        schedule[step] = Math.round(mins);
+      }
+      const value = JSON.stringify(schedule);
+      updateSetting("no_response_schedule", value);
+      updated.no_response_schedule = value;
     }
 
     if (Object.keys(updated).length === 0) {

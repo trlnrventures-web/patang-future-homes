@@ -53,6 +53,7 @@ export default function ChangePasswordForm({
 
       const data = await res.json();
       setUser(data.user);
+      setLoading(false);
       if (onSuccess) {
         onSuccess();
       } else {

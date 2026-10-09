@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
+import { pickRandomCallerId } from "@/lib/crm/leads";
+import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { notifyUser } from "@/lib/crm/push";
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || "";
@@ -98,22 +100,16 @@ type LeadgenDetails = {
   campaign_id?: string;
 };
 
-function notifyCaller(leadId: number, name: string): void {
+function notifyCaller(leadId: number, name: string, callerId: number | null): void {
+  if (!callerId) return;
   try {
-    const db = getDb();
-    const callers = db
-      .select()
-      .from(schema.users)
-      .all()
-      .filter((u) => u.role === "caller" || u.role === "admin" || u.role === "marketing");
-    for (const c of callers) {
-      notifyUser(c.id, {
-        title: "New Meta lead",
-        body: `${name || "New enquiry"} - Meta Lead Ad`,
-        url: `/crm/leads/${leadId}`,
-        tag: `meta-lead-${leadId}`,
-      }).catch(() => {});
-    }
+    notifyUser(callerId, {
+      title: "New Meta lead",
+      body: `${name || "New enquiry"} - Meta Lead Ad`,
+      url: `/crm/leads/${leadId}`,
+      tag: `meta-lead-${leadId}`,
+      requireInteraction: true,
+    }).catch(() => {});
   } catch (err) {
     console.warn("[meta-leads-webhook] notifyCaller failed:", err);
   }
@@ -280,6 +276,7 @@ export async function POST(request: NextRequest) {
                 originalMessage: JSON.stringify(fields),
                 notes: `Meta Lead Ad webhook. Form: ${leadDetails.form_id || "n/a"}, Page: ${leadDetails.page_id || "n/a"}, Ad: ${leadDetails.ad_id || "n/a"}, AdSet: ${leadDetails.adset_id || "n/a"}, Campaign: ${leadDetails.campaign_id || "n/a"}`,
                 status: "new",
+                assignedCallerId: pickRandomCallerId(db),
                 stageChangedAt: now,
                 createdAt: now,
                 updatedAt: now,
@@ -310,7 +307,8 @@ export async function POST(request: NextRequest) {
             leadId: leadRow.id,
             message: "New lead created",
           });
-          notifyCaller(leadRow.id, fullName);
+          notifyCaller(leadRow.id, fullName, leadRow.assignedCallerId);
+          notifyNewLead(leadRow.assignedCallerId, leadRow, { kind: "new" });
         } else if (result.kind === "duplicate") {
           logIntegration({
             provider: "meta",
@@ -333,7 +331,8 @@ export async function POST(request: NextRequest) {
             leadId: leadRow.id,
             message: `Reactivated from ${result.fromStatus}`,
           });
-          notifyCaller(leadRow.id, fullName);
+          notifyCaller(leadRow.id, fullName, leadRow.assignedCallerId);
+          notifyNewLead(leadRow.assignedCallerId, leadRow, { kind: "reactivated" });
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

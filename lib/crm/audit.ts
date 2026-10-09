@@ -13,7 +13,8 @@ export type AuditCategory =
   | "leave"
   | "holiday"
   | "settings"
-  | "contact_access";
+  | "contact_access"
+  | "data";
 
 export type AuditEntryInput = {
   category: AuditCategory;

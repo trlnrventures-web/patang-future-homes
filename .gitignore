@@ -43,6 +43,7 @@ next-env.d.ts
 # logs
 dev-server.log
 dev-server-err.log
+dev-live.log
 
 # local sqlite database (live CRM data + WAL files)
 data/crm.db

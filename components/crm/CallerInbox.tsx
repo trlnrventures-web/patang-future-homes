@@ -19,6 +19,7 @@ import type { LeadsViewContext } from "./LeadsPageContent";
 
 const TABS: { key: string; label: string }[] = [
   { key: "new", label: "New" },
+  { key: "my_leads", label: "My Leads" },
   { key: "calling_now", label: "Calling Now" },
   { key: "today_calls", label: "Today's Calls" },
   { key: "overdue", label: "Overdue" },

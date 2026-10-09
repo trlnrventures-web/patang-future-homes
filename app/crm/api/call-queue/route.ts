@@ -5,7 +5,7 @@ import { eq, isNull } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
 import { formatLeadAge } from "@/lib/crm/sla";
 import { istToday, istDayRange } from "@/lib/crm/reports";
-import { isInCallerScope } from "@/lib/crm/leads";
+import { inCallerBook } from "@/lib/crm/leads";
 import { loadPastNotes, requirementLines } from "@/lib/crm/call-queue-shared";
 import type { CallQueueItem } from "@/lib/crm/call-queue-shared";
 import {
@@ -38,7 +38,7 @@ export async function GET() {
     .from(schema.leads)
     .where(isNull(schema.leads.deletedAt))
     .all()
-    .filter(isInCallerScope);
+    .filter((l) => inCallerBook(l, user.id));
 
   const active = myLeads.filter((l) => !TERMINAL.has(l.status));
 
