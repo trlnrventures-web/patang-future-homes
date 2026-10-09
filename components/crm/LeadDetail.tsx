@@ -734,6 +734,9 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               >
                 {lead.phone || "—"}
               </p>
+              {lead.secondaryPhone && (
+                <p className="mt-1 truncate text-sm text-amber-800">Alt: {lead.secondaryPhone}</p>
+              )}
               {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
                 <p className="mt-1 truncate text-sm text-amber-800">WA: {lead.whatsappNumber}</p>
               )}
@@ -746,6 +749,14 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               >
                 {lead.phone || "—"}
               </a>
+              {lead.secondaryPhone && (
+                <a
+                  href={`tel:+${String(lead.secondaryPhone).replace(/\D/g, "")}`}
+                  className="mt-1 block truncate text-sm text-primary hover:underline"
+                >
+                  Alt: {lead.secondaryPhone}
+                </a>
+              )}
               {lead.whatsappNumber && lead.whatsappNumber !== lead.phone && (
                 <p className="mt-1 truncate text-sm text-navy">WA: {lead.whatsappNumber}</p>
               )}
@@ -1767,6 +1778,7 @@ function EditDetailsModal({
   const [form, setForm] = useState({
     name: lead.name || "",
     phone: lead.phone || "",
+    secondaryPhone: lead.secondaryPhone || "",
     whatsappNumber: lead.whatsappNumber || "",
     email: lead.email || "",
     source: lead.source || "meta",
@@ -1797,6 +1809,7 @@ function EditDetailsModal({
     onSave({
       name: form.name.trim(),
       phone: form.phone.trim(),
+      secondaryPhone: form.secondaryPhone.trim() || null,
       whatsappNumber: form.whatsappNumber.trim() || null,
       email: form.email.trim() || null,
       source: form.source,
@@ -1842,6 +1855,17 @@ function EditDetailsModal({
               <input value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} required />
             </div>
             <div>
+              <label className={label}>Secondary Number</label>
+              <input
+                value={form.secondaryPhone}
+                onChange={(e) => set({ secondaryPhone: e.target.value })}
+                className={input}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
               <label className={label}>WhatsApp Number</label>
               <input
                 value={form.whatsappNumber}
@@ -1849,11 +1873,10 @@ function EditDetailsModal({
                 className={input}
               />
             </div>
-          </div>
-
-          <div>
-            <label className={label}>Email</label>
-            <input type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} className={input} />
+            <div>
+              <label className={label}>Email</label>
+              <input type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} className={input} />
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

@@ -16,6 +16,7 @@ export type CallQueueItem = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone: string | null;
   whatsappNumber: string | null;
   status: string;
   priorityGroup: "overdue" | "due_today" | "new";

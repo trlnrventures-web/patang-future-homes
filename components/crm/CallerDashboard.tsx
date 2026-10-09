@@ -14,6 +14,7 @@ type Card = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone?: string | null;
   whatsappNumber: string | null;
   source: string;
   originalProject: string | null;
@@ -411,6 +412,7 @@ export default function CallerDashboard({ name }: { name: string }) {
                   id={l.id}
                   name={l.name}
                   phone={l.phone}
+                  secondaryPhone={l.secondaryPhone}
                   whatsappNumber={l.whatsappNumber}
                   line2={l.requirementLines.join("  ·  ")}
                   line3={`Added ${l.leadAge}${l.lastNote ? `  ·  ${l.lastNote}` : ""}`}
@@ -524,6 +526,7 @@ export default function CallerDashboard({ name }: { name: string }) {
                       id={c.id}
                       name={c.name}
                       phone={c.phone}
+                      secondaryPhone={c.secondaryPhone}
                       whatsappNumber={c.whatsappNumber}
                       line2={[c.preferredProject || c.originalProject || "", sourceLabel(c.source)]
                         .filter(Boolean)
@@ -567,6 +570,7 @@ type RowProps = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone?: string | null;
   whatsappNumber: string | null;
   /** Second line: project and source, or the requirement summary. */
   line2: string;
@@ -576,7 +580,7 @@ type RowProps = {
 };
 
 /** One lead. The whole row opens the lead; the two buttons sit above it. */
-function LeadRow({ id, name, phone, whatsappNumber, line2, line3, overdue }: RowProps) {
+function LeadRow({ id, name, phone, secondaryPhone, whatsappNumber, line2, line3, overdue }: RowProps) {
   return (
     <div className="relative flex flex-col gap-3 rounded-xl border border-border bg-white p-4 transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:gap-4">
       {/* The link overlay covers the whole row; the buttons sit above it. */}
@@ -591,6 +595,9 @@ function LeadRow({ id, name, phone, whatsappNumber, line2, line3, overdue }: Row
         </div>
         <div className="mt-1 truncate text-sm text-muted">{line2}</div>
         <div className="mt-1 truncate text-sm text-muted">{line3}</div>
+        {secondaryPhone && secondaryPhone !== phone && (
+          <div className="mt-1 truncate text-sm text-amber-700">Alt: {secondaryPhone}</div>
+        )}
       </Link>
 
       <div className="relative z-10 flex shrink-0 gap-2">

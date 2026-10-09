@@ -10,6 +10,7 @@ export type LeadCardLead = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone?: string | null;
   whatsappNumber?: string | null;
   status?: string;
   statusLabel?: string;
@@ -133,6 +134,9 @@ export default function LeadCard({
             {footerNote}
             {lead.phone && (
               <span className={`truncate ${hidden ? "text-amber-700" : ""}`}>· {lead.phone}</span>
+            )}
+            {lead.secondaryPhone && lead.secondaryPhone !== lead.phone && (
+              <span className={`truncate ${hidden ? "text-amber-700" : ""}`}>/ {lead.secondaryPhone}</span>
             )}
           </div>
         </div>

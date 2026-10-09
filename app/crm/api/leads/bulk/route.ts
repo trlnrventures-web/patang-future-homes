@@ -245,6 +245,7 @@ export async function GET(request: NextRequest) {
     id: l.id,
     name: l.name,
     phone: l.phone,
+    secondaryPhone: l.secondaryPhone || "",
     whatsappNumber: l.whatsappNumber || "",
     email: l.email || "",
     source: l.source,

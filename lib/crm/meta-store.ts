@@ -14,9 +14,10 @@ import { normalizeEmail, normalizePhone } from "./identifiers";
  * nowhere to put.
  */
 export const MAPPABLE_FIELDS: { key: string; label: string }[] = [
-  { key: "name", label: "Name" },
-  { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
+    { key: "name", label: "Name" },
+    { key: "phone", label: "Phone" },
+    { key: "secondary_phone", label: "Secondary number" },
+    { key: "email", label: "Email" },
   { key: "budget", label: "Budget" },
   { key: "bhk", label: "BHK" },
   { key: "location", label: "Location" },
@@ -451,8 +452,8 @@ export function markIngested(leadgenId: string, formId: string, leadId: number |
 export function normalizeMappedValue(field: string, raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  if (field === "phone") return normalizePhone(trimmed);
-  if (field === "email") return normalizeEmail(trimmed);
+    if (field === "phone" || field === "secondary_phone") return normalizePhone(trimmed);
+    if (field === "email") return normalizeEmail(trimmed);
   if (field === "bhk") {
     // "3" and "3 BHK" both mean three bedrooms to anyone reading the lead.
     const n = trimmed.replace(/\s*BHK\s*$/i, "").trim();
@@ -467,7 +468,8 @@ export function mappingFor(mapping: MappingRow): Record<string, string> {
 
 /** True when the mapping is complete enough to create a lead from. */
 export function mappingIsUsable(mapping: MappingRow): { ok: boolean; reason: string | null } {
-  if (!mapping.callerId) return { ok: false, reason: "No Caller assigned to this form." };
+  // No caller requirement any more: every form's leads are distributed randomly
+  // among the active callers at ingest time, so a form never needs a caller set.
   const map = mappingFor(mapping);
   const mapped = Object.values(map);
   if (!mapped.some((v) => v === "name")) return { ok: false, reason: "No Meta field is mapped to Name." };

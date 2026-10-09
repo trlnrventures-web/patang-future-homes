@@ -32,6 +32,7 @@ export default function NewLeadForm({ isOpen, onClose }: Props) {
         body: JSON.stringify({
           name: String(form.get("name")),
           phone: String(form.get("phone")),
+          secondaryPhone: form.get("secondaryPhone") || null,
           originalProject: form.get("originalProject") || null,
           source: form.get("source") || "meta",
           notes: form.get("notes") || null,
@@ -73,6 +74,10 @@ export default function NewLeadForm({ isOpen, onClose }: Props) {
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted">Phone Number *</label>
             <input name="phone" required placeholder="9876543210" type="tel" className={input} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Secondary Number</label>
+            <input name="secondaryPhone" placeholder="Optional second number" type="tel" className={input} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted">Original Project</label>

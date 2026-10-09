@@ -159,7 +159,7 @@ export async function PATCH(
       body.statusChangeNote || body.notes || "Status updated";
 
     const allowedFields: (keyof typeof schema.leads.$inferInsert)[] = [
-      "name", "phone", "whatsappNumber", "email", "source", "campaignName",
+      "name", "phone", "secondaryPhone", "whatsappNumber", "email", "source", "campaignName",
       "adSetName", "adName", "formName", "utmSource", "utmMedium", "utmCampaign",
       "originalMessage", "location", "sublocation", "budget", "budgetMin",
       "budgetMax", "bhk", "purpose", "timeline", "preferredProject",

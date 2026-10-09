@@ -266,12 +266,13 @@ export function maskEmail(raw: string | null | undefined): string {
 }
 
 /**
- * Applied to one lead row on the way out of an API. `phone`/`whatsappNumber`/
- * `email` become the masked string, and `contactHidden` tells the UI to
+ * Applied to one lead row on the way out of an API. `phone`/`secondaryPhone`/
+ * `whatsappNumber`/`email` become the masked string, and `contactHidden` tells the UI to
  * disable Call/WhatsApp tap-to-dial for this row.
  */
 export function maskLeadContacts<T extends {
   phone?: string | null;
+  secondaryPhone?: string | null;
   whatsappNumber?: string | null;
   email?: string | null;
 }>(lead: T, decision: MaskDecision): T & { contactHidden: boolean } {
@@ -279,6 +280,7 @@ export function maskLeadContacts<T extends {
   return {
     ...lead,
     phone: maskPhone(lead.phone),
+    secondaryPhone: maskPhone(lead.secondaryPhone),
     whatsappNumber: maskPhone(lead.whatsappNumber),
     email: maskEmail(lead.email),
     contactHidden: true,
@@ -288,6 +290,7 @@ export function maskLeadContacts<T extends {
 /** Bulk form for list endpoints. */
 export function maskLeadList<T extends {
   phone?: string | null;
+  secondaryPhone?: string | null;
   whatsappNumber?: string | null;
   email?: string | null;
 }>(leads: T[], decision: MaskDecision): (T & { contactHidden: boolean })[] {

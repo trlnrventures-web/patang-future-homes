@@ -83,6 +83,7 @@ type AccessReport = {
 const CRM_FIELDS: { key: string; label: string }[] = [
   { key: "name", label: "Name" },
   { key: "phone", label: "Phone" },
+  { key: "secondary_phone", label: "Secondary number" },
   { key: "email", label: "Email" },
   { key: "budget", label: "Budget" },
   { key: "bhk", label: "BHK" },
@@ -325,12 +326,6 @@ export default function MetaIntegrationPanel({
       const data = await res.json();
       if (!res.ok) {
         setBanner({ tone: "error", text: data.error || "Could not save this form." });
-        // "No Caller assigned" is the one rejection the admin can fix on this
-        // screen, and only from inside the mapping editor — open it for them
-        // rather than leaving them hunting for where the caller is picked.
-        if (typeof data.error === "string" && data.error.includes("No Caller assigned")) {
-          setOpenFormId(form.id);
-        }
         return false;
       }
       setForms((prev) =>
@@ -618,7 +613,6 @@ export default function MetaIntegrationPanel({
                   <FormRow
                     key={form.id}
                     form={form}
-                    callerName={callers.find((c) => c.id === form.callerId)?.name || null}
                     smName={salesManagers.find((s) => s.id === form.smId)?.name || null}
                     saving={savingFormId === form.id}
                     syncing={syncing}
@@ -717,7 +711,6 @@ export default function MetaIntegrationPanel({
 
 function FormRow({
   form,
-  callerName,
   smName,
   saving,
   syncing,
@@ -726,7 +719,6 @@ function FormRow({
   onSync,
 }: {
   form: Form;
-  callerName: string | null;
   smName: string | null;
   saving: boolean;
   syncing: boolean;
@@ -754,13 +746,10 @@ function FormRow({
       </td>
       <td className="py-2.5 pr-3 text-muted">{formatDate(form.createdTime)}</td>
       <td className="py-2.5 pr-3 text-muted">
-        {callerName || smName ? (
-          <span title={[callerName && `Caller: ${callerName}`, smName && `SM: ${smName}`].filter(Boolean).join(" · ")}>
-            {[callerName, smName].filter(Boolean).join(" · ")}
-          </span>
-        ) : (
-          <span className="text-amber-700">Not set</span>
-        )}
+        <span title="Leads from every form are distributed randomly across active callers">
+          <span className="font-semibold text-navy">Random</span>
+          {smName ? ` · SM: ${smName}` : ""}
+        </span>
       </td>
       <td className="py-2.5 pr-3 text-muted">{form.lastSyncedAt ? formatTime(form.lastSyncedAt) : "Never"}</td>
       <td className="py-2.5">
@@ -916,22 +905,12 @@ function MappingEditor({
         </div>
 
         <div>
-          <label htmlFor={`caller-${form.id}`} className="mb-1.5 block text-xs font-bold text-navy">
-            Default Caller
-          </label>
-          <select
-            id={`caller-${form.id}`}
-            value={form.callerId || ""}
-            onChange={(e) => onChange({ callerId: e.target.value ? Number(e.target.value) : null })}
-            className={`${inputClass} w-full`}
-          >
-            <option value="">Not set</option>
-            {callers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <span className="mb-1.5 block text-xs font-bold text-navy">Caller assignment</span>
+          <p className="rounded-xl border border-dashed border-border bg-white px-3 py-2.5 text-xs text-muted">
+            Distributed randomly across all {callers.length} active caller
+            {callers.length === 1 ? "" : "s"}. Every Meta form shares this rule, so leads spread
+            across the team.
+          </p>
           {callers.length === 0 && (
             <p className="mt-1 text-[11px] font-semibold text-red-700">
               No active Caller users found. Add a user with the Caller role in Team — sync cannot
@@ -981,7 +960,8 @@ function MappingEditor({
           {form.syncEnabled ? "Sync is on" : "Save and turn sync on"}
         </button>
         <span className="text-[11px] text-muted">
-          A caller is required, and at least one question must map to Name.
+          At least one question must map to Name, and one to Phone or Email. Leads are assigned to
+          callers randomly.
         </span>
       </div>
     </div>

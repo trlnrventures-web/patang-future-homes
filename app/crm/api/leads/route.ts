@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           .values({
             name: (body.name || "").trim(),
             phone: phoneForMatch,
+            secondaryPhone: (body.secondaryPhone || "").trim() || null,
             whatsappNumber: (body.whatsappNumber || body.phone || "").trim(),
             email: body.email || null,
             source: body.source || "other",

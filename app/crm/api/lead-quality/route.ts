@@ -138,6 +138,7 @@ export async function GET(req: Request) {
       // Same office-hours masking as the due/overdue queue, which shares the
       // CallQueue UI.
       phone: decision.mask ? maskPhone(l.phone) : l.phone,
+      secondaryPhone: decision.mask ? maskPhone(l.secondaryPhone) : l.secondaryPhone,
       whatsappNumber: decision.mask ? maskPhone(l.whatsappNumber) : l.whatsappNumber,
       contactHidden: decision.mask,
       status: l.status,

@@ -119,12 +119,12 @@ export default function CallerInbox({ listContext }: { listContext?: LeadsViewCo
       if (!res.ok) throw new Error("failed");
       const data = await res.json();
       const rows = data.leads as Record<string, unknown>[];
-      const headers = ["ID", "Name", "Phone", "WhatsApp", "Email", "Source", "Status", "Location", "Sub-location", "Budget", "BHK", "Project", "Preferred Project", "Assigned Caller", "Assigned SM", "Created At"];
+      const headers = ["ID", "Name", "Phone", "Secondary", "WhatsApp", "Email", "Source", "Status", "Location", "Sub-location", "Budget", "BHK", "Project", "Preferred Project", "Assigned Caller", "Assigned SM", "Created At"];
       const esc = (v: unknown) => {
         const s = v == null ? "" : String(v);
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
-      const lines = [headers.join(","), ...rows.map((r) => [r.id, r.name, r.phone, r.whatsappNumber, r.email, r.source, r.status, r.location, r.sublocation, r.budget, r.bhk, r.originalProject, r.preferredProject, r.assignedCaller, r.assignedSm, r.createdAt].map(esc).join(","))];
+      const lines = [headers.join(","), ...rows.map((r) => [r.id, r.name, r.phone, r.secondaryPhone, r.whatsappNumber, r.email, r.source, r.status, r.location, r.sublocation, r.budget, r.bhk, r.originalProject, r.preferredProject, r.assignedCaller, r.assignedSm, r.createdAt].map(esc).join(","))];
       const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -267,6 +267,7 @@ export default function CallerInbox({ listContext }: { listContext?: LeadsViewCo
                 id: lead.id,
                 name: lead.name,
                 phone: lead.phone,
+                secondaryPhone: lead.secondaryPhone,
                 whatsappNumber: lead.whatsappNumber,
                 status: lead.status,
                 statusLabel: LEAD_STATUS_LABELS[lead.status] || lead.status,

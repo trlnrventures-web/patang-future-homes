@@ -75,7 +75,7 @@ export function normalizePhone(value: string | null | undefined): string {
 
 /**
  * Resolve the event to a lead. An explicit leadId wins; otherwise the number is
- * matched against phone and whatsappNumber. A live lead always beats a deleted
+ * matched against phone, secondaryPhone and whatsappNumber. A live lead always beats a deleted
  * one, so an old number being recycled cannot attach a live call to a tombstone.
  */
 export function resolveLead(db: Db, event: CallEventInput) {
@@ -98,7 +98,9 @@ export function resolveLead(db: Db, event: CallEventInput) {
     .all()
     .filter(
       (l) =>
-        normalizePhone(l.phone) === phone || normalizePhone(l.whatsappNumber) === phone
+        normalizePhone(l.phone) === phone ||
+        normalizePhone(l.secondaryPhone) === phone ||
+        normalizePhone(l.whatsappNumber) === phone
     );
 
   return candidates.find((l) => l.status !== "invalid" && l.status !== "lost") ?? candidates[0] ?? null;

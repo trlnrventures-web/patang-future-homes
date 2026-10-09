@@ -57,6 +57,7 @@ function createTables(sqlite: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
+      secondary_phone TEXT,
       whatsapp_number TEXT,
       email TEXT,
       source TEXT NOT NULL DEFAULT 'meta',

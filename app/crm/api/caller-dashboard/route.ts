@@ -13,6 +13,7 @@ export type DashboardLeadCard = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone: string | null;
   whatsappNumber: string | null;
   source: string;
   campaignName: string | null;
@@ -104,6 +105,7 @@ function enrichLead(l: (typeof schema.leads.$inferSelect), now: Date, userMap: M
     id: l.id,
     name: l.name,
     phone: l.phone,
+    secondaryPhone: l.secondaryPhone,
     whatsappNumber: l.whatsappNumber,
     source: l.source,
     campaignName: l.campaignName,

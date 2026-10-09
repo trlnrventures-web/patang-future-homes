@@ -127,6 +127,8 @@ export const leads = sqliteTable("leads", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
+  /** A second number the customer can be reached on; genuinely separate from WhatsApp. */
+  secondaryPhone: text("secondary_phone"),
   whatsappNumber: text("whatsapp_number"),
   email: text("email"),
   source: text("source", {

@@ -30,6 +30,7 @@ export type InboxLead = {
   id: number;
   name: string;
   phone: string;
+  secondaryPhone: string | null;
   whatsappNumber: string | null;
   source: string;
   campaignName: string | null;

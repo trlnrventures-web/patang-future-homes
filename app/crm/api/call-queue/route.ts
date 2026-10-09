@@ -86,6 +86,7 @@ export async function GET() {
       // contact fields are rewritten; the rest of the queue item is built
       // explicitly so no extra lead columns leak into the response.
       phone: decision.mask ? maskPhone(l.phone) : l.phone,
+      secondaryPhone: decision.mask ? maskPhone(l.secondaryPhone) : l.secondaryPhone,
       whatsappNumber: decision.mask ? maskPhone(l.whatsappNumber) : l.whatsappNumber,
       contactHidden: decision.mask,
       status: l.status,

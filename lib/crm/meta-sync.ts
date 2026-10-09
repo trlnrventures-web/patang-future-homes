@@ -327,10 +327,11 @@ function ingestLead(
 
   const answerLines = Object.entries(values).map(([field, value]) => `${field}: ${value}`);
 
-  // The form's configured caller wins. When the form has no caller set, the lead
-  // is handed to a random active caller instead of sitting unassigned, so a
-  // synced Meta lead always has an owner the moment it lands.
-  const resolvedCallerId = mapping.callerId ?? pickRandomCallerId(db);
+  // Every Meta form's leads are distributed randomly among the active callers,
+  // so enquiries spread across the team instead of piling up on one person. This
+  // ignores any caller once stored on the mapping, which is what "all forms
+  // random" requires.
+  const resolvedCallerId = pickRandomCallerId(db);
 
   const result = handleReInquiry({
     db,
@@ -344,6 +345,7 @@ function ingestLead(
         .values({
           name,
           phone: phoneForMatch,
+          secondaryPhone: values.secondary_phone ?? null,
           whatsappNumber: phoneForMatch,
           email: email || null,
           source: "meta",
@@ -387,8 +389,8 @@ function ingestLead(
             .trim(),
           status: "new",
           stageChangedAt: now,
-          // Assignment comes from the form's configuration, not from load
-          // balancing: a Pam enquiry belongs to the person Pam's leads belong to.
+          // Randomly assigned across active callers (see above); the SM still
+          // comes from the form's configuration.
           assignedCallerId: resolvedCallerId,
           assignedSmId: mapping.smId,
           assignedAt: resolvedCallerId || mapping.smId ? now : null,

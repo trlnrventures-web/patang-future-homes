@@ -222,6 +222,7 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
       id: l.id,
       name: l.name,
       phone: l.phone,
+      secondaryPhone: l.secondaryPhone,
       whatsappNumber: l.whatsappNumber,
       source: l.source,
       campaignName: l.campaignName,
