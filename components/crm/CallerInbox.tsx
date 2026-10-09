@@ -323,7 +323,7 @@ export default function CallerInbox({ listContext }: { listContext?: LeadsViewCo
       )}
 
       {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[calc(3.75rem_+_env(safe-area-inset-bottom))] z-30 border-t border-border bg-white/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-navy">{selected.size} selected</span>
             <div className="flex flex-wrap items-center gap-2">

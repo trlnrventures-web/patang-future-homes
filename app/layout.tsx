@@ -1,6 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { inter, plusJakarta } from "./fonts";
 import "./globals.css";
+
+// `viewportFit: "cover"` is what makes `env(safe-area-inset-*)` resolve to a
+// real value, so the CRM's fixed bottom navigation clears the iPhone home
+// indicator instead of sitting under it.
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: {

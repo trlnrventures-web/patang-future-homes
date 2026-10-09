@@ -1426,7 +1426,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       </div>
 
       {/* ===== Mobile: the three actions stay pinned to the bottom ===== */}
-      <div className="fixed inset-x-0 bottom-[3.75rem] z-30 border-t border-border bg-white/95 p-2 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(3.75rem_+_env(safe-area-inset-bottom))] z-30 border-t border-border bg-white/95 p-2 backdrop-blur md:hidden">
         {mobileActions}
       </div>
 

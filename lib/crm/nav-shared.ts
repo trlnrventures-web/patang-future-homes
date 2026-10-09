@@ -3,9 +3,14 @@
  * can never drift apart.
  *
  * The rule: the destinations every salesperson needs stay visible to everyone,
- * plus My Pay for the two roles that are actually paid. Everything else is
- * reporting or configuration, so it sits behind More, which owner/admin only
- * get. A caller signing in sees the four core tabs plus My Pay.
+ * plus My Pay / Incentives for the two roles that are actually paid and the
+ * Daily Report for the roles that submit one. Everything else is reporting or
+ * configuration, so it sits behind More.
+ *
+ * More is role-aware: a More item with no `roles` is administrator-only (the
+ * default), while an item that names roles opens to those roles too. So opening
+ * More up to staff never leaks the configuration pages - only the items that
+ * explicitly list them.
  */
 
 export type NavItem = {
@@ -32,13 +37,21 @@ export const NAV_PRIMARY_ITEMS: NavItem[] = [
   // rows. Without this the page sat under More, which owner/admin alone can
   // open, so a caller or SM had no route to their own incentives at all.
   { href: "/crm/incentives", label: "My Incentives", shortLabel: "Incentives", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6", roles: ["sales_manager", "caller"] },
+  // The Daily Report is where staff COPY / SHARE their report (WhatsApp). It
+  // used to be reachable only from a dashboard card, so a caller who was not on
+  // the dashboard had no route to it at all. Owner/admin still reach it from
+  // More; the roles below get the tab directly.
+  { href: "/crm/reports", label: "Daily Report", shortLabel: "Report", icon: "M8 13v5M12 9v9M16 5v13M3 3v18h18M3 5h14M17 5l3 3V3.5", roles: ["caller", "sales_manager", "marketing"] },
 ];
 
 export const NAV_MORE_ITEMS: NavItem[] = [
   { href: "/crm/properties", label: "Properties", icon: "M3 21h18M5 21V7l7-4 7 4v14M9 9h6M9 13h6M9 17h6", iconSrc: "/Icon/Properties.svg" },
-  { href: "/crm/marketing", label: "Marketing", icon: "M3 3v18M3 5h18M5 3v2M7 8l3 2M7 13l3 4 5-9M17 5l4 13M15 12h4", iconSrc: "/Icon/Marketing.svg" },
+  { href: "/crm/marketing", label: "Marketing", roles: ["admin", "sales_head", "marketing"], icon: "M3 3v18M3 5h18M5 3v2M7 8l3 2M7 13l3 4 5-9M17 5l4 13M15 12h4", iconSrc: "/Icon/Marketing.svg" },
   { href: "/crm/reports", label: "Daily Report", icon: "M8 13v5M12 9v9M16 5v13M3 3v18h18M3 5h14M17 5l3 3V3.5", iconSrc: "/Icon/Daily reports.svg" },
-  { href: "/crm/leaderboard", label: "Leaderboard", icon: "M8 21h8M12 17v4M17 3h4v4M7 7h10v4M17 11a5 5 0 0 1-10 0 5 5 0 0 1 10 0Z", iconSrc: "/Icon/Leaderboard.svg" },
+  // Marketing gets this so its More section is worth opening; caller/SM reach
+  // the leaderboard from their dashboard card, and giving them a More entry too
+  // would push the mobile bar to eight buttons.
+  { href: "/crm/leaderboard", label: "Leaderboard", roles: ["admin", "sales_head", "marketing"], icon: "M8 21h8M12 17v4M17 3h4v4M7 7h10v4M17 11a5 5 0 0 1-10 0 5 5 0 0 1 10 0Z", iconSrc: "/Icon/Leaderboard.svg" },
   { href: "/crm/incentives", label: "Incentives", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6", iconSrc: "/Icon/Incentives.svg" },
   { href: "/crm/salary", label: "Salary Reports", icon: "M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4Z", iconSrc: "/Icon/Salary report.svg" },
   { href: "/crm/attendance/report", label: "Attendance Report", icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z", iconSrc: "/Icon/Attendence Report.svg" },
@@ -66,12 +79,21 @@ export function primaryItemsFor(userRole?: string): NavItem[] {
   );
 }
 
-/** Owner/admin are the only roles that get a More section at all. */
-export function canSeeMore(userRole?: string): boolean {
-  return userRole === "admin" || userRole === "sales_head";
-}
+/**
+ * A More item without explicit roles is configuration and stays administrator-
+ * only. Items that name roles (Marketing, Leaderboard) open to those roles too,
+ * which is what gives a marketing user a route to their own page.
+ */
+const MORE_DEFAULT_ROLES = ["admin", "sales_head"];
 
 export function moreItemsFor(userRole?: string): NavItem[] {
-  if (!canSeeMore(userRole)) return [];
-  return NAV_MORE_ITEMS.filter((item) => !item.roles || (userRole ? item.roles.includes(userRole) : false));
+  return NAV_MORE_ITEMS.filter((item) => {
+    const roles = item.roles ?? MORE_DEFAULT_ROLES;
+    return userRole ? roles.includes(userRole) : false;
+  });
+}
+
+/** Anyone with at least one More entry gets the More section. */
+export function canSeeMore(userRole?: string): boolean {
+  return moreItemsFor(userRole).length > 0;
 }
