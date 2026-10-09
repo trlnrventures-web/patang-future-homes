@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
+import { fetchAdContext } from "@/lib/crm/meta-graph";
 import { pickRandomCallerId } from "@/lib/crm/leads";
 import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { notifyUser } from "@/lib/crm/push";
@@ -253,6 +254,14 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // The `*Name` columns must hold names, not the numeric ids Meta sends on the
+      // lead: a raw id there would never match a CRM campaign and reads as garbage
+      // in the lead view. Resolving is best-effort - a token without
+      // `ads_management` gets nulls, and the lead still imports.
+      const adContext = leadDetails.ad_id
+        ? await fetchAdContext(String(leadDetails.ad_id), PAGE_ACCESS_TOKEN)
+        : { adName: null, adSetName: null, campaignName: null };
+
       try {
         const result = handleReInquiry({
           db,
@@ -272,11 +281,11 @@ export async function POST(request: NextRequest) {
                 campaignId: leadDetails.campaign_id ? String(leadDetails.campaign_id) : null,
                 adSetId: leadDetails.adset_id ? String(leadDetails.adset_id) : null,
                 adId: leadDetails.ad_id ? String(leadDetails.ad_id) : null,
-                campaignName: leadDetails.campaign_id ? String(leadDetails.campaign_id) : null,
-                adSetName: leadDetails.adset_id ? String(leadDetails.adset_id) : null,
-                adName: leadDetails.ad_id ? String(leadDetails.ad_id) : null,
+                campaignName: adContext.campaignName,
+                adSetName: adContext.adSetName,
+                adName: adContext.adName,
                 originalMessage: JSON.stringify(fields),
-                notes: `Meta Lead Ad webhook. Form: ${leadDetails.form_id || "n/a"}, Page: ${leadDetails.page_id || "n/a"}, Ad: ${leadDetails.ad_id || "n/a"}, AdSet: ${leadDetails.adset_id || "n/a"}, Campaign: ${leadDetails.campaign_id || "n/a"}`,
+                notes: `Meta Lead Ad webhook. Form: ${leadDetails.form_id || "n/a"}, Page: ${leadDetails.page_id || "n/a"}, Ad: ${adContext.adName || "n/a"}, AdSet: ${adContext.adSetName || "n/a"}, Campaign: ${adContext.campaignName || "n/a"}`,
                 status: "new",
                 assignedCallerId: pickRandomCallerId(db),
                 stageChangedAt: now,

@@ -5,8 +5,10 @@ import { notifyNewLead } from "./lead-alerts";
 import { handleReInquiry } from "./reinquiry";
 import { pickRandomCallerId } from "./leads";
 import {
+  fetchAdContext,
   fetchLeadsSince,
   GraphError,
+  type AdContext,
   type GraphLead,
 } from "./meta-graph";
 import {
@@ -37,13 +39,38 @@ class LeadRejectedError extends Error {}
 
 /**
  * Meta's Lead Ads testing tool submits answers like
- * `"<test lead: dummy data for full_name>"`. They are not real enquiries, so they
- * are dropped instead of imported (and instead of looking like a sync failure).
+ * `"<test lead: dummy data for full_name>"`. They are imported like any other
+ * lead - dropping them made a working integration look dead - but are stamped
+ * with `TEST_SUBMISSION_NOTE` so they are never mistaken for a real enquiry.
  */
 const TEST_LEAD_MARKER = "<test lead:";
 
 function isTestLeadSubmission(lead: GraphLead): boolean {
   return Object.values(lead.fields).some((value) => value.includes(TEST_LEAD_MARKER));
+}
+
+/**
+ * Stamped on a testing-tool submission's notes and activity so importing it (see
+ * below) cannot be mistaken for a real enquiry by whoever opens the lead.
+ */
+const TEST_SUBMISSION_NOTE = "Meta integration test submission (Lead Ads testing tool).";
+
+const EMPTY_AD_CONTEXT: AdContext = { adName: null, adSetName: null, campaignName: null };
+
+/**
+ * The one-line ad attribution written into a lead's notes and its activity trail
+ * on every ingestion. `Meta ad: none` is deliberate rather than an empty string:
+ * an operator reading the trail can tell "no ad" apart from a resolution failure.
+ */
+function adNoteLine(ad: AdContext): string {
+  if (!ad.adName) return "Meta ad: none";
+  const details = [
+    ad.adSetName ? `ad set: ${ad.adSetName}` : "",
+    ad.campaignName ? `campaign: ${ad.campaignName}` : "",
+  ]
+    .filter(Boolean)
+    .join(" \u00b7 ");
+  return details ? `Meta ad: ${ad.adName} (${details})` : `Meta ad: ${ad.adName}`;
 }
 
 /**
@@ -218,22 +245,28 @@ async function syncForm(mapping: MappingRow, ranAt: string): Promise<FormSyncRes
 
   const fieldMap = mappingFor(mapping);
   let newest = mapping.lastSyncedCursor;
-  let ignored = 0;
   const failReasons: string[] = [];
+  // Many submissions on one form share an ad, so the names are resolved once per
+  // distinct ad per run rather than on every lead.
+  const adCache = new Map<string, AdContext>();
 
   for (const lead of fresh) {
     if (lead.createdTime && (!newest || lead.createdTime > newest)) newest = lead.createdTime;
 
-    // A testing-tool submission is not a real enquiry. Recording it as ingested
-    // keeps the cursor moving without inventing a lead or a red error.
-    if (isTestLeadSubmission(lead)) {
-      ignored += 1;
-      markIngested(lead.id, mapping.formId, null);
-      continue;
+    const isTest = isTestLeadSubmission(lead);
+    let adContext = EMPTY_AD_CONTEXT;
+    if (lead.adId) {
+      const cached = adCache.get(lead.adId);
+      if (cached) {
+        adContext = cached;
+      } else {
+        adContext = await fetchAdContext(lead.adId, token);
+        adCache.set(lead.adId, adContext);
+      }
     }
 
     try {
-      const outcome = ingestLead(mapping, lead, fieldMap);
+      const outcome = ingestLead(mapping, lead, fieldMap, adContext, isTest);
       base.created += outcome.created;
       base.duplicates += outcome.duplicate;
       base.reactivated += outcome.reactivated;
@@ -263,7 +296,6 @@ async function syncForm(mapping: MappingRow, ranAt: string): Promise<FormSyncRes
   if (base.created) parts.push(`${base.created} new lead${base.created === 1 ? "" : "s"}`);
   if (base.reactivated) parts.push(`${base.reactivated} reactivated`);
   if (base.duplicates) parts.push(`${base.duplicates} duplicate${base.duplicates === 1 ? "" : "s"}`);
-  if (ignored) parts.push(`${ignored} test lead${ignored === 1 ? "" : "s"} ignored`);
   if (base.errors) {
     // Surface the actual reason, not just a count, so the activity log explains
     // the warning instead of leaving the admin to guess.
@@ -334,7 +366,9 @@ function handleFetchError(
 function ingestLead(
   mapping: MappingRow,
   lead: GraphLead,
-  fieldMap: Record<string, string>
+  fieldMap: Record<string, string>,
+  adContext: AdContext,
+  isTest: boolean
 ): { created: number; duplicate: number; reactivated: number; leadId: number } {
   const db = getDb();
   const now = new Date().toISOString();
@@ -379,11 +413,19 @@ function ingestLead(
   // random" requires.
   const resolvedCallerId = pickRandomCallerId(db);
 
+  // The ad line rides on the message so it reaches the activity trail for a
+  // duplicate or reactivated lead, and on `notes` below for a newly created one,
+  // so every ingestion records where the lead came from - not just brand-new ones.
+  const adLine = adNoteLine(adContext);
+  const message = [answerLines.join(" | "), adLine, isTest ? TEST_SUBMISSION_NOTE : ""]
+    .filter(Boolean)
+    .join(" | ");
+
   const result = handleReInquiry({
     db,
     phone: phoneForMatch,
     project: mapping.project,
-    message: answerLines.join(" | ") || lead.id,
+    message: message || lead.id,
     source: "meta",
     insertLead: () =>
       db
@@ -426,13 +468,20 @@ function ingestLead(
           campaignId: lead.campaignId,
           adSetId: lead.adSetId,
           adId: lead.adId,
-          campaignName: values.campaign_name ?? null,
+          adName: adContext.adName,
+          adSetName: adContext.adSetName,
+          // A mapped campaign answer wins: it is a deliberate admin choice and may
+          // be a CRM campaign the Meta ad node knows nothing about. The resolved
+          // ad name is the fallback, and it is a name - never the raw id.
+          campaignName: values.campaign_name ?? adContext.campaignName,
           notes: [
             `Synced from Facebook form "${mapping.formName}".`,
-            unmapped.length ? `\nUnmapped answers: ${unmapped.join("; ")}` : "",
+            adLine,
+            isTest ? TEST_SUBMISSION_NOTE : "",
+            unmapped.length ? `Unmapped answers: ${unmapped.join("; ")}` : "",
           ]
-            .join("")
-            .trim(),
+            .filter(Boolean)
+            .join("\n"),
           status: "new",
           stageChangedAt: now,
           // Randomly assigned across active callers (see above); the SM still
@@ -455,7 +504,9 @@ function ingestLead(
         leadId: leadRow.id,
         userId: resolvedCallerId || mapping.smId || leadRow.assignedCallerId || 1,
         type: "note",
-        notes: `Lead created from Facebook form "${mapping.formName}".`,
+        notes: [`Lead created from Facebook form "${mapping.formName}".`, isTest ? TEST_SUBMISSION_NOTE : ""]
+          .filter(Boolean)
+          .join(" "),
         createdAt: now,
       })
       .run();

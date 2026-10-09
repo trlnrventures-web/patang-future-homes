@@ -425,6 +425,40 @@ async function fetchLeadPages(
   return out;
 }
 
+export type AdContext = {
+  adName: string | null;
+  adSetName: string | null;
+  campaignName: string | null;
+};
+
+/**
+ * Resolves the human-readable names behind a lead's ad attribution.
+ *
+ * A lead carries only ids (`ad_id`, `adset_id`, `campaign_id`), which say nothing
+ * on their own; the names are one hop away on the ad node. This needs the same
+ * `ads_management` scope the ids themselves do, so a token without it simply gets
+ * nulls here - the lead still imports, just without a name.
+ */
+export async function fetchAdContext(adId: string, pageToken: string): Promise<AdContext> {
+  try {
+    const data = await graphGet<{
+      name?: string;
+      adset?: { name?: string };
+      campaign?: { name?: string };
+    }>(adId, {
+      access_token: pageToken,
+      fields: "name,adset{name},campaign{name}",
+    });
+    return {
+      adName: data.name ? String(data.name) : null,
+      adSetName: data.adset?.name ? String(data.adset.name) : null,
+      campaignName: data.campaign?.name ? String(data.campaign.name) : null,
+    };
+  } catch {
+    return { adName: null, adSetName: null, campaignName: null };
+  }
+}
+
 export type LeadAccessReport = {
   canAccess: boolean | null;
   appHasPermission: boolean | null;

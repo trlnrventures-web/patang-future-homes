@@ -117,7 +117,12 @@ export function handleReInquiry(input: {
         leadId: target.id,
         userId: actorId ?? 1,
         type: "status_change",
-        notes: `Lead reactivated: customer re-enquired via ${input.source} on ${now.slice(0, 10)}, previous status was ${fromStatus === "deleted" ? "Deleted" : fromStatus}.`,
+        notes: [
+          `Lead reactivated: customer re-enquired via ${input.source} on ${now.slice(0, 10)}, previous status was ${fromStatus === "deleted" ? "Deleted" : fromStatus}.`,
+          input.message ? `Message: ${input.message}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         createdAt: now,
       })
       .run();
