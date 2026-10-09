@@ -29,6 +29,24 @@ import {
 } from "./meta-store";
 
 /**
+ * A submission the CRM can never turn into a lead: it carries no name and no
+ * phone/email. Retrying can only fail the same way, so the poller records it as
+ * handled rather than letting it wedge the form into an endless retry.
+ */
+class LeadRejectedError extends Error {}
+
+/**
+ * Meta's Lead Ads testing tool submits answers like
+ * `"<test lead: dummy data for full_name>"`. They are not real enquiries, so they
+ * are dropped instead of imported (and instead of looking like a sync failure).
+ */
+const TEST_LEAD_MARKER = "<test lead:";
+
+function isTestLeadSubmission(lead: GraphLead): boolean {
+  return Object.values(lead.fields).some((value) => value.includes(TEST_LEAD_MARKER));
+}
+
+/**
  * The lead poller.
  *
  * Webhooks are the right long-term shape for this, but a `leads_retrieval`
@@ -200,9 +218,20 @@ async function syncForm(mapping: MappingRow, ranAt: string): Promise<FormSyncRes
 
   const fieldMap = mappingFor(mapping);
   let newest = mapping.lastSyncedCursor;
+  let ignored = 0;
+  const failReasons: string[] = [];
 
   for (const lead of fresh) {
     if (lead.createdTime && (!newest || lead.createdTime > newest)) newest = lead.createdTime;
+
+    // A testing-tool submission is not a real enquiry. Recording it as ingested
+    // keeps the cursor moving without inventing a lead or a red error.
+    if (isTestLeadSubmission(lead)) {
+      ignored += 1;
+      markIngested(lead.id, mapping.formId, null);
+      continue;
+    }
+
     try {
       const outcome = ingestLead(mapping, lead, fieldMap);
       base.created += outcome.created;
@@ -211,7 +240,17 @@ async function syncForm(mapping: MappingRow, ranAt: string): Promise<FormSyncRes
       markIngested(lead.id, mapping.formId, outcome.leadId);
     } catch (error) {
       base.errors += 1;
-      console.error(`[crm-meta] lead ${lead.id} on form ${mapping.formId} failed:`, error);
+      const reason = error instanceof Error ? error.message : String(error);
+      failReasons.push(reason);
+      // A rejected submission (missing name/phone) can never succeed; record it
+      // as handled so the next poll skips it. A transient failure is left
+      // unmarked so the duplicate guard retries it.
+      if (error instanceof LeadRejectedError) {
+        markIngested(lead.id, mapping.formId, null);
+        console.warn(`[crm-meta] lead ${lead.id} on form ${mapping.formId} rejected: ${reason}`);
+      } else {
+        console.error(`[crm-meta] lead ${lead.id} on form ${mapping.formId} failed:`, error);
+      }
     }
   }
 
@@ -224,7 +263,14 @@ async function syncForm(mapping: MappingRow, ranAt: string): Promise<FormSyncRes
   if (base.created) parts.push(`${base.created} new lead${base.created === 1 ? "" : "s"}`);
   if (base.reactivated) parts.push(`${base.reactivated} reactivated`);
   if (base.duplicates) parts.push(`${base.duplicates} duplicate${base.duplicates === 1 ? "" : "s"}`);
-  if (base.errors) parts.push(`${base.errors} error${base.errors === 1 ? "" : "s"}`);
+  if (ignored) parts.push(`${ignored} test lead${ignored === 1 ? "" : "s"} ignored`);
+  if (base.errors) {
+    // Surface the actual reason, not just a count, so the activity log explains
+    // the warning instead of leaving the admin to guess.
+    const reason = failReasons[0];
+    const detail = reason ? `: ${reason.length > 200 ? `${reason.slice(0, 200)}...` : reason}` : "";
+    parts.push(`${base.errors} error${base.errors === 1 ? "" : "s"}${detail}`);
+  }
 
   return finish(
     base.errors ? "warning" : "ok",
@@ -316,7 +362,7 @@ function ingestLead(
   // mapped no phone question and the form collected none.
   const phoneForMatch = phone || (email ? `${email}@no-phone` : "");
   if (!name || !phoneForMatch) {
-    throw new Error("Submission has neither a name nor a phone/email to identify it by.");
+    throw new LeadRejectedError("Submission has neither a name nor a phone/email to identify it by.");
   }
 
   // Keeps the raw answers for the team, since an unmapped question is otherwise

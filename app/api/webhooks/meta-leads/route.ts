@@ -92,7 +92,7 @@ type WebhookBody = {
 type LeadgenDetails = {
   id: string;
   created_time?: string;
-  field_data?: Array<{ name: string; values?: Array<{ value?: string }> }>;
+  field_data?: Array<{ name: string; values?: Array<string | { value?: string }> }>;
   form_id?: string;
   page_id?: string;
   ad_id?: string;
@@ -134,7 +134,9 @@ function extractLeadFields(fieldData: LeadgenDetails["field_data"] = []): Record
   for (const item of fieldData) {
     const name = item.name;
     if (!name) continue;
-    const value = item.values?.[0]?.value;
+    // Graph returns `values` as plain strings; older payloads use `{ value }`.
+    const first = item.values?.[0];
+    const value = typeof first === "string" ? first : first?.value;
     if (value != null) {
       fields[name] = String(value);
     }

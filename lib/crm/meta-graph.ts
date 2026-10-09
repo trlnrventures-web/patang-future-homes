@@ -304,7 +304,7 @@ export async function getFormQuestions(formId: string, pageToken: string): Promi
   }));
 }
 
-export type RawFieldValue = { name: string; text?: string; values?: { value?: string }[] };
+export type RawFieldValue = { name: string; text?: string; values?: Array<string | { value?: string }> };
 
 export type GraphLead = {
   id: string;
@@ -399,7 +399,11 @@ async function fetchLeadPages(
         : ((fd as { values?: RawFieldValue[] } | null | undefined)?.values || []);
       const answers: Record<string, string> = {};
       for (const v of entries) {
-        const text = v.text ?? v.values?.[0]?.value;
+        // Graph returns `values` as an array of plain strings, but some payloads
+        // (and older docs) use `{ value }` objects. Accept both, or every answer
+        // silently reads back empty.
+        const first = v.values?.[0];
+        const text = v.text ?? (typeof first === "string" ? first : first?.value);
         if (v.name && text != null) answers[v.name] = String(text);
       }
       out.push({
