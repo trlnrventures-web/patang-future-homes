@@ -1,5 +1,5 @@
 ﻿import type { Metadata } from "next";
-import LoginForm from "@/components/crm/LoginForm";
+import PinLoginForm from "@/components/crm/PinLoginForm";
 import { getCurrentUser } from "@/lib/crm/data";
 import { redirect } from "next/navigation";
 
@@ -28,7 +28,7 @@ export default async function LoginPage() {
           </h1>
           <p className="mt-1 text-sm text-muted">Vasai West Sales</p>
         </div>
-        <LoginForm />
+        <PinLoginForm />
       </div>
     </div>
   );

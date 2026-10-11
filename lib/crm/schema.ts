@@ -32,6 +32,17 @@ export const users = sqliteTable("users", {
   passwordResetTokenHash: text("password_reset_token_hash"),
   passwordResetExpiresAt: text("password_reset_expires_at"),
   passwordResetUsedAt: text("password_reset_used_at"),
+  // 4-digit login PIN, stored twice on purpose. `pin` is the plaintext an admin
+  // reads back to the user on the Team screen; `pinHash` is the bcrypt used for
+  // the login comparison. Hashing a 4-digit space buys little against an
+  // offline attacker (it is brute-forced instantly), so the real protection is
+  // the hard lock below, which is not time-based.
+  pin: text("pin"),
+  pinHash: text("pin_hash"),
+  // Hard lock: set after PIN_MAX_ATTEMPTS wrong PINs and cleared only when an
+  // admin unlocks the account. A locked user cannot get back in on their own.
+  pinLocked: integer("pin_locked", { mode: "boolean" }).notNull().default(false),
+  pinFailedCount: integer("pin_failed_count").notNull().default(0),
 });
 
 export const attendance = sqliteTable("attendance", {

@@ -27,6 +27,7 @@ const PUBLIC_PATHS = [
 // listing and the proxy allowlist is per-path, not per-method.
 const PUBLIC_API_PATHS = [
   "/crm/api/auth/login",
+  "/crm/api/auth/pin",
   "/crm/api/auth/logout",
   "/crm/api/auth/forgot-password",
   "/crm/api/auth/reset-password",

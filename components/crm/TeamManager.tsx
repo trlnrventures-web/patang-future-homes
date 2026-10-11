@@ -13,6 +13,9 @@ type TeamUser = {
   weekOffDay: string;
   baseSalary: number | null;
   seeAllLeads: boolean;
+  pin: string | null;
+  pinLocked: boolean;
+  pinFailedCount: number;
 };
 
 type EditState = {
@@ -127,6 +130,30 @@ export default function TeamManager() {
     }));
   };
 
+  const pinAction = async (userId: number, action: "reset" | "unlock") => {
+    setSaving(userId);
+    try {
+      const res = await fetch("/crm/api/team/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      const name = users.find((u) => u.id === userId)?.name || "user";
+      flash(
+        action === "reset"
+          ? `New PIN for ${name}: ${json.pin}`
+          : `Unlocked ${name}`
+      );
+      loadUsers();
+    } catch (e: unknown) {
+      flash((e as Error).message || "Something went wrong");
+    } finally {
+      setSaving(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-muted">
@@ -151,6 +178,7 @@ export default function TeamManager() {
                 <th className="px-2 py-2">Name</th>
                 <th className="px-2 py-2">Email (login)</th>
                 <th className="px-2 py-2">Phone (login)</th>
+                <th className="px-2 py-2">Login PIN</th>
                 <th className="px-2 py-2">Role</th>
                 <th className="px-2 py-2">Week Off</th>
                 <th className="px-2 py-2">All Leads</th>
@@ -203,6 +231,43 @@ export default function TeamManager() {
                           phoneChanged ? "border-primary" : "border-border"
                         }`}
                       />
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-lg bg-gray-100 px-2 py-1 font-mono text-xs tracking-widest text-navy">
+                            {u.pin ?? "----"}
+                          </span>
+                          <button
+                            onClick={() => pinAction(u.id, "reset")}
+                            disabled={saving === u.id}
+                            className="rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/5 disabled:opacity-50"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                        {u.pinLocked ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-red-600">
+                              Locked
+                            </span>
+                            <button
+                              onClick={() => pinAction(u.id, "unlock")}
+                              disabled={saving === u.id}
+                              className="rounded-lg bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                            >
+                              Unlock
+                            </button>
+                          </div>
+                        ) : (
+                          u.pinFailedCount > 0 && (
+                            <span className="text-[11px] text-amber-600">
+                              {u.pinFailedCount} failed attempt
+                              {u.pinFailedCount === 1 ? "" : "s"}
+                            </span>
+                          )
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-2.5 text-xs text-muted">
                       {ROLE_LABELS[u.role] || u.role}
@@ -277,6 +342,12 @@ export default function TeamManager() {
           phone are both used to sign in and must be unique across the team.
           Phone is the number their reset link and account are tied to - leave
           it blank only if the person has no number on file yet.
+        </p>
+        <p className="mt-1.5">
+          <strong className="text-primary">Login PIN:</strong> read the 4-digit
+          PIN here and hand it to the person. After 5 wrong attempts the account
+          locks - use <strong>Unlock</strong> to let them retry, or{" "}
+          <strong>Reset</strong> to issue a new PIN.
         </p>
         <p className="mt-1.5">
           <strong className="text-primary">Note:</strong> Changing a salary only

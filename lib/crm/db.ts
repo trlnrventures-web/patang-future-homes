@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
+import { generatePin, hashPin } from "./pin";
 
 const DB_PATH =
   process.env.CRM_DB_PATH || path.join(process.cwd(), "data", "crm.db");
@@ -43,7 +44,11 @@ function createTables(sqlite: Database.Database) {
       created_at TEXT NOT NULL DEFAULT '',
       password_reset_token_hash TEXT,
       password_reset_expires_at TEXT,
-      password_reset_used_at TEXT
+      password_reset_used_at TEXT,
+      pin TEXT,
+      pin_hash TEXT,
+      pin_locked INTEGER NOT NULL DEFAULT 0,
+      pin_failed_count INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS login_attempts (
@@ -877,6 +882,18 @@ function migrateUsers(sqlite: Database.Database) {
   if (!have.has("see_all_leads")) {
     sqlite.exec("ALTER TABLE users ADD COLUMN see_all_leads INTEGER NOT NULL DEFAULT 0");
   }
+  if (!have.has("pin")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN pin TEXT");
+  }
+  if (!have.has("pin_hash")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN pin_hash TEXT");
+  }
+  if (!have.has("pin_locked")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN pin_locked INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!have.has("pin_failed_count")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN pin_failed_count INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 /**
@@ -1183,6 +1200,37 @@ function seedData() {
 
   seedMessageTemplates(sqlite);
   ensureMarketingUser(sqlite);
+  backfillPins(sqlite);
+}
+
+/**
+ * Give every account a 4-digit login PIN it does not already have. Runs on
+ * every boot but only touches rows whose pin_hash is still NULL, so it is
+ * idempotent and it backfills accounts that existed before PIN login shipped
+ * (the seeded team, and any live users) as well as newly inserted ones.
+ *
+ * The PIN is generated against the set already in use so no two people share
+ * one - that keeps "read your PIN off the Team screen" unambiguous.
+ */
+function backfillPins(sqlite: Database.Database) {
+  const missing = sqlite
+    .prepare("SELECT id FROM users WHERE pin_hash IS NULL")
+    .all() as { id: number }[];
+  if (!missing.length) return;
+
+  const taken = new Set(
+    (sqlite.prepare("SELECT pin FROM users WHERE pin IS NOT NULL").all() as {
+      pin: string;
+    }[]).map((r) => r.pin)
+  );
+
+  const update = sqlite.prepare("UPDATE users SET pin = ?, pin_hash = ? WHERE id = ?");
+  for (const { id } of missing) {
+    const pin = generatePin(taken);
+    if (!pin) break;
+    taken.add(pin);
+    update.run(pin, hashPin(pin), id);
+  }
 }
 
 // Alphanumeric only: enough entropy to be safe while staying easy to read aloud

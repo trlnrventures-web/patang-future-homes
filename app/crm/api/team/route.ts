@@ -32,6 +32,9 @@ export async function GET() {
       weekOffDay: schema.users.weekOffDay,
       baseSalary: schema.users.baseSalary,
       seeAllLeads: schema.users.seeAllLeads,
+      pin: schema.users.pin,
+      pinLocked: schema.users.pinLocked,
+      pinFailedCount: schema.users.pinFailedCount,
     })
     .from(schema.users)
     .all()

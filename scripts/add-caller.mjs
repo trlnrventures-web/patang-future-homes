@@ -57,6 +57,17 @@ function normalizePhone(value) {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 
+// Must match generatePin in lib/crm/pin.ts - a random 4-digit PIN that avoids
+// the values already in use, so no two accounts share one. Duplicated for the
+// same reason normalizePhone is: this file cannot import the TypeScript module.
+function generatePin(taken) {
+  for (let i = 0; i < 10000; i++) {
+    const pin = (randomBytes(2).readUInt16BE(0) % 10000).toString().padStart(4, "0");
+    if (!taken.has(pin)) return pin;
+  }
+  return null;
+}
+
 const PHONE = PHONE_RAW ? normalizePhone(PHONE_RAW) : null;
 
 // Must match the users.role enum in lib/crm/schema.ts. Inserting anything else
@@ -129,6 +140,11 @@ const hasMustChange = userCols.has("must_change_password");
 if (!hasMustChange) {
   console.log("note: users.must_change_password is missing on this database; the first-login change will not be forced.");
 }
+const hasPin = userCols.has("pin") && userCols.has("pin_hash");
+if (!hasPin) {
+  console.log("note: users.pin is missing on this database; no PIN is set here. The");
+  console.log("      app backfills one on next boot - restart it before sharing a login.");
+}
 
 const activeCallersBefore = db
   .prepare("select id, name from users where role = 'caller' and active = 1 order by id")
@@ -142,6 +158,7 @@ console.log(`new ${ROLE.padEnd(13)}: ${NAME} <${EMAIL}>${PHONE ? ` · ${PHONE}` 
 console.log(`week off   : ${WEEK_OFF || "(unset - the app falls back to its default, Tuesday)"}`);
 console.log(`base salary: ${BASE_SALARY ?? "(unset)"}`);
 console.log(`password   : ${TEMP_PASSWORD ? "from TEMP_PASSWORD" : "generated below"}`);
+console.log(`login PIN  : ${hasPin ? "generated below" : "(no pin column - set on next boot)"}`);
 console.log(`callers    : ${activeCallersBefore.length} active before -> ${ROLE === "caller" ? activeCallersBefore.length + 1 : activeCallersBefore.length} after`);
 console.log(`queue      : starts empty; ${unassigned} lead(s) are currently unassigned and stay that way`);
 
@@ -162,20 +179,37 @@ if (existsSync(BACKUP_PATH)) {
 const hash = bcrypt.hashSync(password, 10);
 const now = new Date().toISOString();
 
-// The role is bound, never interpolated into the SQL string.
-const insert = hasMustChange
-  ? `insert into users (name, email, password_hash, role, phone, active, week_off_day, base_salary, must_change_password, created_at)
-     values (?, ?, ?, ?, ?, 1, ?, ?, 1, ?)`
-  : `insert into users (name, email, password_hash, role, phone, active, week_off_day, base_salary, created_at)
-     values (?, ?, ?, ?, ?, 1, ?, ?, ?)`;
-
-const run = db.transaction(() =>
-  db.prepare(insert).run(NAME, EMAIL, hash, ROLE, PHONE, WEEK_OFF, BASE_SALARY, ...(hasMustChange ? [now] : []))
+const takenPins = new Set(
+  db.prepare("select pin from users where pin is not null").all().map((r) => r.pin)
 );
+const pin = hasPin ? generatePin(takenPins) : null;
+if (hasPin && !pin) fail("all 10,000 PINs are in use - cannot allocate a unique one");
+const pinHash = pin ? bcrypt.hashSync(pin, 10) : null;
+
+// Columns and values are built as pairs so the two never drift; the role and
+// every other value are bound, never interpolated into the SQL string.
+const columns = ["name", "email", "password_hash", "role", "phone", "active", "week_off_day", "base_salary"];
+const values = [NAME, EMAIL, hash, ROLE, PHONE, 1, WEEK_OFF, BASE_SALARY];
+if (hasMustChange) {
+  columns.push("must_change_password");
+  values.push(1);
+}
+if (hasPin) {
+  columns.push("pin", "pin_hash");
+  values.push(pin, pinHash);
+}
+columns.push("created_at");
+values.push(now);
+
+const insert = `insert into users (${columns.join(", ")}) values (${columns
+  .map(() => "?")
+  .join(", ")})`;
+
+const run = db.transaction(() => db.prepare(insert).run(...values));
 const { lastInsertRowid } = run();
 
 const check = db
-  .prepare("select id, name, email, role, active, phone, week_off_day, base_salary, must_change_password from users where id = ?")
+  .prepare("select id, name, email, role, active, phone, week_off_day, base_salary, must_change_password, pin from users where id = ?")
   .get(lastInsertRowid);
 const activeCallersAfter = db
   .prepare("select count(*) n from users where role = 'caller' and active = 1")
@@ -184,6 +218,7 @@ const activeCallersAfter = db
 console.log(`\ncreated: id ${check.id} · ${check.name} <${check.email}> · role ${check.role} · active ${check.active}`);
 console.log(`base salary: ${check.base_salary ?? "NULL"}`);
 console.log(`must change password on first login: ${check.must_change_password ?? "column absent"}`);
+console.log(`login PIN: ${check.pin ?? "(not set - restart the app to backfill one)"}`);
 console.log(`leads assigned to ${check.name}: 0 (queue starts empty)`);
 
 if (!TEMP_PASSWORD) {
