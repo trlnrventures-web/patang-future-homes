@@ -35,6 +35,11 @@ type Props = {
    * list so the detail page can offer Previous/Next Lead in the same order.
    */
   hrefQuery?: string;
+  /**
+   * When provided, opening the card runs this instead of a plain push, so the
+   * caller can freeze the current queue before navigating to the lead.
+   */
+  onOpen?: () => void;
 };
 
 export default function LeadCard({
@@ -46,13 +51,14 @@ export default function LeadCard({
   selected,
   onToggleSelect,
   hrefQuery = "",
+  onOpen,
 }: Props) {
   const router = useRouter();
   const overdue = !!lead.hasOverdueFollowUp && !!lead.nextFollowUpDisplay;
   // Server-decided; when true the phone field holds a masked string, not a number.
   const hidden = !!(lead as { contactHidden?: boolean }).contactHidden;
 
-  const open = () => router.push(`/crm/leads/${lead.id}${hrefQuery}`);
+  const open = () => (onOpen ? onOpen() : router.push(`/crm/leads/${lead.id}${hrefQuery}`));
   const stop = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -182,14 +188,28 @@ export default function LeadCard({
               </a>
             </>
           )}
-          <Link
-            href={`/crm/leads/${lead.id}${hrefQuery}`}
-            title="Open lead"
-            onClick={stop}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
-          >
-            <ChevronIcon />
-          </Link>
+          {onOpen ? (
+            <button
+              type="button"
+              title="Open lead"
+              onClick={(e) => {
+                stop(e);
+                onOpen();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
+            >
+              <ChevronIcon />
+            </button>
+          ) : (
+            <Link
+              href={`/crm/leads/${lead.id}${hrefQuery}`}
+              title="Open lead"
+              onClick={stop}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-white text-navy transition-colors hover:bg-primary/5 hover:text-primary"
+            >
+              <ChevronIcon />
+            </Link>
+          )}
         </div>
       </div>
     </div>

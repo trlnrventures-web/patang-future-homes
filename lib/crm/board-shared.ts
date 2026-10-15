@@ -29,8 +29,10 @@ export const LEAD_FUNNEL_STAGES: FunnelStage[] = [
   { key: "visit_booked", label: "Visit Booked", status: "visit_booked", matches: ["visit_proposed", "visit_booked"] },
   { key: "visit_confirmed", label: "Visit Confirmed", status: "visit_confirmed", matches: ["visit_confirmed"] },
   { key: "visit_done", label: "Visit Done", status: "visit_done", matches: ["visit_done"] },
-  { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation"] },
-  { key: "booked", label: "Booked", status: "booked", matches: ["booked"] },
+  { key: "revisit_scheduled", label: "Revisit Scheduled", status: "revisit_scheduled", matches: ["revisit_scheduled"] },
+  { key: "revisit_done", label: "Revisit Done", status: "revisit_done", matches: ["revisit_done"] },
+  { key: "negotiation", label: "Negotiation", status: "negotiation", matches: ["negotiation", "token"] },
+  { key: "booked", label: "Booked", status: "booked", matches: ["booked", "won"] },
 ];
 
 /** Which funnel column a status belongs to, or null for exited leads. */
@@ -67,8 +69,11 @@ export const LEAD_COLUMNS: LeadColumn[] = [
   { key: "plan_hold", label: "Plan Hold", dropStatus: "plan_hold", matches: ["plan_hold"] },
   { key: "site_visit", label: "Site Visit", dropStatus: "visit_proposed", matches: ["visit_proposed", "visit_booked", "visit_confirmed"] },
   { key: "visit_done", label: "Visit Done", dropStatus: "visit_done", matches: ["visit_done"] },
-  { key: "negotiation", label: "Negotiation", dropStatus: "negotiation", matches: ["negotiation"] },
-  { key: "booked", label: "Booked", dropStatus: "booked", matches: ["booked"] },
+  { key: "revisit_scheduled", label: "Revisit Scheduled", dropStatus: "revisit_scheduled", matches: ["revisit_scheduled"] },
+  { key: "revisit_done", label: "Revisit Done", dropStatus: "revisit_done", matches: ["revisit_done"] },
+  { key: "negotiation", label: "Negotiation", dropStatus: "negotiation", matches: ["negotiation", "token"] },
+  { key: "token", label: "Token", dropStatus: "token", matches: ["token"] },
+  { key: "booked", label: "Booked", dropStatus: "booked", matches: ["booked", "won"] },
   { key: "lost", label: "Lost", dropStatus: "lost", matches: ["lost", "invalid", "dnc"], closed: true },
 ];
 
@@ -108,8 +113,12 @@ export const STAGE_ACCENTS: Record<
   visit_booked: { bar: "bg-cyan-500", text: "text-cyan-700", soft: "bg-cyan-50", ring: "ring-cyan-300" },
   visit_confirmed: { bar: "bg-teal-500", text: "text-teal-700", soft: "bg-teal-50", ring: "ring-teal-300" },
   visit_done: { bar: "bg-indigo-500", text: "text-indigo-700", soft: "bg-indigo-50", ring: "ring-indigo-300" },
+  revisit_scheduled: { bar: "bg-amber-500", text: "text-amber-700", soft: "bg-amber-50", ring: "ring-amber-300" },
+  revisit_done: { bar: "bg-cyan-500", text: "text-cyan-700", soft: "bg-cyan-50", ring: "ring-cyan-300" },
   negotiation: { bar: "bg-fuchsia-500", text: "text-fuchsia-700", soft: "bg-fuchsia-50", ring: "ring-fuchsia-300" },
+  token: { bar: "bg-violet-500", text: "text-violet-700", soft: "bg-violet-50", ring: "ring-violet-300" },
   booked: { bar: "bg-green-600", text: "text-green-700", soft: "bg-green-50", ring: "ring-green-300" },
+  won: { bar: "bg-green-600", text: "text-green-700", soft: "bg-green-50", ring: "ring-green-300" },
 };
 
 export const FALLBACK_ACCENT = {
@@ -166,8 +175,12 @@ export const BOARD_STATUS_FILTERS = [
   "visit_booked",
   "visit_confirmed",
   "visit_done",
+  "revisit_scheduled",
+  "revisit_done",
   "negotiation",
+  "token",
   "booked",
+  "won",
   "lost",
 ] as const;
 

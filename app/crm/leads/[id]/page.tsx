@@ -8,11 +8,12 @@ import { and, eq, isNull } from "drizzle-orm";
 import { suggestCategory } from "@/lib/crm/messages";
 import { LEAD_STATUS_LABELS, findLikelyDuplicates } from "@/lib/crm/leads";
 import { queryLeadList, QUICK_FILTERS } from "@/lib/crm/lead-query";
-import { queryInboxLeads } from "@/lib/crm/inbox-query";
 import { INBOX_SORTS, isInboxTab } from "@/lib/crm/inbox-shared";
-import { BOARD_SORT_KEYS } from "@/lib/crm/board-shared";
+import { BOARD_SORT_KEYS, columnForStatus } from "@/lib/crm/board-shared";
 import { readProjectsFile } from "@/lib/crm/projects-store";
 import { getBudgetPresets } from "@/lib/crm/settings";
+import type { LeadQueue } from "@/lib/crm/lead-queue";
+import LeadNav from "@/components/crm/LeadNav";
 import LeadDetail, { LeadDetailData } from "@/components/crm/LeadDetail";
 import MessageCenter, { MCTemplate, MCLog, MCLead } from "@/components/crm/MessageCenter";
 
@@ -182,21 +183,28 @@ const visits = db
   }
   if (fromInbox && rawStatus && isInboxTab(rawStatus)) navParams.set("status", rawStatus);
   const navQs = navParams.toString();
-  const leadHref = (targetId: number) => `/crm/leads/${targetId}${navQs ? `?${navQs}` : ""}`;
   const backHref = `/crm/leads${navQs ? `?${navQs}` : ""}`;
+  const queueKey = firstValue(query.queue) || null;
 
-  const queue = fromInbox
-    ? queryInboxLeads(db, user, { tab: rawStatus, sort: navSort, q: navQuery.q })
-    : queryLeadList(db, user, navQuery);
-  const currentIndex = queue.findIndex((l) => l.id === leadId);
-  const prevLead = currentIndex > 0 ? queue[currentIndex - 1] : null;
-  const nextLead = currentIndex >= 0 ? (queue[currentIndex + 1] ?? null) : null;
-  const inQueue = currentIndex >= 0 && queue.length > 1;
-
-  const navLinkCls =
-    "rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:border-primary hover:bg-primary/5";
-  const navDisabledCls =
-    "cursor-not-allowed rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-bold text-soft opacity-50";
+  // Fallback queue for a direct link / notification / global search: the lead's
+  // own stage, newest first, built with the same list comparator. `LeadNav`
+  // freezes it into sessionStorage so the walk stays stable afterwards.
+  const stageColumn = columnForStatus(lead.status);
+  const stageLabel = stageColumn?.label || LEAD_STATUS_LABELS[lead.status] || lead.status;
+  const fallbackIds = queryLeadList(db, user, {
+    ...(stageColumn ? { column: stageColumn.key } : { status: lead.status }),
+    sort: "newest",
+  })
+    .slice(0, 2000)
+    .map((l) => l.id);
+  const fallbackQueue: LeadQueue = {
+    ids: fallbackIds,
+    stage: stageColumn?.key || lead.status,
+    stageLabel,
+    kind: "list",
+    ...(stageColumn ? { column: stageColumn.key } : { status: lead.status }),
+    sort: "newest",
+  };
 
   return (
     <div className="space-y-5">
@@ -205,39 +213,12 @@ const visits = db
           <Link href={backHref} className="text-xs font-semibold text-accent-ink hover:underline">
             ← {fromInbox ? "Back to Inbox" : "Back to Leads"}
           </Link>
-          <div className="flex items-center gap-2">
-            {inQueue && (
-              <span className="hidden text-[11px] font-semibold text-soft sm:inline">
-                Lead {currentIndex + 1} of {queue.length}
-              </span>
-            )}
-            {prevLead ? (
-              <Link
-                href={leadHref(prevLead.id)}
-                className={navLinkCls}
-                title={prevLead.name}
-              >
-                ← Previous
-              </Link>
-            ) : (
-              <span aria-disabled="true" className={navDisabledCls}>
-                ← Previous
-              </span>
-            )}
-            {nextLead ? (
-              <Link
-                href={leadHref(nextLead.id)}
-                className={navLinkCls}
-                title={nextLead.name}
-              >
-                Next →
-              </Link>
-            ) : (
-              <span aria-disabled="true" className={navDisabledCls}>
-                Next →
-              </span>
-            )}
-          </div>
+          <LeadNav
+            currentId={leadId}
+            queueKey={queueKey}
+            fallback={fallbackQueue}
+            navQs={navQs}
+          />
         </div>
         <div className="mt-2">
           <h1 className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">{lead.name}</h1>

@@ -9,11 +9,14 @@ import {
 } from "./leads";
 import { computeSlaStatus, isLeadActionOverdue } from "./sla-compute";
 import { seesAllLeads, type AuthUser } from "./auth";
+import { columnForStatus } from "./board-shared";
 
 export const QUICK_FILTERS = ["overdue", "hot", "unassigned", "visit_today"] as const;
 
 export type LeadListQuery = {
   status?: string | undefined;
+  /** Board column key (`LEAD_COLUMNS`), which folds several statuses together. */
+  column?: string | undefined;
   quick?: string | undefined;
   q?: string | undefined;
   sort?: string | undefined;
@@ -40,6 +43,7 @@ function daysSince(iso: string | null | undefined, now = Date.now()): number {
  */
 export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
   const status = query.status || undefined;
+  const column = query.column || undefined;
   const quick = query.quick || undefined;
   const q = (query.q || "").toLowerCase();
   const sort = query.sort || "newest";
@@ -100,6 +104,13 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
     rows = rows.filter((l) => l.status === status);
   }
 
+  if (column) {
+    // A board column can hold several statuses (e.g. Site Visit folds
+    // visit_proposed/booked/confirmed), so match on the column map rather than a
+    // single status. This is what lets a frozen board queue keep its own stage.
+    rows = rows.filter((l) => columnForStatus(l.status)?.key === column);
+  }
+
   if (q) {
     rows = rows.filter(
       (l) =>
@@ -113,8 +124,13 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
     const t = l.nextFollowUp || l.nextAttemptAt;
     return t ? new Date(t).getTime() : Infinity;
   };
+  // Every branch ends on `id` so two leads that compare equal never swap
+  // places between loads, which is what keeps a frozen queue walkable.
   if (sort === "oldest") {
-    rows.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    rows.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id - b.id
+    );
   } else if (sort === "overdue") {
     rows.sort((a, b) => {
       const ao = isLeadActionOverdue({
@@ -130,7 +146,7 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
         nextActionAt: b.nextFollowUp || b.nextAttemptAt,
       });
       if (ao !== bo) return ao ? -1 : 1;
-      return actionAtMs(a) - actionAtMs(b);
+      return actionAtMs(a) - actionAtMs(b) || b.id - a.id;
     });
   } else if (sort === "longest_in_stage") {
     // Oldest stage entry first. The board draws a column in exactly this order,
@@ -138,7 +154,14 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
     // Next Lead on the detail page walks the same sequence.
     const stageMs = (l: (typeof rows)[number]) =>
       new Date(l.stageChangedAt || l.createdAt).getTime();
-    rows.sort((a, b) => stageMs(a) - stageMs(b));
+    rows.sort((a, b) => stageMs(a) - stageMs(b) || a.id - b.id);
+  } else {
+    // Default: newest first, ties broken by id descending so the freshest row
+    // of a same-second batch stays first no matter how the DB returned it.
+    rows.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id
+    );
   }
 
   const users = db.select().from(schema.users).all();

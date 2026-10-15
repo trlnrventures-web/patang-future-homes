@@ -22,6 +22,7 @@ import {
   applyFilters,
   type LeadFilters,
 } from "@/lib/crm/lead-filters";
+import { newQueueKey, saveQueue } from "@/lib/crm/lead-queue";
 import LeadFilterPanel from "./LeadFilterPanel";
 import ContactMaskingBanner from "./ContactMaskingBanner";
 import type { LeadsViewContext } from "./LeadsPageContent";
@@ -261,6 +262,31 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
     }
     return grouped;
   }, [visibleLeads]);
+
+  // Opening a card freezes that column's displayed order into sessionStorage and
+  // carries the key in the URL, so lead detail walks the same column instead of
+  // the whole board. The order is exactly what is on screen (same comparator,
+  // same filters), and a later stage change on the open lead cannot reorder it.
+  const openLead = useCallback(
+    (leadId: number, column: LeadColumn) => {
+      const ids = (byColumn[column.key] ?? []).map((l) => l.id);
+      const key = newQueueKey();
+      saveQueue(key, {
+        ids,
+        stage: column.key,
+        stageLabel: column.label,
+        kind: "board",
+        column: column.key,
+        quick: serverQuick,
+        q: query.trim(),
+        sort: "newest",
+      });
+      const params = new URLSearchParams(hrefQuery.startsWith("?") ? hrefQuery.slice(1) : hrefQuery);
+      params.set("queue", key);
+      router.push(`/crm/leads/${leadId}?${params.toString()}`);
+    },
+    [byColumn, serverQuick, query, hrefQuery, router]
+  );
 
   // The leads shown by the mobile stage list, and that stage's name for the
   // empty state. Declared after `byColumn`, which it reads.
@@ -840,7 +866,7 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
                       key={lead.id}
                       lead={lead}
                       pending={pendingId === lead.id}
-                      onOpen={() => router.push(`/crm/leads/${lead.id}${hrefQuery}`)}
+                      onOpen={() => openLead(lead.id, activeStageColumn)}
                       selectable={canBulk}
                       selected={selected.has(lead.id)}
                       onToggleSelect={toggleSelect}
@@ -896,7 +922,7 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
                 setOverColumn((c) => (c === column.key ? null : c))
               }
               onDrop={(id) => handleDrop(column, id)}
-              onOpen={(id) => router.push(`/crm/leads/${id}${hrefQuery}`)}
+              onOpen={(id) => openLead(id, column)}
               selectable={canBulk}
               selected={selected}
               onToggleSelect={toggleSelect}

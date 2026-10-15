@@ -84,18 +84,20 @@ const PRIORITY_RANK: Record<PriorityLevel, number> = {
 export function sortInboxLeads<T extends InboxLead>(list: T[], sort: string): T[] {
   const arr = [...list];
   const actionMs = (x: T) => (x.nextFollowUpIso ? new Date(x.nextFollowUpIso).getTime() : Infinity);
+  // The `id` tie-break mirrors the list comparator so a frozen inbox queue keeps
+  // the same order on every walk even when two leads share a timestamp.
   if (sort === "oldest") {
-    return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id);
   }
   if (sort === "overdue") {
     return arr.sort((a, b) => {
       if (!!a.hasOverdueFollowUp !== !!b.hasOverdueFollowUp) {
         return a.hasOverdueFollowUp ? -1 : 1;
       }
-      return actionMs(a) - actionMs(b);
+      return actionMs(a) - actionMs(b) || b.id - a.id;
     });
   }
-  return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
 }
 
 /**
@@ -252,7 +254,8 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
   enriched.sort(
     (a, b) =>
       PRIORITY_RANK[a.priority as PriorityLevel] - PRIORITY_RANK[b.priority as PriorityLevel] ||
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+      b.id - a.id
   );
 
   return sortInboxLeads(enriched, sort);

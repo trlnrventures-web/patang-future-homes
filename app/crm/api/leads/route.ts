@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/crm/auth";
 import { resolveDefaultCallerId } from "@/lib/crm/leads";
 import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { queryLeadList } from "@/lib/crm/lead-query";
+import { queryInboxLeads } from "@/lib/crm/inbox-query";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
 import { contactMaskFor, describeMasking, maskLeadList } from "@/lib/crm/office-hours";
 
@@ -21,6 +22,32 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(100, Math.max(10, parseInt(searchParams.get("pageSize") || "20", 10) || 20));
 
   const db = getDb();
+
+  // Lightweight ordered-id payload for lead-detail Previous/Next. It runs the
+  // exact same query and permission scope as the list/board/inbox (soft-deleted
+  // rows are already excluded there), so a queue can never leak a lead the user
+  // could not otherwise see. Capped so one huge filter cannot ship the whole
+  // table to the browser.
+  if (view === "ids") {
+    const QUEUE_ID_CAP = 2000;
+    const ids =
+      searchParams.get("inbox") === "1"
+        ? queryInboxLeads(db, user, {
+            tab: searchParams.get("tab") || undefined,
+            q: searchParams.get("q") || undefined,
+            sort: searchParams.get("sort") || undefined,
+          })
+        : queryLeadList(db, user, {
+            status: searchParams.get("status") || undefined,
+            column: searchParams.get("column") || undefined,
+            quick: searchParams.get("quick") || undefined,
+            q: searchParams.get("q") || undefined,
+            sort: searchParams.get("sort") || undefined,
+          });
+    const capped = ids.slice(0, QUEUE_ID_CAP).map((l) => l.id);
+    return NextResponse.json({ ids: capped, total: ids.length, capped: ids.length > QUEUE_ID_CAP });
+  }
+
   const all = queryLeadList(db, user, {
     status: searchParams.get("status") || undefined,
     quick: searchParams.get("quick") || undefined,

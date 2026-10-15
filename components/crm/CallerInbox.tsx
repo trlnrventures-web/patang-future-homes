@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "./ui";
+import { newQueueKey, saveQueue } from "@/lib/crm/lead-queue";
 import LeadCard from "./LeadCard";
 import InboxSnapshot from "./InboxSnapshot";
 import AccentLegend from "./AccentLegend";
@@ -47,6 +49,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default function CallerInbox({ listContext }: { listContext?: LeadsViewContext }) {
+  const router = useRouter();
   const [leads, setLeads] = useState<InboxLead[]>([]);
   const [loading, setLoading] = useState(true);
   // The inbox tab is passed through the same `status`-shaped query the Leads list
@@ -75,6 +78,29 @@ export default function CallerInbox({ listContext }: { listContext?: LeadsViewCo
     if (query.trim()) params.set("q", query.trim());
     return `?${params.toString()}`;
   }, [tab, sort, query]);
+
+  // Freeze the current inbox order before opening a lead, so Previous/Next walks
+  // this exact tab/sort instead of the whole caller book. The queue key rides in
+  // the URL; changing the open lead's stage later cannot reorder the queue.
+  const openLead = useCallback(
+    (leadId: number) => {
+      const ids = leads.map((l) => l.id);
+      const key = newQueueKey();
+      saveQueue(key, {
+        ids,
+        stage: tab,
+        stageLabel: TABS.find((t) => t.key === tab)?.label || tab,
+        kind: "inbox",
+        tab,
+        q: query.trim(),
+        sort,
+      });
+      const params = new URLSearchParams(hrefQuery.startsWith("?") ? hrefQuery.slice(1) : hrefQuery);
+      params.set("queue", key);
+      router.push(`/crm/leads/${leadId}?${params.toString()}`);
+    },
+    [leads, tab, query, sort, hrefQuery, router]
+  );
 
   const toggleSelect = useCallback((id: number) => {
     setSelected((prev) => {
@@ -317,6 +343,7 @@ export default function CallerInbox({ listContext }: { listContext?: LeadsViewCo
                   </>
                 }
               hrefQuery={hrefQuery}
+              onOpen={() => openLead(lead.id)}
             />
           ))}
         </div>
