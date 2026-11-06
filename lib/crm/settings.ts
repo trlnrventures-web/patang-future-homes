@@ -8,6 +8,15 @@ const DEFAULTS: Record<string, string> = {
   budget_ranges: '["under_25","25_40","40_60","60_85","85_plus"]',
   matching_weights: '{"subLocation":40,"location":20,"budget":25,"budgetPartial":10}',
   no_response_schedule: '{"1":0,"2":240,"3":1440,"4":4320,"5":10080}',
+  // ---- Vasai West conversion strategy ----
+  budget_stretch_pct: "10",
+  daily_visit_cap: "3",
+  nurture_daily_task_limit: "20",
+  post_visit_cadence: "[2,5,10,20]",
+  routing_pointer_commission: "",
+  routing_pointer_salaried: "",
+  visit_reminder_hour_ist: "10",
+  visit_reminder_overdue_hour_ist: "18",
 };
 
 export type MatchingWeights = {
@@ -62,4 +71,53 @@ export function updateSetting(key: string, value: string): void {
   } else {
     db.insert(crmSettings).values({ key, value, updatedAt: now }).run();
   }
+}
+
+/** Percent below the lowest matching unit price that still counts as a stretch. */
+export function getBudgetStretchPct(): number {
+  const v = parseFloat(getSetting("budget_stretch_pct"));
+  return Number.isFinite(v) && v >= 0 && v <= 50 ? v : 10;
+}
+
+export function getDailyVisitCap(): number {
+  const v = parseInt(getSetting("daily_visit_cap"), 10);
+  return Number.isFinite(v) && v > 0 ? v : 3;
+}
+
+export function getNurtureDailyTaskLimit(): number {
+  const v = parseInt(getSetting("nurture_daily_task_limit"), 10);
+  return Number.isFinite(v) && v > 0 ? v : 20;
+}
+
+export function getPostVisitCadenceDays(): number[] {
+  try {
+    const parsed = JSON.parse(getSetting("post_visit_cadence"));
+    if (Array.isArray(parsed)) {
+      const days = parsed.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+      if (days.length) return days;
+    }
+  } catch {
+    // fall through
+  }
+  return [2, 5, 10, 20];
+}
+
+export function getRoutingPointer(tier: "commission" | "salaried"): number | null {
+  const raw = getSetting(`routing_pointer_${tier}`);
+  const v = parseInt(raw, 10);
+  return Number.isFinite(v) ? v : null;
+}
+
+export function setRoutingPointer(tier: "commission" | "salaried", userId: number): void {
+  updateSetting(`routing_pointer_${tier}`, String(userId));
+}
+
+export function getVisitReminderHourIst(): number {
+  const v = parseInt(getSetting("visit_reminder_hour_ist"), 10);
+  return Number.isFinite(v) && v >= 0 && v <= 23 ? v : 10;
+}
+
+export function getVisitReminderOverdueHourIst(): number {
+  const v = parseInt(getSetting("visit_reminder_overdue_hour_ist"), 10);
+  return Number.isFinite(v) && v >= 0 && v <= 23 ? v : 18;
 }

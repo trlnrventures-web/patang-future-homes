@@ -14,6 +14,7 @@ import {
   maskLeadContacts,
 } from "@/lib/crm/office-hours";
 import { closeStaleCallSessions, loadCallSessionsForLead } from "@/lib/crm/call-sessions";
+import { writeAuditLog } from "@/lib/crm/audit";
 
 export async function GET(
   _request: NextRequest,
@@ -89,13 +90,13 @@ export async function GET(
 
   const enrichActivities = activities.map((a) => ({
     ...a,
-    userName: userMap.get(a.userId)?.name || "",
+    userName: userMap.get(a.userId)?.name || "Former team member",
     callLog: sessionByActivity.get(a.id) ?? null,
   }));
 
   const enrichVisits = visits.map((v) => ({
     ...v,
-    smName: userMap.get(v.smId)?.name || "",
+    smName: userMap.get(v.smId)?.name || "Former team member",
   }));
 
   // Same server-side mask as the list endpoints, so the detail page cannot be
@@ -106,10 +107,10 @@ export async function GET(
     lead: {
       ...maskLeadContacts(lead, decision),
       assignedCallerName: lead.assignedCallerId
-        ? userMap.get(lead.assignedCallerId)?.name || ""
+        ? userMap.get(lead.assignedCallerId)?.name || "Former team member"
         : "",
       assignedSmName: lead.assignedSmId
-        ? userMap.get(lead.assignedSmId)?.name || ""
+        ? userMap.get(lead.assignedSmId)?.name || "Former team member"
         : "",
     },
     activities: enrichActivities,
@@ -165,6 +166,8 @@ export async function PATCH(
       "budgetMax", "bhk", "purpose", "timeline", "preferredProject",
       "familyRequirements", "loanRequired", "otherPreferences", "notes",
       "status", "leadScore", "nextFollowUp", "assignedCallerId", "assignedSmId",
+      "visitIntent", "fundingStatus", "visitAttendees",
+      "pitchedProjectSlug", "backupProjectSlug",
     ];
 
     const update: Record<string, unknown> = {};
@@ -230,6 +233,40 @@ export async function PATCH(
         update.assignedSmId = newSm;
         update.assignedAt = now;
         update.assignedBy = user.id;
+        // An Admin / Sales Head manual choice is an override: it needs a reason,
+        // it locks the assignment, and auto-routing will never move it again.
+        if (
+          newSm !== existing.assignedSmId &&
+          newSm != null &&
+          ["admin", "sales_head"].includes(user.role)
+        ) {
+          const reason = String(body.assignmentReason || "").trim();
+          if (!reason) {
+            return NextResponse.json(
+              { error: "A reason is required to override the SM assignment" },
+              { status: 400 },
+            );
+          }
+          update.assignmentLocked = true;
+          update.assignmentLockedBy = user.id;
+          update.assignmentLockedAt = now;
+          update.assignmentLockedReason = reason;
+          writeAuditLog({
+            category: "data",
+            action: "assignment_override",
+            actorUserId: user.id,
+            entityType: "lead",
+            entityId: existing.id,
+            summary: `SM assignment overridden to user ${newSm}: ${reason}`,
+            createdAt: now,
+          });
+        }
+        if (body.clearAssignmentLock === true && ["admin", "sales_head"].includes(user.role)) {
+          update.assignmentLocked = false;
+          update.assignmentLockedBy = null;
+          update.assignmentLockedAt = null;
+          update.assignmentLockedReason = null;
+        }
         if (newSm != null && newSm !== existing.assignedSmId) {
           update.status = "assigned";
           update.nextAction = "sm_follow_up";

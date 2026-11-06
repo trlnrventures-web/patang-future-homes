@@ -99,7 +99,7 @@ function projectBudgetRange(p: Project): { min: number; max: number } | null {
   return { min, max };
 }
 
-function configBudgetRange(price: string): { min: number; max: number } | null {
+export function configBudgetRange(price: string): { min: number; max: number } | null {
   const nums = (price.match(/₹?([\d,.]+)\s*(Lacs?|Cr|Lakh|Lakhs?)/gi) || [])
     .map(parseLakhs)
     .filter((n): n is number => n != null);
@@ -107,7 +107,7 @@ function configBudgetRange(price: string): { min: number; max: number } | null {
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
-function projectBhkOptions(p: Project): string[] {
+export function projectBhkOptions(p: Project): string[] {
   const out = new Set<string>();
   for (const c of p.configurations) {
     const m = c.type.match(/(\d+)\s*BHK/i);
@@ -116,7 +116,7 @@ function projectBhkOptions(p: Project): string[] {
   return [...out];
 }
 
-function desiredArea(desired?: string | null): "west" | "east" | null {
+export function desiredArea(desired?: string | null): "west" | "east" | null {
   if (!desired) return null;
   const d = desired.toLowerCase();
   if (d.includes("west")) return "west";

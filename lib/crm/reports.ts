@@ -482,3 +482,192 @@ export function getTeamReport(date: string): TeamReport {
 
   return { date, totals, callers, salesManagers };
 }
+
+/* ------------------------------------------------------------------ */
+/* Vasai West conversion funnel                                       */
+/* ------------------------------------------------------------------ */
+
+export type LostReasonCount = { reason: string; count: number };
+
+/**
+ * One row of the conversion funnel. Percentages are computed on the graded
+ * cohort, because an ungraded lead has not entered the funnel yet.
+ */
+export type FunnelSlice = {
+  key: string;
+  label: string;
+  totalLeads: number;
+  graded: number;
+  gradeA: number;
+  gradeB: number;
+  gradeC: number;
+  aSharePct: number;
+  visitsBooked: number;
+  visitsDone: number;
+  booked: number;
+  lost: number;
+  dormant: number;
+  visitBookedPct: number;
+  visitDonePct: number;
+  bookingPct: number;
+  lostPct: number;
+  lostReasons: LostReasonCount[];
+};
+
+export type ConversionFunnel = {
+  from: string;
+  to: string;
+  overall: FunnelSlice;
+  perCaller: FunnelSlice[];
+  perSm: FunnelSlice[];
+  perProject: FunnelSlice[];
+};
+
+function pct(numerator: number, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function emptySlice(key: string, label: string): FunnelSlice {
+  return {
+    key,
+    label,
+    totalLeads: 0,
+    graded: 0,
+    gradeA: 0,
+    gradeB: 0,
+    gradeC: 0,
+    aSharePct: 0,
+    visitsBooked: 0,
+    visitsDone: 0,
+    booked: 0,
+    lost: 0,
+    dormant: 0,
+    visitBookedPct: 0,
+    visitDonePct: 0,
+    bookingPct: 0,
+    lostPct: 0,
+    lostReasons: [],
+  };
+}
+
+function projectTitle(slug: string | null | undefined, lookup: Map<string, string>): string {
+  if (!slug) return "No project";
+  return lookup.get(slug) || slug;
+}
+
+/**
+ * The Vasai West funnel for a date window: grade mix and A-share, visit booked
+ * and visit done rates, booking rate, and lost reasons — overall and split by
+ * caller, SM and pitched project.
+ *
+ * The cohort is leads created inside the window. Visits, outcomes and lost
+ * reasons are then attached to those leads regardless of when they happened, so
+ * a lead created on day 1 still counts its day 20 follow-up.
+ */
+export function getConversionFunnel(
+  fromDate: string,
+  toDate: string,
+  projectLookup: Map<string, string> = new Map(),
+): ConversionFunnel {
+  const db = getDb();
+  const { from } = istDayRange(fromDate);
+  const { to } = istDayRange(toDate);
+
+  const leads = db
+    .select()
+    .from(schema.leads)
+    .where(and(isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, from), lt(schema.leads.createdAt, to)))
+    .all();
+
+  const leadIds = new Set(leads.map((l) => l.id));
+  const visits = db
+    .select()
+    .from(schema.siteVisits)
+    .all()
+    .filter((v) => leadIds.has(v.leadId));
+
+  const visitsByLead = new Map<number, typeof visits>();
+  for (const visit of visits) {
+    const list = visitsByLead.get(visit.leadId) || [];
+    list.push(visit);
+    visitsByLead.set(visit.leadId, list);
+  }
+
+  const users = db.select().from(schema.users).all();
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const build = (key: string, label: string, cohort: typeof leads): FunnelSlice => {
+    const slice = emptySlice(key, label);
+    const lostCounter = new Map<string, number>();
+
+    for (const lead of cohort) {
+      slice.totalLeads += 1;
+      if (lead.grade === "A") slice.gradeA += 1;
+      else if (lead.grade === "B") slice.gradeB += 1;
+      else if (lead.grade === "C") slice.gradeC += 1;
+      if (lead.grade) slice.graded += 1;
+      if (lead.status === "lost") slice.lost += 1;
+      if (lead.dormantAt) slice.dormant += 1;
+
+      const leadVisits = visitsByLead.get(lead.id) || [];
+      const hasBooking = leadVisits.some((v) => !!v.date && !!v.time && v.status !== "cancelled");
+      const isDone = leadVisits.some((v) => v.status === "visit_done" || !!v.outcome);
+      const isBooked = lead.status === "booked" || leadVisits.some((v) => v.outcome === "token_paid");
+      if (hasBooking) slice.visitsBooked += 1;
+      if (isDone) slice.visitsDone += 1;
+      if (isBooked) slice.booked += 1;
+
+      for (const visit of leadVisits) {
+        if (visit.outcome !== "lost") continue;
+        const reason = (visit.outcomeReason || "No reason given").trim() || "No reason given";
+        lostCounter.set(reason, (lostCounter.get(reason) || 0) + 1);
+      }
+    }
+
+    slice.aSharePct = pct(slice.gradeA, slice.graded);
+    slice.visitBookedPct = pct(slice.visitsBooked, slice.graded);
+    slice.visitDonePct = pct(slice.visitsDone, slice.visitsBooked);
+    slice.bookingPct = pct(slice.booked, slice.visitsDone);
+    slice.lostPct = pct(slice.lost, slice.graded);
+    slice.lostReasons = [...lostCounter.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return slice;
+  };
+
+  const groupBy = (
+    keyOf: (lead: (typeof leads)[number]) => string,
+    labelOf: (key: string) => string,
+  ): FunnelSlice[] => {
+    const groups = new Map<string, typeof leads>();
+    for (const lead of leads) {
+      const key = keyOf(lead);
+      const list = groups.get(key) || [];
+      list.push(lead);
+      groups.set(key, list);
+    }
+    return [...groups.entries()]
+      .map(([key, cohort]) => build(key, labelOf(key), cohort))
+      .sort((a, b) => b.graded - a.graded || b.totalLeads - a.totalLeads);
+  };
+
+  return {
+    from: fromDate,
+    to: toDate,
+    overall: build("all", "Overall", leads),
+    perCaller: groupBy(
+      (lead) => (lead.assignedCallerId != null ? String(lead.assignedCallerId) : "none"),
+      (key) => (key === "none" ? "Unassigned" : userMap.get(Number(key))?.name || "Former team member"),
+    ),
+    perSm: groupBy(
+      (lead) => (lead.assignedSmId != null ? String(lead.assignedSmId) : "none"),
+      (key) => (key === "none" ? "Unassigned" : userMap.get(Number(key))?.name || "Former team member"),
+    ),
+    perProject: groupBy(
+      (lead) => lead.pitchedProjectSlug || "none",
+      (key) => (key === "none" ? "No pitched project" : projectTitle(key, projectLookup)),
+    ),
+  };
+}

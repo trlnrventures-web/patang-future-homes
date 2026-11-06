@@ -6,6 +6,19 @@ import { getAuthUser, seesAllLeads } from "@/lib/crm/auth";
 import { computeSlaStatus, nextNoResponseAttempt } from "@/lib/crm/sla-compute";
 import { isCallAttemptType } from "@/lib/crm/call-sessions-shared";
 import { closeCallSession, recordUntimedCallAttempt } from "@/lib/crm/call-sessions";
+import { gradeLead } from "@/lib/crm/grading";
+import { getBudgetStretchPct } from "@/lib/crm/settings";
+import { alertSalesHeads, routeLeadAfterBooking } from "@/lib/crm/routing";
+import {
+  completeReminder,
+  logNoShow,
+  logVisitOutcome,
+  onVisitStatusChanged,
+  overrideReveal,
+  setVisitConfirmation,
+} from "@/lib/crm/visit-flow";
+import { enterNurture, logNurtureContact } from "@/lib/crm/nurture";
+import { writeAuditLog } from "@/lib/crm/audit";
 
 export async function POST(
   request: NextRequest,
@@ -103,6 +116,222 @@ export async function POST(
       qualification: "qualified",
     };
     let newStatus: string | undefined = statusMap[body.type];
+
+    // ---- Vasai West conversion actions ----------------------------------
+    // These are distinct from the older free-form activity types: each one owns
+    // its own validation and side effects, then returns immediately.
+
+    if (body.type === "grade") {
+      const visitIntent = body.visitIntent || lead.visitIntent || "not_asked";
+      const previousIntent = lead.visitIntent;
+      let intentAttempts = lead.visitIntentAttempts ?? 0;
+      if (visitIntent === "maybe" && previousIntent === "maybe" && body.countAttempt !== false) {
+        intentAttempts += 1;
+      } else if (visitIntent !== "maybe") {
+        intentAttempts = 0;
+      }
+
+      const patch: Record<string, unknown> = {
+        visitIntent,
+        visitIntentAttempts: intentAttempts,
+        visitIntentAskedAt: visitIntent === "not_asked" ? null : now,
+        updatedAt: now,
+      };
+      for (const key of ["location", "budget", "budgetMin", "budgetMax", "bhk", "timeline", "fundingStatus", "visitAttendees", "pitchedProjectSlug", "backupProjectSlug"] as const) {
+        if (body[key] !== undefined) patch[key] = body[key] === "" ? null : body[key];
+      }
+
+      const result = gradeLead({
+        location: (patch.location as string) ?? lead.location,
+        bhk: (patch.bhk as string) ?? lead.bhk,
+        budgetMin: (patch.budgetMin as number) ?? lead.budgetMin,
+        budgetMax: (patch.budgetMax as number) ?? lead.budgetMax,
+        timeline: (patch.timeline as string) ?? lead.timeline,
+        visitIntent,
+        intentAttempts,
+        stretchPct: getBudgetStretchPct(),
+        notInterested: body.notInterested === true,
+      });
+
+      if (result.grade == null) {
+        db.update(schema.leads).set(patch).where(eq(schema.leads.id, lead.id)).run();
+        return NextResponse.json({ ok: true, grade: null, reason: result.reason, breakdown: result.breakdown });
+      }
+
+      patch.grade = result.grade;
+      patch.gradeReason = result.reason;
+      patch.gradeBreakdown = result.breakdown;
+      patch.gradedAt = now;
+      patch.gradedBy = user.id;
+      db.update(schema.leads).set(patch).where(eq(schema.leads.id, lead.id)).run();
+
+      db.insert(schema.activities).values({
+        leadId: lead.id,
+        userId: user.id,
+        type: "status_change",
+        notes: `Graded ${result.grade} — ${result.reason}`,
+        createdAt: now,
+      }).run();
+
+      if (result.grade === "C") {
+        enterNurture(db, {
+          leadId: lead.id,
+          reason: result.nurtureReason || "other",
+          actorUserId: user.id,
+          note: result.reason,
+        });
+      } else {
+        db.update(schema.leads)
+          .set({ status: "qualified", nextAction: "site_visit", updatedAt: now })
+          .where(eq(schema.leads.id, lead.id))
+          .run();
+      }
+
+      const routed = result.grade === "C" ? null : routeLeadAfterBooking(db, lead.id, user.id);
+      const fresh = db.select().from(schema.leads).where(eq(schema.leads.id, lead.id)).get();
+      return NextResponse.json({ ok: true, grade: result.grade, reason: result.reason, breakdown: result.breakdown, routed, lead: fresh });
+    }
+
+    if (body.type === "visit_confirm") {
+      const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.leadId, lead.id)).all();
+      const target = body.visitId
+        ? visits.find((v) => v.id === Number(body.visitId))
+        : visits.sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`))[0];
+      if (!target) return NextResponse.json({ error: "Book the visit before confirming it" }, { status: 400 });
+
+      const pitched = body.pitchedProjectSlug || lead.pitchedProjectSlug;
+      if (!pitched) {
+        return NextResponse.json({ error: "Pick the pitched project before confirming the visit" }, { status: 400 });
+      }
+
+      const visitPatch: Partial<typeof schema.siteVisits.$inferInsert> = {};
+      if (body.visitDate) visitPatch.date = String(body.visitDate);
+      if (body.visitTime) visitPatch.time = String(body.visitTime);
+      if (body.meetingPoint !== undefined) visitPatch.meetingPoint = String(body.meetingPoint || "");
+      if (body.familyAttending !== undefined) visitPatch.familyAttending = String(body.familyAttending || "");
+      if (body.transportRequirement !== undefined) visitPatch.transportRequirement = String(body.transportRequirement || "");
+      if (body.pitchedProjectSlug) visitPatch.pitchedProjectSlug = String(body.pitchedProjectSlug);
+      if (body.backupProjectSlug !== undefined) visitPatch.backupProjectSlug = String(body.backupProjectSlug || "");
+      visitPatch.status = "booked";
+      if (Object.keys(visitPatch).length) {
+        db.update(schema.siteVisits).set(visitPatch).where(eq(schema.siteVisits.id, target.id)).run();
+      }
+      if (body.pitchedProjectSlug || body.visitAttendees) {
+        db.update(schema.leads)
+          .set({
+            ...(body.pitchedProjectSlug ? { pitchedProjectSlug: String(body.pitchedProjectSlug) } : {}),
+            ...(body.visitAttendees ? { visitAttendees: body.visitAttendees } : {}),
+            updatedAt: now,
+          })
+          .where(eq(schema.leads.id, lead.id))
+          .run();
+      }
+
+      const result = setVisitConfirmation(db, {
+        visitId: target.id,
+        confirmed: body.customerConfirmed !== false,
+        actorUserId: user.id,
+      });
+      if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+
+      db.update(schema.leads)
+        .set({ status: "visit_confirmed", nextAction: "site_visit", nextFollowUp: `${result.visit.date}T${result.visit.time}`, updatedAt: now })
+        .where(eq(schema.leads.id, lead.id))
+        .run();
+
+      return NextResponse.json({
+        ok: true,
+        revealAllowed: result.reveal,
+        visit: result.visit,
+        lead: db.select().from(schema.leads).where(eq(schema.leads.id, lead.id)).get(),
+      });
+    }
+
+    if (body.type === "visit_outcome") {
+      const outcome = String(body.outcome || "");
+      if (!["token_paid", "second_visit", "thinking", "lost"].includes(outcome)) {
+        return NextResponse.json({ error: "Choose a valid visit outcome" }, { status: 400 });
+      }
+      const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.leadId, lead.id)).all();
+      const target = body.visitId
+        ? visits.find((v) => v.id === Number(body.visitId))
+        : visits[visits.length - 1];
+      if (!target) return NextResponse.json({ error: "No visit to log an outcome for" }, { status: 400 });
+      if (target.outcomeLoggedAt && !["admin", "sales_head"].includes(user.role)) {
+        return NextResponse.json({ error: "The outcome was already logged. Ask an Admin or Sales Head to change it." }, { status: 403 });
+      }
+      if (outcome === "lost" && !String(body.reason || "").trim()) {
+        return NextResponse.json({ error: "A lost reason is required" }, { status: 400 });
+      }
+      const cadence = logVisitOutcome(db, {
+        visitId: target.id,
+        outcome: outcome as "token_paid" | "second_visit" | "thinking" | "lost",
+        reason: body.reason,
+        actorUserId: user.id,
+      });
+      if (target.outcomeLoggedAt) {
+        writeAuditLog({
+          category: "data",
+          action: "visit_outcome_edited",
+          actorUserId: user.id,
+          entityType: "site_visit",
+          entityId: target.id,
+          summary: `Outcome changed from ${target.outcome} to ${outcome} on lead ${lead.id}`,
+          createdAt: now,
+        });
+      }
+      return NextResponse.json({ ok: true, ...cadence });
+    }
+
+    if (body.type === "visit_no_show") {
+      const visits = db.select().from(schema.siteVisits).where(eq(schema.siteVisits.leadId, lead.id)).all();
+      const target = body.visitId
+        ? visits.find((v) => v.id === Number(body.visitId))
+        : visits[visits.length - 1];
+      if (!target) return NextResponse.json({ error: "No visit to mark as a no-show" }, { status: 400 });
+      logNoShow(db, { visitId: target.id, actorUserId: user.id, note: body.notes });
+      alertSalesHeads(db, {
+        leadId: lead.id,
+        kind: "reminder",
+        title: "No-show needs rebooking",
+        body: `${lead.name} did not turn up for the visit on ${target.date} ${target.time}. A rebook follow-up was created for the caller.`,
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.type === "reminder_done") {
+      const kind = body.kind === "two_hour" ? "two_hour" : "day_before";
+      if (!body.visitId) return NextResponse.json({ error: "visitId is required" }, { status: 400 });
+      completeReminder(db, { visitId: Number(body.visitId), kind, actorUserId: user.id, message: body.message });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.type === "nurture_contact") {
+      const result = logNurtureContact(db, {
+        leadId: lead.id,
+        actorUserId: user.id,
+        responded: body.responded === true,
+        note: body.notes,
+      });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (body.type === "reveal_override") {
+      if (!["admin", "sales_head"].includes(user.role)) {
+        return NextResponse.json({ error: "Only an Admin or Sales Head can override the reveal" }, { status: 403 });
+      }
+      if (!String(body.reason || "").trim()) {
+        return NextResponse.json({ error: "A reason is required" }, { status: 400 });
+      }
+      overrideReveal(db, {
+        leadId: lead.id,
+        allowed: body.allowed !== false,
+        actorUserId: user.id,
+        reason: String(body.reason),
+      });
+      return NextResponse.json({ ok: true });
+    }
+
 
     const isCallAttempt = isCallAttemptType(body.type, body.outcome);
 
@@ -320,7 +549,14 @@ export async function POST(
     if (body.type === "visit_proposed" || body.type === "visit_booked") {
       const visitDate = body.visitDate;
       const visitTime = body.visitTime;
-      db.insert(schema.siteVisits).values({
+      const pitchedSlug = body.pitchedProjectSlug || lead.pitchedProjectSlug;
+      if (visitDate && visitTime && !pitchedSlug) {
+        return NextResponse.json(
+          { error: "Pick the pitched project before booking a visit" },
+          { status: 400 },
+        );
+      }
+      const insertedVisit = db.insert(schema.siteVisits).values({
         leadId: lead.id,
         projectId: body.projectId || lead.preferredProject || lead.originalProject || null,
         smId: body.smId || lead.assignedSmId || user.id,
@@ -331,15 +567,26 @@ export async function POST(
         transportRequirement: body.transportRequirement || "",
         status: body.visitStatus || body.type.replace("visit_", ""),
         notes: body.notes || "",
+        pitchedProjectSlug: pitchedSlug || null,
+        backupProjectSlug: body.backupProjectSlug || lead.backupProjectSlug || null,
         recommendedProperties: Array.isArray(body.recommendedProperties)
           ? JSON.stringify(body.recommendedProperties)
           : null,
         createdAt: now,
-      }).run();
+      }).returning().get();
       newStatus = body.type === "visit_proposed" ? "visit_proposed" : "visit_booked";
       leadUpdates.nextAction = "site_visit";
       if (visitDate) {
         leadUpdates.nextFollowUp = `${visitDate}T${visitTime || "10:00"}`;
+      }
+      if (body.pitchedProjectSlug || body.visitAttendees) {
+        leadUpdates.pitchedProjectSlug = body.pitchedProjectSlug || lead.pitchedProjectSlug;
+        if (body.backupProjectSlug !== undefined) leadUpdates.backupProjectSlug = body.backupProjectSlug || null;
+        if (body.visitAttendees) leadUpdates.visitAttendees = body.visitAttendees;
+      }
+      // A graded lead with a real slot is the routing trigger.
+      if (visitDate && visitTime && insertedVisit) {
+        routeLeadAfterBooking(db, lead.id, user.id);
       }
     }
 
@@ -431,7 +678,17 @@ export async function POST(
           .set(visitSet)
           .where(eq(schema.siteVisits.id, target.id))
           .run();
+        if (body.type === "visit_no_show") {
+          logNoShow(db, { visitId: target.id, actorUserId: user.id, note: body.notes });
+        } else {
+          onVisitStatusChanged(db, target.id, user.id);
+        }
         if (body.type === "visit_confirmed") {
+          setVisitConfirmation(db, {
+            visitId: target.id,
+            confirmed: body.customerConfirmed !== false,
+            actorUserId: user.id,
+          });
           leadUpdates.nextAction = "site_visit";
           if (lead.status !== "negotiation" && lead.status !== "booked") newStatus = "visit_confirmed";
         }
@@ -506,6 +763,16 @@ export async function POST(
       if (quals.otherPreferences) update.otherPreferences = quals.otherPreferences;
       if (quals.notes) update.notes = quals.notes;
       if (quals.concern) update.concern = quals.concern;
+      // Conversion-strategy fields: the dedicated `grade` action still owns the
+      // grade decision, but qualification saves the inputs it needs.
+      if (quals.visitIntent) {
+        update.visitIntent = quals.visitIntent;
+        update.visitIntentAskedAt = now;
+      }
+      if (quals.fundingStatus !== undefined) update.fundingStatus = quals.fundingStatus || null;
+      if (quals.visitAttendees) update.visitAttendees = quals.visitAttendees;
+      if (quals.pitchedProjectSlug) update.pitchedProjectSlug = quals.pitchedProjectSlug;
+      if (quals.backupProjectSlug !== undefined) update.backupProjectSlug = quals.backupProjectSlug || null;
       if (lead.status !== "qualified" && lead.status !== "assigned") {
         update.status = "qualified";
         update.stageChangedAt = now;

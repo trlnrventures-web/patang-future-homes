@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/crm/data";
 import { isAdmin as isAdminRole } from "@/lib/crm/auth";
 import { getDailyMetricsForEmployee, getTeamReport, istToday } from "@/lib/crm/reports";
 import DailyReport from "@/components/crm/DailyReport";
+import ConversionFunnelReport from "@/components/crm/ConversionFunnelReport";
 import type { DailyMetrics, TeamReport } from "@/lib/crm/reports";
 
 export const metadata: Metadata = {
@@ -28,10 +29,13 @@ export default async function ReportsPage() {
   if (isAdmin) team = getTeamReport(date);
 
   return (
-    <DailyReport
-      initialMy={my as { date: string; name: string; role: string; metrics: DailyMetrics }}
-      initialTeam={team}
-      isAdmin={isAdmin}
-    />
+    <div className="space-y-5">
+      <DailyReport
+        initialMy={my as { date: string; name: string; role: string; metrics: DailyMetrics }}
+        initialTeam={team}
+        isAdmin={isAdmin}
+      />
+      {isAdmin && <ConversionFunnelReport />}
+    </div>
   );
 }

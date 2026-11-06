@@ -43,6 +43,18 @@ export const users = sqliteTable("users", {
   // admin unlocks the account. A locked user cannot get back in on their own.
   pinLocked: integer("pin_locked", { mode: "boolean" }).notNull().default(false),
   pinFailedCount: integer("pin_failed_count").notNull().default(0),
+  // ---- Routing availability ----
+  /** Toggle that takes an SM out of auto-routing (leave, sickness, day off). */
+  available: integer("available", { mode: "boolean" }).notNull().default(true),
+  unavailableFrom: text("unavailable_from"),
+  unavailableTo: text("unavailable_to"),
+  unavailableNote: text("unavailable_note"),
+  /** Commission SMs get A leads, salaried SMs get B leads. */
+  routingTier: text("routing_tier", { enum: ["commission", "salaried", "none"] })
+    .notNull()
+    .default("none"),
+  /** Per-SM override of the global daily visit cap. */
+  dailyVisitCap: integer("daily_visit_cap"),
 });
 
 export const attendance = sqliteTable("attendance", {
@@ -209,6 +221,49 @@ export const leads = sqliteTable("leads", {
   deletedAt: text("deleted_at"),
   reactivatedAt: text("reactivated_at"),
   reactivatedFrom: text("reactivated_from"),
+
+  // ---- Vasai West conversion strategy ----
+  /** A/B/C grade from the qualification gates. Null until the caller grades. */
+  grade: text("grade", { enum: ["A", "B", "C"] }),
+  /** Human reason shown next to the badge, e.g. "C: budget below range". */
+  gradeReason: text("grade_reason"),
+  /** Structured gate results, kept so a re-grade can be explained later. */
+  gradeBreakdown: text("grade_breakdown", { mode: "json" }).$type<Record<string, unknown>>(),
+  gradedAt: text("graded_at"),
+  gradedBy: integer("graded_by"),
+  /**
+   * The customer's attitude to visiting, separate from whether a slot exists.
+   * "not_asked" blocks grading so a caller cannot skip the question.
+   */
+  visitIntent: text("visit_intent", { enum: ["not_asked", "yes", "maybe", "no"] })
+    .notNull()
+    .default("not_asked"),
+  visitIntentAttempts: integer("visit_intent_attempts").notNull().default(0),
+  visitIntentAskedAt: text("visit_intent_asked_at"),
+  /** Optional; never blocks grading or booking. */
+  fundingStatus: text("funding_status", { enum: ["self_funded", "loan", "not_sure"] }),
+  visitAttendees: text("visit_attendees", { enum: ["self", "spouse", "family_together"] }),
+  /** The team's internal choice of what to pitch. Hidden from the customer. */
+  pitchedProjectSlug: text("pitched_project_slug"),
+  backupProjectSlug: text("backup_project_slug"),
+  /** Customer-facing templates blank the project name/address until this is on. */
+  revealAllowed: integer("reveal_allowed", { mode: "boolean" }).notNull().default(false),
+  revealChangedAt: text("reveal_changed_at"),
+  revealChangedBy: integer("reveal_changed_by"),
+  revealSource: text("reveal_source", { enum: ["auto", "admin"] }),
+  /** Admin override: auto-routing never changes a locked assignment. */
+  assignmentLocked: integer("assignment_locked", { mode: "boolean" }).notNull().default(false),
+  assignmentLockedBy: integer("assignment_locked_by"),
+  assignmentLockedAt: text("assignment_locked_at"),
+  assignmentLockedReason: text("assignment_locked_reason"),
+  nurtureReason: text("nurture_reason", {
+    enum: ["budget_low", "location", "configuration", "exploring", "not_interested", "not_reachable", "other"],
+  }),
+  nurtureAttempts: integer("nurture_attempts").notNull().default(0),
+  nurtureNextAt: text("nurture_next_at"),
+  dormantAt: text("dormant_at"),
+  /** Frozen copy of the enquiry as it arrived, so grading never rewrites it. */
+  enquirySnapshot: text("enquiry_snapshot", { mode: "json" }).$type<Record<string, unknown>>(),
 });
 
 export const crmSettings = sqliteTable("crm_settings", {
@@ -461,6 +516,12 @@ export const followUps = sqliteTable("follow_ups", {
   })
     .notNull()
     .default("pending"),
+  /** Why this follow-up exists, so cadences can be queried and cancelled cleanly. */
+  kind: text("kind", {
+    enum: ["manual", "visit_intent_reask", "no_show_rebook", "post_visit_cadence", "nurture_recontact"],
+  })
+    .notNull()
+    .default("manual"),
   completedAt: text("completed_at"),
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(""),
@@ -493,6 +554,21 @@ export const siteVisits = sqliteTable("site_visits", {
   recommendedProperties: text("recommended_properties"),
   propertiesShown: text("properties_shown"),
   doneAt: text("done_at"),
+
+  // ---- Confirmation, reveal and outcome ----
+  /** Set only when the caller ticks "Customer confirmed" after a slot exists. */
+  customerConfirmed: integer("customer_confirmed", { mode: "boolean" }).notNull().default(false),
+  confirmedAt: text("confirmed_at"),
+  confirmedBy: integer("confirmed_by"),
+  outcome: text("outcome", { enum: ["token_paid", "second_visit", "thinking", "lost"] }),
+  outcomeReason: text("outcome_reason"),
+  outcomeLoggedBy: integer("outcome_logged_by"),
+  outcomeLoggedAt: text("outcome_logged_at"),
+  /** Snapshot of what was actually pitched for this visit. */
+  pitchedProjectSlug: text("pitched_project_slug"),
+  backupProjectSlug: text("backup_project_slug"),
+  dayBeforeDoneAt: text("day_before_done_at"),
+  twoHourDoneAt: text("two_hour_done_at"),
   createdAt: text("created_at").notNull().default(""),
 });
 
@@ -795,7 +871,9 @@ export const leadAlerts = sqliteTable("lead_alerts", {
   leadId: integer("lead_id")
     .notNull()
     .references(() => leads.id),
-  kind: text("kind", { enum: ["new", "reactivated"] })
+  kind: text("kind", {
+    enum: ["new", "reactivated", "routing", "reminder", "outcome", "nurture"],
+  })
     .notNull()
     .default("new"),
   title: text("title").notNull().default(""),

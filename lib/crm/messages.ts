@@ -47,9 +47,30 @@ export type LeadSnapshot = {
   sm_phone?: string;
   company_name?: string;
   timeline?: string;
+};import { projects } from "@/lib/projects";
+
+const AREA_LABELS: Record<string, string> = {
+  vasai_west: "Vasai West",
+  vasai_east: "Vasai East",
+  naigaon: "Naigaon",
+  nalasopara: "Nalasopara",
+  virar: "Virar",
+  other: "Vasai",
 };
 
-function displayBudget(lead: Record<string, unknown>): string {
+/** The broad area is always safe to share; the exact project is not. */
+export function generalAreaLabel(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return "Vasai West";
+  return AREA_LABELS[raw.toLowerCase()] || (raw.toLowerCase().includes("west") ? "Vasai West" : raw);
+}
+
+function pitchedProjectTitle(slug: unknown): string {
+  if (typeof slug !== "string" || !slug) return "";
+  return projects.find((p) => p.slug === slug)?.title || "";
+}
+
+export function displayBudget(lead: Record<string, unknown>): string {
   const min = lead.budgetMin ? String(lead.budgetMin) : "";
   const max = lead.budgetMax ? String(lead.budgetMax) : "";
   if (min && max && min !== max) {
@@ -88,12 +109,18 @@ export function buildLeadContext(
 
   const possession = typeof lead.possession === "string" ? lead.possession : "";
 
+  // Reveal gate: until the customer confirms a visit, no template may name the
+  // project or carry an address/pin. The general area (Vasai West) stays.
+  const revealAllowed = lead.revealAllowed === true;
+  const pitched = pitchedProjectTitle(lead.pitchedProjectSlug);
+  const projectName = pitched || (lead.preferredProject as string) || (lead.project as string) || "";
+
   return {
     name: name || "Customer",
     first_name: name.split(" ")[0] || "there",
-    project: (lead.preferredProject as string) || (lead.project as string) || "",
+    project: revealAllowed ? projectName : "",
     original_project: stores,
-    location: (lead.location as string) || "Vasai West",
+    location: generalAreaLabel(lead.location),
     bhk: ((lead.bhk as string) || "").replace(/\s*BHK\s*$/i, "").trim(),
     budget: fullBudget,
     budget_min: lead.budgetMin ? String(lead.budgetMin) : "",

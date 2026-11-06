@@ -94,6 +94,67 @@ export async function PATCH(request: NextRequest) {
       updated.no_response_schedule = value;
     }
 
+    // ---- Vasai West conversion settings ----
+    if (body.budget_stretch_pct != null) {
+      const v = Number(body.budget_stretch_pct);
+      if (!Number.isFinite(v) || v < 0 || v > 50) {
+        return NextResponse.json({ error: "Budget stretch must be 0–50%" }, { status: 400 });
+      }
+      updateSetting("budget_stretch_pct", String(v));
+      updated.budget_stretch_pct = String(v);
+    }
+
+    if (body.daily_visit_cap != null) {
+      const v = parseInt(String(body.daily_visit_cap), 10);
+      if (!Number.isFinite(v) || v < 1 || v > 50) {
+        return NextResponse.json({ error: "Daily visit cap must be 1–50" }, { status: 400 });
+      }
+      updateSetting("daily_visit_cap", String(v));
+      updated.daily_visit_cap = String(v);
+    }
+
+    if (body.nurture_daily_task_limit != null) {
+      const v = parseInt(String(body.nurture_daily_task_limit), 10);
+      if (!Number.isFinite(v) || v < 1 || v > 200) {
+        return NextResponse.json({ error: "Nurture task limit must be 1–200" }, { status: 400 });
+      }
+      updateSetting("nurture_daily_task_limit", String(v));
+      updated.nurture_daily_task_limit = String(v);
+    }
+
+    if (body.post_visit_cadence != null) {
+      if (!Array.isArray(body.post_visit_cadence)) {
+        return NextResponse.json({ error: "Post-visit cadence must be a list of days" }, { status: 400 });
+      }
+      const days = body.post_visit_cadence
+        .map((n: unknown) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && n > 0 && n <= 365);
+      if (days.length === 0) {
+        return NextResponse.json({ error: "Add at least one cadence day" }, { status: 400 });
+      }
+      const value = JSON.stringify(days);
+      updateSetting("post_visit_cadence", value);
+      updated.post_visit_cadence = value;
+    }
+
+    if (body.visit_reminder_hour_ist != null) {
+      const v = parseInt(String(body.visit_reminder_hour_ist), 10);
+      if (!Number.isFinite(v) || v < 0 || v > 23) {
+        return NextResponse.json({ error: "Reminder hour must be 0–23 IST" }, { status: 400 });
+      }
+      updateSetting("visit_reminder_hour_ist", String(v));
+      updated.visit_reminder_hour_ist = String(v);
+    }
+
+    if (body.visit_reminder_overdue_hour_ist != null) {
+      const v = parseInt(String(body.visit_reminder_overdue_hour_ist), 10);
+      if (!Number.isFinite(v) || v < 0 || v > 23) {
+        return NextResponse.json({ error: "Overdue hour must be 0–23 IST" }, { status: 400 });
+      }
+      updateSetting("visit_reminder_overdue_hour_ist", String(v));
+      updated.visit_reminder_overdue_hour_ist = String(v);
+    }
+
     if (Object.keys(updated).length === 0) {
       return NextResponse.json({ error: "No valid settings provided" }, { status: 400 });
     }

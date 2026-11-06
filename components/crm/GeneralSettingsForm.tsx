@@ -45,6 +45,12 @@ export default function GeneralSettingsForm() {
   const [weights, setWeights] = useState<Weights>(DEFAULT_WEIGHTS);
   const [schedule, setSchedule] = useState<Record<number, number>>(DEFAULT_SCHEDULE);
   const [budgetKeys, setBudgetKeys] = useState<string[]>(DEFAULT_BUDGET_RANGE_KEYS);
+  const [stretch, setStretch] = useState("10");
+  const [dailyCap, setDailyCap] = useState("3");
+  const [nurtureLimit, setNurtureLimit] = useState("20");
+  const [cadence, setCadence] = useState("2, 5, 10, 20");
+  const [reminderHour, setReminderHour] = useState("10");
+  const [overdueHour, setOverdueHour] = useState("18");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -83,6 +89,19 @@ export default function GeneralSettingsForm() {
         } catch {
           /* keep defaults */
         }
+        if (s.budget_stretch_pct) setStretch(s.budget_stretch_pct);
+        if (s.daily_visit_cap) setDailyCap(s.daily_visit_cap);
+        if (s.nurture_daily_task_limit) setNurtureLimit(s.nurture_daily_task_limit);
+        if (s.post_visit_cadence) {
+          try {
+            const days = JSON.parse(s.post_visit_cadence) as number[];
+            if (Array.isArray(days)) setCadence(days.join(", "));
+          } catch {
+            /* keep default */
+          }
+        }
+        if (s.visit_reminder_hour_ist) setReminderHour(s.visit_reminder_hour_ist);
+        if (s.visit_reminder_overdue_hour_ist) setOverdueHour(s.visit_reminder_overdue_hour_ist);
       })
       .catch(() => setErr("Could not load settings."))
       .finally(() => setLoading(false));
@@ -110,6 +129,15 @@ export default function GeneralSettingsForm() {
           matching_weights: weights,
           no_response_schedule: schedule,
           budget_ranges: budgetKeys,
+          budget_stretch_pct: Number(stretch),
+          daily_visit_cap: Number(dailyCap),
+          nurture_daily_task_limit: Number(nurtureLimit),
+          post_visit_cadence: cadence
+            .split(",")
+            .map((d) => Number(d.trim()))
+            .filter((n) => Number.isFinite(n) && n > 0),
+          visit_reminder_hour_ist: Number(reminderHour),
+          visit_reminder_overdue_hour_ist: Number(overdueHour),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -237,9 +265,82 @@ export default function GeneralSettingsForm() {
         )}
       </section>
 
+      {/* Vasai West conversion */}
+      <section className="rounded-xl border border-border bg-slate-50 p-3">
+        <h2 className="text-sm font-bold text-navy">Vasai West conversion rules</h2>
+        <p className="mt-0.5 text-xs text-muted">
+          Budget stretch, SM load caps, nurture limits and the visit reminder clock.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Budget stretch below lowest unit (%)</span>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={stretch}
+              onChange={(e) => setStretch(e.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Daily visits per SM (cap)</span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={dailyCap}
+              onChange={(e) => setDailyCap(e.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Nurture tasks per caller per day</span>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={nurtureLimit}
+              onChange={(e) => setNurtureLimit(e.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Post-visit cadence (days, comma separated)</span>
+            <input
+              value={cadence}
+              onChange={(e) => setCadence(e.target.value)}
+              className={input}
+              placeholder="2, 5, 10, 20"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Day-before reminder time (IST hour)</span>
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={reminderHour}
+              onChange={(e) => setReminderHour(e.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted">Overdue cutoff for the Sales Head (IST hour)</span>
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={overdueHour}
+              onChange={(e) => setOverdueHour(e.target.value)}
+              className={input}
+            />
+          </label>
+        </div>
+      </section>
+
       {msg && <p className="text-xs font-semibold text-green-700">{msg}</p>}
       {err && <p className="text-xs font-semibold text-red-700">{err}</p>}
-
       <button
         type="button"
         onClick={save}

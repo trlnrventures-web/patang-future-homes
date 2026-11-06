@@ -35,6 +35,12 @@ export async function GET() {
       pin: schema.users.pin,
       pinLocked: schema.users.pinLocked,
       pinFailedCount: schema.users.pinFailedCount,
+      available: schema.users.available,
+      unavailableFrom: schema.users.unavailableFrom,
+      unavailableTo: schema.users.unavailableTo,
+      unavailableNote: schema.users.unavailableNote,
+      routingTier: schema.users.routingTier,
+      dailyVisitCap: schema.users.dailyVisitCap,
     })
     .from(schema.users)
     .all()
@@ -145,6 +151,37 @@ export async function PATCH(request: NextRequest) {
       updates.active = Boolean(body.active);
     }
 
+    // ---- Routing availability --------------------------------------------
+    if (body.available !== undefined) {
+      updates.available = Boolean(body.available);
+    }
+    if (body.unavailableFrom !== undefined) {
+      updates.unavailableFrom = body.unavailableFrom ? String(body.unavailableFrom) : null;
+    }
+    if (body.unavailableTo !== undefined) {
+      updates.unavailableTo = body.unavailableTo ? String(body.unavailableTo) : null;
+    }
+    if (body.unavailableNote !== undefined) {
+      updates.unavailableNote = body.unavailableNote ? String(body.unavailableNote) : null;
+    }
+    if (body.routingTier !== undefined) {
+      const tier = String(body.routingTier);
+      if (!["commission", "salaried", "none"].includes(tier)) {
+        return NextResponse.json({ error: "Invalid routing tier" }, { status: 400 });
+      }
+      if (tier !== "none" && target.role !== "sales_manager") {
+        return NextResponse.json({ error: "Only sales managers can be routed leads" }, { status: 400 });
+      }
+      updates.routingTier = tier;
+    }
+    if (body.dailyVisitCap !== undefined) {
+      const cap = body.dailyVisitCap === null ? null : Number(body.dailyVisitCap);
+      if (cap !== null && (!Number.isFinite(cap) || cap < 1)) {
+        return NextResponse.json({ error: "Daily visit cap must be at least 1" }, { status: 400 });
+      }
+      updates.dailyVisitCap = cap;
+    }
+
     // Read access to the whole lead book. Sales-only: it is a scoping override
     // for staff who work follow-up, so there is nothing to widen for admin,
     // sales_head or marketing, and they already see everything anyway.
@@ -167,6 +204,37 @@ export async function PATCH(request: NextRequest) {
       .set(updates)
       .where(eq(schema.users.id, targetUserId))
       .run();
+
+    // Deactivate-only lifecycle: an inactive user keeps every row they touched
+    // for history, but their open leads go back to the pool and they stop
+    // receiving routed work.
+    if (body.active === false) {
+      db.update(schema.users)
+        .set({ routingTier: "none", available: false })
+        .where(eq(schema.users.id, targetUserId))
+        .run();
+      const openLeads = db
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.assignedSmId, targetUserId))
+        .all()
+        .filter((l) => !l.deletedAt && !["booked", "lost", "invalid", "dnc"].includes(l.status));
+      for (const lead of openLeads) {
+        db.update(schema.leads)
+          .set({ assignedSmId: null, nextAction: "review_assignment", updatedAt: new Date().toISOString() })
+          .where(eq(schema.leads.id, lead.id))
+          .run();
+      }
+      writeAuditLog({
+        category: "data",
+        action: "user_deactivated",
+        actorUserId: user.id,
+        targetUserId,
+        entityType: "user",
+        entityId: targetUserId,
+        summary: `Deactivated ${target.name}; ${openLeads.length} open lead(s) returned to the assignment pool.`,
+      });
+    }
 
     if (body.seeAllLeads !== undefined) {
       invalidateLeadAccessCache();
@@ -191,5 +259,63 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Team PATCH error:", error);
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+  }
+}
+
+/**
+ * Deactivate-only lifecycle: a hard delete is refused whenever the account has
+ * history, because deleting it would orphan leads, visits and the audit trail.
+ */
+export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user || !isAdmin(user)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  try {
+    const body = await request.json();
+    const targetUserId = Number(body.userId);
+    if (!targetUserId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+    if (targetUserId === user.id) {
+      return NextResponse.json({ error: "You cannot delete your own account" }, { status: 400 });
+    }
+    const db = getDb();
+    const target = db.select().from(schema.users).where(eq(schema.users.id, targetUserId)).get();
+    if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const counts = {
+      leads: db.select().from(schema.leads).all().filter((l) => l.assignedSmId === targetUserId || l.assignedCallerId === targetUserId).length,
+      activities: db.select().from(schema.activities).all().filter((a) => a.userId === targetUserId).length,
+      visits: db.select().from(schema.siteVisits).all().filter((v) => v.smId === targetUserId).length,
+      followUps: db.select().from(schema.followUps).all().filter((f) => f.userId === targetUserId).length,
+      messages: db.select().from(schema.messageLogs).all().filter((m) => m.userId === targetUserId).length,
+    };
+    const blockers = Object.entries(counts).filter(([, n]) => n > 0);
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Hard delete is blocked because this account has history. Deactivate it instead so the records stay readable as 'Former team member'.",
+          references: counts,
+        },
+        { status: 409 },
+      );
+    }
+
+    db.delete(schema.users).where(eq(schema.users.id, targetUserId)).run();
+    writeAuditLog({
+      category: "data",
+      action: "user_deleted",
+      actorUserId: user.id,
+      targetUserId,
+      entityType: "user",
+      entityId: targetUserId,
+      summary: `Hard-deleted ${target.name} (no lead or activity history).`,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Team DELETE error:", error);
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
   }
 }

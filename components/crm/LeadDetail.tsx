@@ -28,6 +28,7 @@ import SiteVisitModal, {
   type ShownProperty,
   type VisitRecord,
 } from "./SiteVisitModal";
+import ConversionPanel from "./ConversionPanel";
 
 export type LeadDetailData = {
   lead: Record<string, any>;
@@ -200,7 +201,10 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "failed");
+      }
       const data = await res.json();
       if (data.lead) setLead((l) => ({ ...l, ...data.lead }));
       return data;
@@ -483,6 +487,8 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
         visitTime: payload.visitTime,
         meetingPoint: payload.meetingPoint,
         projectId: payload.projectId,
+        pitchedProjectSlug: lead.pitchedProjectSlug || undefined,
+        backupProjectSlug: lead.backupProjectSlug || undefined,
         recommendedProperties: payload.recommendedProperties,
         smId: lead.assignedSmId || currentUser.id,
         notes: payload.notes,
@@ -490,8 +496,8 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
       showToast("Site visit booked");
       setShowVisit(false);
       reload();
-    } catch {
-      showToast("Could not book visit");
+    } catch (e: unknown) {
+      showToast((e as Error).message || "Could not book visit");
     } finally {
       setBusy(false);
     }
@@ -713,6 +719,14 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
           );
         })}
       </div>
+
+      <ConversionPanel
+        lead={lead}
+        visits={visits}
+        currentUser={currentUser}
+        onRefresh={reload}
+        showToast={showToast}
+      />
 
       {lead.reactivatedAt && (
         <p className="mt-4 text-sm text-muted">

@@ -15,6 +15,7 @@ import { getMatchingWeights } from "@/lib/crm/settings";
 import { scanAndFetchReactivationAlerts } from "@/lib/crm/reactivation";
 import { getTodayTeamStatus } from "@/lib/crm/team-status";
 import TeamStatus from "@/components/crm/TeamStatus";
+import ConversionTasks from "@/components/crm/ConversionTasks";
 
 export const metadata: Metadata = {
   title: { absolute: "Dashboard | Patang CRM" },
@@ -356,6 +357,8 @@ return (
 
       {/* Caller command center */}
       {isCaller && <CallerDashboard name={user.name} />}
+
+      <ConversionTasks />
 
       {/* Owner stats */}
       {isAdmin && (
