@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/crm/auth";
 import { getDb } from "@/lib/crm/db";
 import { reminderTasksFor, overdueReminderTasks, overdueOutcomeVisits } from "@/lib/crm/visit-flow";
-import { nurtureTasksFor } from "@/lib/crm/nurture";
+import { nurtureTasksFor, flagNurtureForNewProjects } from "@/lib/crm/nurture";
 import { unassignedLeads } from "@/lib/crm/routing";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,8 @@ export async function GET() {
   if (user.role === "marketing") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const db = getDb();
+  // Opportunistic scan: a newly published project can resurface dormant nurture leads.
+  try { flagNurtureForNewProjects(db); } catch { /* non-fatal */ }
   const isAdmin = user.role === "admin" || user.role === "sales_head";
 
   const reminders = reminderTasksFor(db, user.id, user.role);

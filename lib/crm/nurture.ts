@@ -4,7 +4,9 @@ import type { CrmDb } from "./leads";
 import { istNowIso, istToday } from "./attendance";
 import { getNurtureDailyTaskLimit } from "./settings";
 import { NURTURE_REASON_LABELS, type NurtureReason } from "./grading";
-import { projects } from "@/lib/projects";
+import fs from "node:fs";
+import path from "node:path";
+import { projects as staticProjects } from "@/lib/projects";
 import { matchProperties } from "./matching";
 import { getMatchingWeights } from "./settings";
 
@@ -267,7 +269,17 @@ export function flagNurtureForNewProjects(db: CrmDb): number {
     .where(eq(schema.crmSettings.key, "nurture_scanned_slugs"))
     .get();
   const scanned: string[] = setting ? JSON.parse(setting.value || "[]") : [];
-  const fresh = projects.filter((p) => !scanned.includes(p.slug));
+  let allProjects = staticProjects;
+  try {
+    const file = path.join(process.cwd(), "data", "projects.json");
+    if (fs.existsSync(file)) {
+      const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (Array.isArray(raw)) allProjects = raw;
+    }
+  } catch {
+    // Fall back to the bundled list.
+  }
+  const fresh = allProjects.filter((p: { slug: string }) => !scanned.includes(p.slug));
   if (fresh.length === 0) return 0;
 
   const weights = getMatchingWeights();
