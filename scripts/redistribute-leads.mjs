@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
-const db = new Database("data/crm.db");
+const dbPath = process.env.CRM_DB_PATH || "data/crm.db";
+const db = new Database(dbPath);
 
 const EXCLUDE = new Set(["visit_done", "booked", "revisit_scheduled"]);
 const sms = db.prepare("SELECT id, name FROM users WHERE role='sales_manager' AND active=1 ORDER BY id").all();
