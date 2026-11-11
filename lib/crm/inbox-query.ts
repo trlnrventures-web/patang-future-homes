@@ -125,7 +125,9 @@ export function queryInboxLeads(db: CrmDb, user: AuthUser, query: InboxQuery): I
     // longer widens the scope, so a caller can never surface a colleague's lead.
     rows = seesAllLeads(user) ? rows : rows.filter((l) => inCallerBook(l, user.id));
   } else if (user.role === "sales_manager") {
-    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
+    rows = seesAllLeads(user)
+      ? rows
+      : rows.filter((l) => l.assignedSmId === user.id || l.assignedCallerId === user.id);
   }
 
   if (q) {

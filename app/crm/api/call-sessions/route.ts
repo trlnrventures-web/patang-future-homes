@@ -31,7 +31,7 @@ function canActOnLead(user: AuthUser, lead: Lead): boolean {
     return lead.assignedCallerId === null || lead.assignedCallerId === user.id;
   }
   if (user.role === "sales_manager") {
-    return !lead.assignedSmId || lead.assignedSmId === user.id;
+    return (!lead.assignedSmId && !lead.assignedCallerId) || lead.assignedSmId === user.id || lead.assignedCallerId === user.id;
   }
   return true;
 }

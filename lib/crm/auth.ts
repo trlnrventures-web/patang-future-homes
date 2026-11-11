@@ -46,7 +46,7 @@ function usersWithAllLeadAccess(): Set<number> {
 export function seesAllLeads(user: AuthUser | null | undefined): boolean {
   if (!user) return false;
   if (isAdmin(user)) return true;
-  if (user.role !== "caller" && user.role !== "sales_manager") return false;
+  if (user.role !== "sales_manager") return false;
   try {
     return usersWithAllLeadAccess().has(user.id);
   } catch {
@@ -86,7 +86,22 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifyToken(token);
+  const user = await verifyToken(token);
+  if (!user) return null;
+  // Always resolve the role (and seeAllLeads) from the database so a stale JWT
+  // from before a role migration cannot keep a user locked into an old role.
+  try {
+    const dbUser = getDb().select().from(schema.users).where(eq(schema.users.id, user.id)).get();
+    if (dbUser) {
+      user.role = dbUser.role;
+      user.name = dbUser.name;
+      user.email = dbUser.email;
+      (user as AuthUser & { seeAllLeads?: boolean }).seeAllLeads = !!dbUser.seeAllLeads;
+    }
+  } catch {
+    /* keep JWT values on DB failure */
+  }
+  return user;
 }
 
 export const SESSION_SECONDS = 7 * 24 * 60 * 60; // 7 days

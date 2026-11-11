@@ -1,7 +1,8 @@
 import { getDb } from "./db";
 import * as schema from "./schema";
 import { eq, or } from "drizzle-orm";
-import { resolveDefaultCallerId, type CrmDb } from "./leads";
+import { type CrmDb } from "./leads";
+import { resolveDefaultCallerId } from "./assignment";
 
 /**
  * A re-inquiry is a second (or duplicate) enquiry for the same phone number.

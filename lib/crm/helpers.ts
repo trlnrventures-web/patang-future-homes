@@ -28,11 +28,9 @@ export function rolesAllowed(user: AuthUser | null): string[] {
   switch (user.role) {
     case "admin":
     case "sales_head":
-      return ["admin", "sales_head", "sales_manager", "caller", "marketing"];
+      return ["admin", "sales_head", "sales_manager", "marketing"];
     case "sales_manager":
-      return ["sales_manager", "caller"];
-    case "caller":
-      return ["caller"];
+      return ["sales_manager"];
     default:
       return [];
   }
@@ -45,10 +43,10 @@ export function userIsAdmin(user: AuthUser | null): boolean {
 export function getLeadsForUser(user: AuthUser, status?: string) {
   const db = getDb();
   let rows = db.select().from(schema.leads).all().filter((l) => !l.deletedAt);
-  if (user.role === "caller") {
-    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedCallerId === user.id);
-  } else if (user.role === "sales_manager") {
-    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
+  if (user.role === "caller" || user.role === "sales_manager") {
+    rows = seesAllLeads(user)
+      ? rows
+      : rows.filter((l) => l.assignedSmId === user.id || l.assignedCallerId === user.id);
   }
   if (status) {
     rows = rows.filter((l) => l.status === status);

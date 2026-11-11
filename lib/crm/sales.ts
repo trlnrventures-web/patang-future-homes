@@ -80,10 +80,10 @@ export const NEXT_ACTION_OPTIONS = [
 
 export function canAccessSales(
   user: AuthUser,
-  lead: { assignedSmId: number | null }
+  lead: { assignedSmId: number | null; assignedCallerId?: number | null }
 ): boolean {
   if (user.role === "caller") return false;
-  if (user.role === "sales_manager") return lead.assignedSmId === user.id;
+  if (user.role === "sales_manager") return lead.assignedSmId === user.id || lead.assignedCallerId === user.id;
   return true;
 }
 

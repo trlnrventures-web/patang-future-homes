@@ -3,7 +3,8 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getAuthUser, isAdmin, seesAllLeads } from "@/lib/crm/auth";
-import { resolveDefaultSmId, resolveDefaultCallerId, inCallerBook } from "@/lib/crm/leads";
+import { inCallerBook } from "@/lib/crm/leads";
+import { resolveDefaultSmId, resolveDefaultCallerId } from "@/lib/crm/assignment";
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
     targetLeads.splice(0, targetLeads.length, ...scoped);
   } else if (user.role === "sales_manager") {
-    const scoped = seesAllLeads(user) ? targetLeads : targetLeads.filter((l) => l.assignedSmId === user.id);
+    const scoped = seesAllLeads(user) ? targetLeads : targetLeads.filter((l) => l.assignedSmId === user.id || l.assignedCallerId === user.id);
     if (scoped.length === 0) {
       return NextResponse.json({ error: "No leads assigned to you" }, { status: 403 });
     }
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
       : leads.filter((l) => inCallerBook(l, user.id));
     leads.splice(0, leads.length, ...scoped);
   } else if (user.role === "sales_manager") {
-    const scoped = seesAllLeads(user) ? leads : leads.filter((l) => l.assignedSmId === user.id);
+    const scoped = seesAllLeads(user) ? leads : leads.filter((l) => l.assignedSmId === user.id || l.assignedCallerId === user.id);
     leads.splice(0, leads.length, ...scoped);
   }
 

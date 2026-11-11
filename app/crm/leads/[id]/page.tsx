@@ -60,7 +60,7 @@ const lead = db
 
 // Role access check: callers may open any lead (handed-off ones stay
   // searchable). Sales managers only their own.
-  if (user.role === "sales_manager" && lead.assignedSmId !== user.id) notFound();
+  if (user.role === "sales_manager" && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) notFound();
 
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u]));

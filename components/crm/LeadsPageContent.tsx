@@ -25,7 +25,7 @@ const EMPTY_CONTEXT: LeadsViewContext = {
 };
 
 export default function LeadsPageContent({
-  role = "caller",
+  role = "sales_manager",
   listContext,
   inbox = true,
 }: {

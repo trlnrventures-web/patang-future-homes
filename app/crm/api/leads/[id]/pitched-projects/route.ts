@@ -32,10 +32,11 @@ export async function GET(
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, Number(id))).get();
   if (!lead || lead.deletedAt) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   if (
-    user.role === "caller" &&
     !seesAllLeads(user) &&
-    lead.assignedCallerId != null &&
-    lead.assignedCallerId !== user.id
+    (
+      (user.role === "sales_manager" && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) ||
+      (user.role === "caller" && lead.assignedCallerId != null && lead.assignedCallerId !== user.id)
+    )
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

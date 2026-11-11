@@ -245,7 +245,7 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   const visibleLeads = useMemo(() => {
     const byQuick = myLeadsActive && user
       ? leads.filter((l) =>
-          user.role === "caller" ? l.assignedCallerId === user.id : l.assignedSmId === user.id
+          user.role === "sales_manager" ? (l.assignedSmId === user.id || l.assignedCallerId === user.id) : l.assignedCallerId === user.id
         )
       : leads;
     return applyFilters(byQuick, filtersState);
@@ -308,7 +308,7 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
   // re-checks lead by lead.
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkSm, setBulkSm] = useState("");
-  const [bulkCaller, setBulkCaller] = useState("");
+
   const [bulkNote, setBulkNote] = useState("");
   const [bulkMsg, setBulkMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -361,7 +361,6 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
     setSelected(new Set());
     setBulkStatus("");
     setBulkSm("");
-    setBulkCaller("");
     setBulkNote("");
     setBulkMsg(null);
     setConfirmDelete(false);
@@ -453,13 +452,6 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
     );
   }, [bulkSm, assignees.sms, runBulk]);
 
-  const applyBulkCaller = useCallback(() => {
-    if (!bulkCaller) return;
-    const name = bulkCaller === "auto" ? "auto-assign" : assignees.callers.find((c) => String(c.id) === bulkCaller)?.name;
-    void runBulk({ action: "assign_caller", ...(bulkCaller === "clear" ? { clear: true } : { callerId: bulkCaller === "auto" ? null : Number(bulkCaller) }) }, (n) =>
-      n === 0 ? "No lead changed — they already had that caller." : `${n} lead${n === 1 ? "" : "s"} assigned to ${name}.`
-    );
-  }, [bulkCaller, assignees.callers, runBulk]);
 
 
   /** Cards to render for a column right now: the cap, unless expanded. */
@@ -689,36 +681,6 @@ export default function LeadBoard({ listContext, readOnly }: Props) {
               </label>
             )}
 
-            {isAdminUser && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-muted">Assign caller</span>
-                <div className="flex gap-1.5">
-                  <select
-                    value={bulkCaller}
-                    onChange={(e) => setBulkCaller(e.target.value)}
-                    disabled={busy}
-                    className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm font-semibold text-navy outline-none focus:border-primary"
-                  >
-                    <option value="">Choose</option>
-                    <option value="auto">Auto-assign (lightest load)</option>
-                    <option value="clear">Unassign</option>
-                    {assignees.callers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={applyBulkCaller}
-                    disabled={busy || !bulkCaller}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </label>
-            )}
 
             {isAdminUser &&
               (confirmDelete ? (

@@ -39,7 +39,7 @@ export async function POST(
   // Role access check: callers may add notes/activities to any lead, including
   // one already assigned to an SM or to another caller. Sales managers stay
   // limited to their own leads.
-  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
+  if (user.role === "sales_manager" && !seesAllLeads(user) && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

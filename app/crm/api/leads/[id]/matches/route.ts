@@ -24,7 +24,7 @@ export async function GET(
 
   // Callers may view matches for any lead; sales managers stay limited to
   // their own leads.
-  if (user.role === "sales_manager" && lead.assignedSmId && lead.assignedSmId !== user.id && !seesAllLeads(user)) {
+  if (user.role === "sales_manager" && !seesAllLeads(user) && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

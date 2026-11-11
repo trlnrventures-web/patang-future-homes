@@ -39,6 +39,7 @@ export default function DataToolsPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [rebalancing, setRebalancing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,8 +93,44 @@ export default function DataToolsPanel() {
     }
   };
 
+  const rebalance = async () => {
+    setRebalancing(true);
+    setMsg("");
+    setErr("");
+    try {
+      const res = await fetch("/crm/api/data/rebalance-leads", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Rebalance failed");
+      setMsg(
+        `Rebalanced ${data.eligible} leads across ${data.managers} managers (${data.moved} moved).`
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Rebalance failed");
+    } finally {
+      setRebalancing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/50 px-3 py-2.5">
+        <div>
+          <h2 className="text-sm font-bold text-navy">Rebalance leads</h2>
+          <p className="mt-0.5 text-[11px] text-soft">
+            Evenly distribute all leads across active sales managers, skipping visit-done, booked, and site-visit-scheduled leads.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void rebalance()}
+          disabled={rebalancing}
+          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-secondary disabled:opacity-50"
+        >
+          {rebalancing ? "Rebalancing..." : "Rebalance now"}
+        </button>
+      </div>
+      {msg && <p className="text-xs font-semibold text-green-700">{msg}</p>}
+      {err && <p className="text-xs font-semibold text-red-700">{err}</p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-bold text-navy">Archived leads</h2>
@@ -113,9 +150,6 @@ export default function DataToolsPanel() {
           </button>
         )}
       </div>
-
-      {msg && <p className="text-xs font-semibold text-green-700">{msg}</p>}
-      {err && <p className="text-xs font-semibold text-red-700">{err}</p>}
 
       {loading ? (
         <p className="py-6 text-center text-sm text-muted">Loading...</p>

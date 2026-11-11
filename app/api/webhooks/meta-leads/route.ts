@@ -4,7 +4,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
 import { fetchAdContext } from "@/lib/crm/meta-graph";
-import { pickRandomCallerId } from "@/lib/crm/leads";
+import { pickRandomCallerId } from "@/lib/crm/assignment";
 import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { notifyUser } from "@/lib/crm/push";
 

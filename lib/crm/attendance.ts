@@ -123,6 +123,12 @@ export function getAttendanceRow(userId: number, dateKey: string): AttendanceRow
     .get() as AttendanceRow | null;
 }
 
+/** True when the user is currently checked in on `dateKey` (checked in, not yet checked out). */
+export function isCheckedIn(userId: number, dateKey?: string): boolean {
+  const row = getAttendanceRow(userId, dateKey || istToday());
+  return !!row?.checkinTime && !row?.checkoutTime;
+}
+
 function nextDateKey(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
 }

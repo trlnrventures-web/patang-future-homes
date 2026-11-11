@@ -1,12 +1,13 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import * as schema from "./schema";
 import type { CrmDb } from "./leads";
+import { SKIP_FOR_LOAD_STATUSES } from "./leads";
 import {
   getDailyVisitCap,
   getRoutingPointer,
   setRoutingPointer,
 } from "./settings";
-import { istNowIso, istToday } from "./attendance";
+import { istNowIso, istToday, isCheckedIn } from "./attendance";
 
 /**
  * Grade-based routing for the Vasai West strategy.
@@ -60,7 +61,7 @@ function openLeadLoads(db: CrmDb): Map<number, number> {
   for (const lead of rows) {
     if (lead.deletedAt) continue;
     if (lead.assignedSmId == null) continue;
-    if (FINAL_LEAD_STATUSES.has(lead.status)) continue;
+    if (SKIP_FOR_LOAD_STATUSES.has(lead.status)) continue;
     counts.set(lead.assignedSmId, (counts.get(lead.assignedSmId) ?? 0) + 1);
   }
   return counts;
@@ -108,6 +109,7 @@ export function routingCandidates(
   for (const user of users) {
     if (!user.available) continue;
     if (!outsideUnavailableWindow(user, visitDate)) continue;
+    if (visitDate === istToday() && !isCheckedIn(user.id, visitDate)) continue;
     const visits = visitLoad(db, user.id, visitDate);
     const userCap = user.dailyVisitCap ?? cap;
     if (visits >= userCap) continue;

@@ -85,7 +85,7 @@ export function resolveLeadId(
 
   if (!lead) return { leadId: null, error: "That lead no longer exists" };
   if (isAdmin(user)) return { leadId: lead.id };
-  if (user.role === "sales_manager" && lead.assignedSmId === user.id) {
+  if (user.role === "sales_manager" && (lead.assignedSmId === user.id || lead.assignedCallerId === user.id)) {
     return { leadId: lead.id };
   }
   if (user.role === "caller" && (lead.assignedCallerId === user.id || seesAllLeads(user))) {

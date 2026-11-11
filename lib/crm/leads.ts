@@ -2,7 +2,15 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./schema";
 
+
 const FINAL_LEAD_STATUSES = new Set(["booked", "lost", "invalid", "dnc", "no_response"]);
+
+/** Statuses that do not count toward a user's open-lead load when assigning. */
+export const SKIP_FOR_LOAD_STATUSES = new Set([
+  "booked", "lost", "invalid", "dnc", "no_response",
+  "won", "visit_done",
+  "visit_booked", "visit_confirmed", "revisit_scheduled",
+]);
 
 export function nextActionLabel(value: string | null | undefined): string {
   if (!value || value === "none") return "";
@@ -114,91 +122,6 @@ export function findLikelyDuplicates(
   return out;
 }
 
-export function resolveDefaultCallerId(
-  db: CrmDb,
-  opts: { preferredId?: number | null } = {}
-): number | null {
-  const callers = db
-    .select()
-    .from(schema.users)
-    .where(and(eq(schema.users.role, "caller"), eq(schema.users.active, true)))
-    .orderBy(schema.users.id)
-    .all();
-
-  if (callers.length === 0) return null;
-
-  if (opts.preferredId != null && callers.some((c) => c.id === opts.preferredId)) {
-    return opts.preferredId;
-  }
-
-  const allLeads = db.select().from(schema.leads).all();
-  const openCounts = new Map(callers.map((c) => [c.id, 0]));
-  for (const lead of allLeads) {
-    if (lead.deletedAt) continue;
-    if (lead.assignedCallerId != null && openCounts.has(lead.assignedCallerId)) {
-      if (!FINAL_LEAD_STATUSES.has(lead.status)) {
-        openCounts.set(lead.assignedCallerId, openCounts.get(lead.assignedCallerId)! + 1);
-      }
-    }
-  }
-
-  const sorted = [...callers].sort((a, b) => {
-    const diff = (openCounts.get(a.id) ?? 0) - (openCounts.get(b.id) ?? 0);
-    return diff !== 0 ? diff : a.id - b.id;
-  });
-  return sorted[0].id;
-}
-
-/**
- * Pick a random active caller to own a freshly-arrived lead. Random rather than
- * load-balanced so incoming Meta leads spread across the team without any
- * caller being able to predict or game the order. Returns null when there is no
- * active caller to assign to.
- */
-export function pickRandomCallerId(db: CrmDb): number | null {
-  const callers = db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(and(eq(schema.users.role, "caller"), eq(schema.users.active, true)))
-    .all();
-  if (callers.length === 0) return null;
-  return callers[Math.floor(Math.random() * callers.length)].id;
-}
-
-export function resolveDefaultSmId(
-  db: CrmDb,
-  opts: { preferredId?: number | null } = {}
-): number | null {
-  const sms = db
-    .select()
-    .from(schema.users)
-    .where(and(eq(schema.users.role, "sales_manager"), eq(schema.users.active, true)))
-    .orderBy(schema.users.id)
-    .all();
-
-  if (sms.length === 0) return null;
-
-  if (opts.preferredId != null && sms.some((s) => s.id === opts.preferredId)) {
-    return opts.preferredId;
-  }
-
-  const allLeads = db.select().from(schema.leads).all();
-  const openCounts = new Map(sms.map((s) => [s.id, 0]));
-  for (const lead of allLeads) {
-    if (lead.deletedAt) continue;
-    if (lead.assignedSmId != null && openCounts.has(lead.assignedSmId)) {
-      if (!FINAL_LEAD_STATUSES.has(lead.status)) {
-        openCounts.set(lead.assignedSmId, openCounts.get(lead.assignedSmId)! + 1);
-      }
-    }
-  }
-
-  const sorted = [...sms].sort((a, b) => {
-    const diff = (openCounts.get(a.id) ?? 0) - (openCounts.get(b.id) ?? 0);
-    return diff !== 0 ? diff : a.id - b.id;
-  });
-  return sorted[0].id;
-}
 
 export const LEAD_STATUSES = [
   { value: "new", label: "New" },

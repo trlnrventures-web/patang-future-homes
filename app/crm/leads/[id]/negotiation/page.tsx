@@ -38,7 +38,7 @@ export default async function NegotiationPage({
   if (!lead || lead.deletedAt) notFound();
 
   if (user.role === "caller") notFound();
-  if (user.role === "sales_manager" && lead.assignedSmId !== user.id) notFound();
+  if (user.role === "sales_manager" && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) notFound();
 
   const users = db.select().from(schema.users).all();
   const userMap = new Map(users.map((u) => [u.id, u]));

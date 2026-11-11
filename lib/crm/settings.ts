@@ -15,6 +15,7 @@ const DEFAULTS: Record<string, string> = {
   post_visit_cadence: "[2,5,10,20]",
   routing_pointer_commission: "",
   routing_pointer_salaried: "",
+  assignment_pointer_sm: "",
   visit_reminder_hour_ist: "10",
   visit_reminder_overdue_hour_ist: "18",
 };
@@ -110,6 +111,16 @@ export function getRoutingPointer(tier: "commission" | "salaried"): number | nul
 
 export function setRoutingPointer(tier: "commission" | "salaried", userId: number): void {
   updateSetting(`routing_pointer_${tier}`, String(userId));
+}
+
+export function getAssignmentPointerSm(): number | null {
+  const raw = getSetting("assignment_pointer_sm");
+  const v = parseInt(raw, 10);
+  return Number.isFinite(v) ? v : null;
+}
+
+export function setAssignmentPointerSm(userId: number): void {
+  updateSetting("assignment_pointer_sm", String(userId));
 }
 
 export function getVisitReminderHourIst(): number {

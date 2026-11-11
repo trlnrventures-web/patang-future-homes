@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
-import { resolveDefaultCallerId } from "@/lib/crm/leads";
+import { resolveDefaultCallerId } from "@/lib/crm/assignment";
 import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { handleReInquiry } from "@/lib/crm/reinquiry";
 

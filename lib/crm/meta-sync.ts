@@ -3,7 +3,7 @@ import * as schema from "./schema";
 import { notifyUser } from "./push";
 import { notifyNewLead } from "./lead-alerts";
 import { handleReInquiry } from "./reinquiry";
-import { pickRandomCallerId } from "./leads";
+import { pickRandomCallerId } from "./assignment";
 import {
   fetchAdContext,
   fetchLeadsSince,

@@ -3,11 +3,8 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { getAuthUser, isAdmin } from "@/lib/crm/auth";
-import {
-  resolveDefaultCallerId,
-  resolveDefaultSmId,
-  findLikelyDuplicates,
-} from "@/lib/crm/leads";
+import { findLikelyDuplicates } from "@/lib/crm/leads";
+import { resolveDefaultCallerId, resolveDefaultSmId } from "@/lib/crm/assignment";
 import {
   contactMaskFor,
   describeMasking,
@@ -38,7 +35,7 @@ export async function GET(
 
   // Role access check: callers may open any lead (they can search handed-off
   // leads too). Sales managers see only leads assigned to them.
-  if (user.role === "sales_manager" && lead.assignedSmId !== user.id) {
+  if (user.role === "sales_manager" && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

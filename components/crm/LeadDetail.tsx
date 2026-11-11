@@ -162,8 +162,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const call = useCallSession(lead.id, "lead_detail");
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
-  const callerUsers = data.users.filter((u) => u.role === "caller");
-  const isCaller = currentUser.role === "caller";
+  const isCaller = false;
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
   // Callers may edit every lead, including one already handed off to an SM:
   // the view never becomes read-only for them. Handing a lead to an SM is a
@@ -823,51 +822,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
               </button>
               {showAssign && (
                 <div className="mt-2.5 space-y-3 border-t border-border pt-3">
-                  {canManageAssignment && (
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-navy">Caller</span>
-                        {lead.assignedCallerName && (
-                          <button
-                            type="button"
-                            onClick={() => handleClearAssignment("caller")}
-                            disabled={busy}
-                            className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                      <div className="mt-1.5 flex gap-2">
-                        <select
-                          value={selectedCaller}
-                          onChange={(e) =>
-                            setSelectedCaller(e.target.value ? Number(e.target.value) : "")
-                          }
-                          className="min-w-0 flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm text-navy outline-none focus:border-primary"
-                        >
-                          <option value="">
-                            {lead.assignedCallerName || "Select caller..."}
-                          </option>
-                          {callerUsers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            selectedCaller !== "" && handleAssignCaller(selectedCaller as number)
-                          }
-                          disabled={busy || selectedCaller === ""}
-                        >
-                          Assign
-                        </Button>
-                      </div>
-                      {selectedCaller && <WorkloadTiles w={callers[selectedCaller]} />}
-                    </div>
-                  )}
+
 
                   <div>
                     <div className="flex items-center justify-between">
@@ -909,14 +864,6 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
                   {canManageAssignment && (
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleAssignCaller("auto")}
-                        disabled={busy || callerUsers.length === 0}
-                      >
-                        Auto Caller
-                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"

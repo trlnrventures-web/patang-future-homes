@@ -63,7 +63,9 @@ export function queryLeadList(db: CrmDb, user: AuthUser, query: LeadListQuery) {
   if (user.role === "caller") {
     rows = seesAllLeads(user) ? rows : rows.filter((l) => inCallerBook(l, user.id));
   } else if (user.role === "sales_manager") {
-    rows = seesAllLeads(user) ? rows : rows.filter((l) => l.assignedSmId === user.id);
+    rows = seesAllLeads(user)
+      ? rows
+      : rows.filter((l) => l.assignedSmId === user.id || l.assignedCallerId === user.id);
   }
 
   if (QUICK_FILTERS.includes(quick as (typeof QUICK_FILTERS)[number]) && quick) {

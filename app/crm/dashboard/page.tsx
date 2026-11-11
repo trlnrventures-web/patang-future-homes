@@ -155,7 +155,7 @@ const smMetrics =
       .all()
       .filter(
         (n) =>
-          n.assignedSmId === user.id &&
+          (n.assignedSmId === user.id) &&
           leadsMap.has(n.leadId) &&
           !FINAL_STAGES.includes(n.status as (typeof FINAL_STAGES)[number])
       );
@@ -306,7 +306,7 @@ const smMetrics =
     const weights = getMatchingWeights();
     for (const p of expiringProjects) {
       for (const lead of activeLeads) {
-        if (isSm && lead.assignedSmId !== user.id) continue;
+        if (isSm && lead.assignedSmId !== user.id && lead.assignedCallerId !== user.id) continue;
         const matches = matchProperties({
           budgetMin: lead.budgetMin,
           budgetMax: lead.budgetMax,

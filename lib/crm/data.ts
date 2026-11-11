@@ -56,7 +56,11 @@ export async function getDashboardData(user: CrmUser) {
   if (user.role === "caller") {
     myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedCallerId, user.id)).all().filter(activeLeadCond);
   } else if (user.role === "sales_manager") {
-    myLeads = db.select().from(schema.leads).where(eq(schema.leads.assignedSmId, user.id)).all().filter(activeLeadCond);
+    myLeads = db
+      .select()
+      .from(schema.leads)
+      .all()
+      .filter((l) => !l.deletedAt && (l.assignedSmId === user.id || l.assignedCallerId === user.id));
   } else {
     myLeads = db.select().from(schema.leads).all().filter(activeLeadCond);
   }
@@ -106,7 +110,7 @@ export async function getDashboardData(user: CrmUser) {
   });
 
   const callerStats = users
-    .filter((u) => u.role === "caller")
+    .filter((u) => u.role === "sales_manager")
     .map((caller) => {
       const assigned = allLeads.filter((l) => l.assignedCallerId === caller.id);
       const contacted = assigned.filter((l) =>

@@ -3,7 +3,7 @@ import { getDb } from "@/lib/crm/db";
 import * as schema from "@/lib/crm/schema";
 import { eq } from "drizzle-orm";
 import { getAuthUser } from "@/lib/crm/auth";
-import { resolveDefaultCallerId } from "@/lib/crm/leads";
+import { resolveDefaultCallerId } from "@/lib/crm/assignment";
 import { notifyNewLead } from "@/lib/crm/lead-alerts";
 import { queryLeadList } from "@/lib/crm/lead-query";
 import { queryInboxLeads } from "@/lib/crm/inbox-query";
