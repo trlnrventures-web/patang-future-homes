@@ -13,11 +13,8 @@ const leads = hasDeletedAt
 const eligible = leads.filter((l) => !EXCLUDE.has(l.status));
 console.log("eligible leads:", eligible.length);
 
-// open counts
+// Fresh rebalance: start from zero so each SM ends up with an equal share.
 const counts = new Map(sms.map((s) => [s.id, 0]));
-for (const l of eligible) {
-  if (l.assigned_sm_id != null && counts.has(l.assigned_sm_id)) counts.set(l.assigned_sm_id, counts.get(l.assigned_sm_id) + 1);
-}
 
 const now = new Date().toISOString();
 const upd = db.prepare("UPDATE leads SET assigned_sm_id=?, assigned_caller_id=?, assigned_at=?, assigned_by=?, updated_at=? WHERE id=?");

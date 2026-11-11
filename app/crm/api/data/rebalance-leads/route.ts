@@ -40,13 +40,8 @@ export async function POST(request: NextRequest) {
 
   const eligible = leads.filter((l) => !EXCLUDE.has(l.status));
 
-  // open counts
+  // Fresh rebalance: start from zero so each SM ends up with an equal share.
   const counts = new Map(sms.map((s) => [s.id, 0]));
-  for (const l of eligible) {
-    if (l.assignedSmId != null && counts.has(l.assignedSmId)) {
-      counts.set(l.assignedSmId, counts.get(l.assignedSmId)! + 1);
-    }
-  }
 
   let moved = 0;
   eligible.sort((a, b) => a.id - b.id);
