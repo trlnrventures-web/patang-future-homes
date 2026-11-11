@@ -57,10 +57,10 @@ function projectOf(lead: BoardLead): string {
   return lead.preferredProject || lead.originalProject || "";
 }
 
-/** Caller first, then SM — whoever is actually working the lead right now. */
+/** SM first — everyone is a sales manager now. */
 function ownerOf(lead: BoardLead): string {
-  if (lead.assignedCallerName) return lead.assignedCallerName;
   if (lead.assignedSmName) return lead.assignedSmName;
+  if (lead.assignedCallerName) return lead.assignedCallerName;
   return "Unassigned";
 }
 

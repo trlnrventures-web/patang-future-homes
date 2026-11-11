@@ -528,7 +528,7 @@ export default function NegotiationWorkspace({ data, currentUser, openFeedbackVi
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
-          {lead.assignedCallerName && <span>Caller: {lead.assignedCallerName}</span>}
+
           {lead.assignedSmName && <span>SM: {lead.assignedSmName}</span>}
           <span>Original: {lead.originalProject || ""}</span>
         </div>

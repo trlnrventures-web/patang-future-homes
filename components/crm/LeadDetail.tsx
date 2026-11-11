@@ -789,7 +789,7 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
 
           <dl className="mt-4 space-y-2 border-t border-border pt-4">
             <DetailRow label="Source" value={sourceLabel(lead.source)} />
-            <DetailRow label="Caller" value={lead.assignedCallerName || "Unassigned"} />
+
             <DetailRow label="SM" value={lead.assignedSmName || "Unassigned"} />
             <DetailRow label="Location" value={locationLabel(lead.location)} />
             <DetailRow label="Budget" value={budgetLabel(lead)} />
