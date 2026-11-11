@@ -5,7 +5,11 @@ const EXCLUDE = new Set(["visit_done", "won", "booked", "visit_booked", "visit_c
 const sms = db.prepare("SELECT id, name FROM users WHERE role='sales_manager' AND active=1 ORDER BY id").all();
 console.log("SMs:", sms.map((s) => s.name).join(", "));
 
-const leads = db.prepare("SELECT id, status, assigned_sm_id FROM leads WHERE deleted_at IS NULL").all();
+const cols = db.prepare("PRAGMA table_info(leads)").all().map((c) => c.name);
+const hasDeletedAt = cols.includes("deleted_at");
+const leads = hasDeletedAt
+  ? db.prepare("SELECT id, status, assigned_sm_id FROM leads WHERE deleted_at IS NULL").all()
+  : db.prepare("SELECT id, status, assigned_sm_id FROM leads").all();
 const eligible = leads.filter((l) => !EXCLUDE.has(l.status));
 console.log("eligible leads:", eligible.length);
 
