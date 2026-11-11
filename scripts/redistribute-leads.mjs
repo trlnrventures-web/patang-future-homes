@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 const db = new Database("data/crm.db");
 
-const EXCLUDE = new Set(["visit_done", "won", "booked", "visit_booked", "visit_confirmed", "revisit_scheduled"]);
+const EXCLUDE = new Set(["visit_done", "booked", "revisit_scheduled"]);
 const sms = db.prepare("SELECT id, name FROM users WHERE role='sales_manager' AND active=1 ORDER BY id").all();
 console.log("SMs:", sms.map((s) => s.name).join(", "));
 

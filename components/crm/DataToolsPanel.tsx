@@ -117,7 +117,7 @@ export default function DataToolsPanel() {
         <div>
           <h2 className="text-sm font-bold text-navy">Rebalance leads</h2>
           <p className="mt-0.5 text-[11px] text-soft">
-            Evenly distribute all leads across active sales managers, skipping visit-done, booked, and site-visit-scheduled leads.
+            Evenly distribute all leads across active sales managers, skipping only visit-done, booked, and revisit-scheduled leads.
           </p>
         </div>
         <button

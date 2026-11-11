@@ -8,10 +8,7 @@ export const dynamic = "force-dynamic";
 
 const EXCLUDE = new Set([
   "visit_done",
-  "won",
   "booked",
-  "visit_booked",
-  "visit_confirmed",
   "revisit_scheduled",
 ]);
 
