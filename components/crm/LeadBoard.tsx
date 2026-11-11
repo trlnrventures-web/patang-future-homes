@@ -1154,6 +1154,7 @@ function BoardCard({
       )}
       <div className="min-w-0">
         <div className="truncate text-sm font-bold text-navy">{lead.name}</div>
+        {lead.budget && <div className="mt-0.5 truncate text-sm text-muted">Budget: {lead.budget}</div>}
         {project && <div className="mt-0.5 truncate text-sm text-muted">{project}</div>}
         <div className="mt-0.5 truncate text-sm text-muted">{owner}</div>
         {source && <div className="mt-0.5 truncate text-sm text-muted">{source}</div>}
@@ -1224,6 +1225,7 @@ function MobileStageCard({
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-bold text-navy">{lead.name}</div>
+        {lead.budget && <div className="mt-0.5 truncate text-sm text-muted">Budget: {lead.budget}</div>}
         {project && <div className="mt-0.5 truncate text-sm text-muted">{project}</div>}
         <div className="mt-0.5 truncate text-sm text-muted">{owner}</div>
         {source && <div className="mt-0.5 truncate text-sm text-muted">{source}</div>}
