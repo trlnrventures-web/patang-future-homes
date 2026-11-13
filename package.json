@@ -6,7 +6,7 @@
     "dev": "next dev",
     "sync:images": "node scripts/sync-project-images.mjs",
     "prebuild": "npm run sync:images",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "prepreview": "node scripts/patch-opennext-windows.mjs",
