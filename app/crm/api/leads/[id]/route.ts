@@ -212,7 +212,7 @@ export async function PATCH(
             .from(schema.users)
             .where(eq(schema.users.id, newCaller))
             .get();
-          if (!caller || caller.role !== "caller") {
+          if (!caller || caller.role !== "sales_manager") {
             return NextResponse.json({ error: "Invalid caller" }, { status: 400 });
           }
         }

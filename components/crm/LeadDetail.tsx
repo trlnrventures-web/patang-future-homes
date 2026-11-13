@@ -162,14 +162,14 @@ export default function LeadDetail({ data, currentUser, initialVisitOpen, messag
   const call = useCallSession(lead.id, "lead_detail");
 
   const smUsers = data.users.filter((u) => u.role === "sales_manager");
-  const isCaller = false;
+  const isCaller = currentUser.role === "caller";
   const isAdmin = currentUser.role === "admin" || currentUser.role === "sales_head";
   // Callers may edit every lead, including one already handed off to an SM:
   // the view never becomes read-only for them. Handing a lead to an SM is a
-  // caller action too. Reassigning a caller, auto-assign and delete stay
-  // owner/admin controls, and an SM keeps today's behaviour — only an admin
-  // may move a lead sideways.
-  const canAssignSm = isAdmin || isCaller;
+  // caller action too. After the caller -> sales_manager migration every team
+  // member is a sales_manager, so they keep the ability to assign. Reassigning
+  // a caller, auto-assign and delete stay owner/admin controls.
+  const canAssignSm = isAdmin || isCaller || currentUser.role === "sales_manager";
   const canManageAssignment = isAdmin;
   const router = useRouter();
 

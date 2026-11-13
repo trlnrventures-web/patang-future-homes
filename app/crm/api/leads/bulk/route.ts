@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       const caller = callerId
         ? db.select().from(schema.users).where(eq(schema.users.id, callerId)).get()
         : null;
-      if (callerId != null && (!caller || caller.role !== "caller")) {
+      if (callerId != null && (!caller || caller.role !== "sales_manager")) {
         return NextResponse.json({ error: "Invalid caller" }, { status: 400 });
       }
       const resolvedCaller = callerId != null ? callerId : resolveDefaultCallerId(db);

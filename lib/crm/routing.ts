@@ -7,7 +7,7 @@ import {
   getRoutingPointer,
   setRoutingPointer,
 } from "./settings";
-import { istNowIso, istToday, isCheckedIn } from "./attendance";
+import { istNowIso, istToday } from "./attendance";
 
 /**
  * Grade-based routing for the Vasai West strategy.
@@ -109,7 +109,8 @@ export function routingCandidates(
   for (const user of users) {
     if (!user.available) continue;
     if (!outsideUnavailableWindow(user, visitDate)) continue;
-    if (visitDate === istToday() && !isCheckedIn(user.id, visitDate)) continue;
+    // Check-in/check-out gating intentionally skipped: a sales manager is
+    // eligible for visit routing regardless of attendance status.
     const visits = visitLoad(db, user.id, visitDate);
     const userCap = user.dailyVisitCap ?? cap;
     if (visits >= userCap) continue;
